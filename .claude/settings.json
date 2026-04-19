@@ -1,5 +1,5 @@
 {
-  "$schema": "https://claude.com/schemas/settings.local.json",
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
     "allow": [
       "Bash(git init:*)",
@@ -63,9 +63,8 @@
           {
             "type": "command",
             "command": "./hooks/session-start.py",
-            "timeout": 5000,
-            "statusMessage": "Loading pos snapshot...",
-            "_note": "Fase D entrega el script. Hasta entonces este hook es no-op al faltar el archivo."
+            "timeout": 5,
+            "statusMessage": "Loading pos snapshot..."
           }
         ]
       }
@@ -78,9 +77,8 @@
           {
             "type": "command",
             "command": "./hooks/pre-branch-gate.py",
-            "timeout": 5000,
-            "statusMessage": "Branch gate (Fase -1)...",
-            "_note": "Entregado en Fase D. Bloquea git checkout -b / git switch -c sin marker."
+            "timeout": 5,
+            "statusMessage": "Branch gate (Fase -1)..."
           }
         ]
       },
@@ -90,8 +88,7 @@
           {
             "type": "command",
             "command": "./hooks/pre-write-guard.py",
-            "timeout": 3000,
-            "_note": "Entregado en Fase D. Enforza test-pair + pattern injection."
+            "timeout": 3
           }
         ]
       }
@@ -103,8 +100,7 @@
           {
             "type": "command",
             "command": "./hooks/post-action.py",
-            "timeout": 5000,
-            "_note": "Entregado en Fase D. Post-merge dispara /pos:compound si touched_paths."
+            "timeout": 5
           }
         ]
       }
@@ -116,8 +112,7 @@
           {
             "type": "command",
             "command": "./hooks/pre-compact.py",
-            "timeout": 10000,
-            "_note": "Entregado en Fase D. Persiste decisiones in-flight antes de compactar."
+            "timeout": 10
           }
         ]
       }
@@ -130,8 +125,7 @@
           {
             "type": "command",
             "command": "./hooks/stop-policy-check.py",
-            "timeout": 5000,
-            "_note": "Entregado en Fase D. Valida policy.yaml vs skill logs del turno."
+            "timeout": 5
           }
         ]
       }

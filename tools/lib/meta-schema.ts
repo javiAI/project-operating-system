@@ -3,7 +3,7 @@ import { parseCondition } from "./condition-parser.ts";
 
 const PATH_RE = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$/;
 const ID_RE = /^[a-z][a-z0-9_]*$/;
-const SECTION_ID_RE = /^[A-Z]$/;
+const SECTION_ID_RE = /^[A-G]$/;
 
 const FieldCommon = z.object({
   path: z.string().regex(PATH_RE, "path must be snake_case dotted (e.g. identity.name)"),

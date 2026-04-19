@@ -114,7 +114,7 @@ describe("cross-validate", () => {
           maps_to: "stack.language",
           options: [{ value: "typescript" }, { value: "python" }],
         },
-        { id: "q_orphan", section: "Z", type: "text", text: "?", maps_to: "identity.license" },
+        { id: "q_orphan", section: "G", type: "text", text: "?", maps_to: "identity.license" },
       ],
     });
     const issues = crossValidate(baseSchema, questions);
