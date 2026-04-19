@@ -1,0 +1,27 @@
+node_modules/
+dist/
+build/
+coverage/
+.DS_Store
+.env
+.env.local
+.env.*.local
+*.log
+.cache/
+
+# Claude Code transient
+.claude/logs/*.jsonl
+!.claude/logs/.gitkeep
+.claude/branch-approvals/*.approved
+!.claude/branch-approvals/.gitkeep
+.claude/worktrees/
+
+# Generator outputs (meta-repo dry runs)
+/tmp/
+/out/
+/generated/
+
+# Editor
+.idea/
+.vscode/
+!.vscode/settings.json

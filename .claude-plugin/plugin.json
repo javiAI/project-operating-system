@@ -1,0 +1,46 @@
+{
+  "$schema": "https://claude.com/schemas/plugin.json",
+  "name": "pos",
+  "displayName": "project-operating-system",
+  "version": "0.0.1",
+  "description": "Generador y sistema operativo determinista para proyectos Claude Code: cuestionario → profile → repo generado con hooks, skills, policy, tests, CI/CD.",
+  "author": {
+    "name": "javiAI",
+    "url": "https://github.com/javiAI"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/javiAI/project-operating-system",
+  "keywords": [
+    "claude-code",
+    "scaffolding",
+    "determinism",
+    "token-efficiency",
+    "compound-engineering",
+    "test-automation",
+    "pattern-registry"
+  ],
+  "engines": {
+    "claude-code": ">=2.0.0"
+  },
+  "components": {
+    "skills": "skills/",
+    "agents": "agents/",
+    "hooks": "hooks/",
+    "commands": "commands/",
+    "mcp": ".mcp.json"
+  },
+  "settings": {
+    "policyFile": "policy.yaml",
+    "minPythonVersion": "3.10",
+    "minNodeVersion": "18.0.0"
+  },
+  "capabilities": {
+    "generator": {
+      "entrypoint": "generator/run.ts",
+      "runtime": "tsx"
+    },
+    "selftest": {
+      "entrypoint": "bin/pos-selftest.sh"
+    }
+  }
+}

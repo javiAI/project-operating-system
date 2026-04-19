@@ -1,0 +1,244 @@
+# policy.yaml — política declarativa del meta-repo
+#
+# Fuente de verdad para qué skills/hooks DEBEN correr en cada punto del ciclo.
+# Leído por:
+#   - hooks/pre-pr-gate.py    → bloquea PR si faltó alguna required
+#   - skills/audit-session/    → compara logs vs policy
+#   - skills/audit-plugin/     → valida nuevos MCPs/plugins
+#
+# Formato: YAML 1.2. El generador produce este mismo schema para cada repo destino
+# (usando `templates/policy.yaml.hbs` en Fase C).
+
+version: "0.1.0"
+project: "project-operating-system"
+type: "meta-repo"   # meta-repo | generated-project
+
+# ─────────────────────────────────────────────
+# Presupuesto de tokens (por sesión)
+# ─────────────────────────────────────────────
+token_budget:
+  session_soft_limit: 150000
+  session_hard_limit: 180000
+  warn_at: 120000
+  auto_compact_at: 160000
+  claude_md_max_lines: 200
+  rules_total_max_kb: 40          # total en disco de .claude/rules/
+  rules_autoload_max_kb: 25       # suma de rules con paths: no-vacío (las que entran a contexto)
+
+# ─────────────────────────────────────────────
+# Model routing (qué modelo para qué)
+# ─────────────────────────────────────────────
+model_routing:
+  default: "claude-sonnet-4-6"
+  overrides:
+    architecture: "claude-opus-4-7"     # branch-plan, deep-interview, compound
+    review: "claude-sonnet-4-6"
+    lookup: "claude-haiku-4-5-20251001" # compress, coverage-explain
+    generation: "claude-sonnet-4-6"
+  escalation:
+    allow_skill_override_model: true
+    require_justification_in_frontmatter: true
+
+# ─────────────────────────────────────────────
+# Lifecycle — qué skills/hooks deben correr cuándo
+# ─────────────────────────────────────────────
+lifecycle:
+
+  session_start:
+    hooks_required: ["session-start.py"]
+    skills_invoked: []   # SessionStart no debe invocar skills (latencia)
+
+  branch_creation:
+    prerequisites:
+      - type: marker
+        path: ".claude/branch-approvals/{branch-slug}.approved"
+      - type: skill_log
+        skill: "pos:branch-plan"
+        must_exist_for_branch: true
+    hooks_required: ["pre-branch-gate.py"]
+    blocking: true  # sin esto, git checkout -b falla
+
+  pre_commit:
+    hooks_required: ["pre-write-guard.py"]
+    skills_required: ["pos:pre-commit-review"]
+    blocking: true
+
+  pre_push:
+    checks_required:
+      - name: "typecheck"
+        command_meta: "npx tsc --noEmit && python3 -m mypy hooks/"
+      - name: "unit-tests"
+        command_meta: "npx vitest run && python3 -m pytest hooks/"
+      - name: "lint"
+        command_meta: "npx eslint . && python3 -m ruff check hooks/"
+      - name: "coverage-threshold"
+        threshold_source: "testing.unit.coverage_threshold"
+    blocking: true
+
+  pre_pr:
+    skills_required:
+      - "pos:simplify"
+      - "pos:pre-commit-review"
+      - "pos:pattern-audit"
+    docs_sync_required:
+      - "ROADMAP.md"
+      - "HANDOFF.md"
+    docs_sync_conditional:
+      - if_touched: ["generator/**", "hooks/**"]
+        then_required: ["docs/ARCHITECTURE.md"]
+      - if_touched: ["skills/**"]
+        then_required: [".claude/rules/skills-map.md"]
+      - if_touched: [".claude/patterns/**"]
+        then_required: ["docs/ARCHITECTURE.md"]
+    ci_dry_run_required: true
+    invariants_check: true
+    blocking: true
+
+  post_merge:
+    skills_conditional:
+      - skill: "pos:compound"
+        trigger:
+          touched_paths_any_of:
+            - "generator/lib/**"
+            - "generator/renderers/**"
+            - "hooks/**"
+            - "skills/**"
+            - "templates/**/*.hbs"
+          skip_if_only:
+            - "docs/**"
+            - "*.md"
+            - ".claude/patterns/**"   # evita loop: compound no dispara por sus propios outputs
+          min_files_changed: 2
+    hooks_required: ["post-action.py"]
+
+  pre_compact:
+    hooks_required: ["pre-compact.py"]
+    persist:
+      - decisions_in_flight
+      - phase_minus_one_state
+      - unsaved_pattern_candidates
+
+# ─────────────────────────────────────────────
+# Safety — community tools
+# ─────────────────────────────────────────────
+safety:
+  community_tool_gate:
+    skill_required: "pos:audit-plugin"
+    block_install_without_pass: true
+    trusted_sources:
+      - "anthropic-mcp-registry"
+      - "plugin://anthropics/*"
+      - "github://javiAI/*"
+    optin_starter_mcps:
+      - name: "mempalace"
+        repo: "github.com/MemPalace/mempalace"
+        license: "MIT"
+        risk: "low"
+        requires_profile_flag: "memory.persistent"
+      - name: "notebooklm-mcp"
+        repo: "github.com/PleasePrompto/notebooklm-mcp"
+        license: "MIT"
+        risk: "medium"
+        requires_profile_flag: "research.notebooklm"
+    denylist:
+      - "openclaw-claude-code"        # security concerns documented
+      - "notebooklm-mcp-cli"          # jacob-bd: uses private APIs, cookie auth
+  hook_audit_rules:
+    - "no_curl_wget_in_hooks"
+    - "no_env_read_without_declaration"
+    - "no_network_without_declaration"
+    - "no_shell_true_subprocess"
+
+# ─────────────────────────────────────────────
+# Testing (meta-repo; cada proyecto generado tiene su propio bloque)
+# ─────────────────────────────────────────────
+testing:
+  unit:
+    framework_node: "vitest"
+    framework_python: "pytest"
+    coverage_threshold: 80
+    coverage_branches_threshold: 75
+  integration:
+    framework_node: "vitest"
+    framework_python: "pytest"
+    markers: ["integration"]
+  selftest:
+    entrypoint: "./bin/pos-selftest.sh"
+    scenarios:
+      - "happy-path-generate-nextjs"
+      - "happy-path-generate-agent-sdk"
+      - "fase-minus-one-missing-marker-blocks"
+      - "test-pair-missing-blocks-write"
+      - "docs-sync-missing-blocks-pr"
+      - "compound-fires-on-generator-change"
+      - "compound-skips-on-docs-only-change"
+  enforcement:
+    test_before_impl: true
+    block_push_if_failing: true
+    block_pr_if_coverage_below_threshold: true
+
+# ─────────────────────────────────────────────
+# CI/CD
+# ─────────────────────────────────────────────
+ci_cd:
+  host: "github"
+  workflows:
+    - name: "ci.yml"
+      triggers: ["pull_request", "push:main"]
+      required_checks:
+        - "lint"
+        - "typecheck"
+        - "unit-tests"
+        - "integration-tests"
+        - "selftest"
+        - "coverage-gate"
+    - name: "audit.yml"
+      triggers: ["schedule:nightly", "workflow_dispatch"]
+      required_checks:
+        - "self-audit"
+        - "dependency-audit"
+    - name: "release.yml"
+      triggers: ["tag:v*"]
+      required_checks:
+        - "version-match"
+        - "changelog-updated"
+        - "all-ci-green"
+  branch_protection:
+    main:
+      required_status_checks:
+        - "ci / lint"
+        - "ci / typecheck"
+        - "ci / unit-tests"
+        - "ci / integration-tests"
+        - "ci / selftest"
+        - "ci / coverage-gate"
+      enforce_admins: false
+      required_pull_request_reviews: 1
+      dismiss_stale_reviews: true
+
+# ─────────────────────────────────────────────
+# Pattern registry triggers (ya arriba en lifecycle.post_merge, duplicado aquí para audit)
+# ─────────────────────────────────────────────
+compound:
+  enabled: true
+  emit_separate_pr: true
+  pr_branch_prefix: "chore/compound-"
+  evidence_required: true
+  min_evidence_commits: 2
+  conflict_policy: "block-merge"  # si el pattern nuevo entra en conflicto con uno existente
+
+# ─────────────────────────────────────────────
+# Auditing
+# ─────────────────────────────────────────────
+audit:
+  log_dirs:
+    - ".claude/logs/"
+  required_logs:
+    - "skills.jsonl"
+    - "hooks.jsonl"
+    - "phase-gates.jsonl"
+  retention_days: 90
+  session_audit:
+    skill: "pos:audit-session"
+    schedule: "weekly"
+    on_demand: true
