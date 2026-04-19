@@ -169,11 +169,11 @@ describe("condition-parser / collectPaths", () => {
     expect(collectPaths(parseCondition("'a' in ['a', 'b']"))).toEqual([]);
   });
 
-  it("walks and/or/not recursively and de-dups order-preserving", () => {
+  it("walks and/or/not recursively and de-dups paths preserving first-seen order", () => {
     const ast = parseCondition(
       "!(stack.language == 'python') && (domain.type == 'api' || stack.language in ['go', 'rust'])"
     );
-    expect(collectPaths(ast)).toEqual(["stack.language", "domain.type", "stack.language"]);
+    expect(collectPaths(ast)).toEqual(["stack.language", "domain.type"]);
   });
 
   it("collects paths on both sides of a comparison", () => {

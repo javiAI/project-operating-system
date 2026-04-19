@@ -102,13 +102,25 @@ export function crossValidate(schema: SchemaFile, questions: QuestionsFile): Cro
       }
     }
 
-    if ((q.type === "single" || q.type === "multi") && field.type === "enum") {
+    if (q.type === "single" && field.type === "enum") {
       for (const opt of q.options) {
         if (!field.values.includes(opt.value as string | number | boolean)) {
           issues.push({
             kind: "option-outside-enum",
             where: q.id,
             detail: `option value '${String(opt.value)}' is not in enum values of '${field.path}'`,
+          });
+        }
+      }
+    }
+
+    if (q.type === "multi" && field.type === "array" && field.values !== undefined) {
+      for (const opt of q.options) {
+        if (!field.values.includes(opt.value as string | number | boolean)) {
+          issues.push({
+            kind: "option-outside-enum",
+            where: q.id,
+            detail: `option value '${String(opt.value)}' is not in values allowlist of array field '${field.path}'`,
           });
         }
       }

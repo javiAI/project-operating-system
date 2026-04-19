@@ -95,8 +95,9 @@ sections:
       - path: integrations.mcps
         type: array
         items: string
+        values: ["mempalace", "notebooklm"]
         default: []
-        description: Lista de MCPs opt-in aprobados (mempalace, notebooklm, ...).
+        description: Lista de MCPs opt-in aprobados (allowlist; ver docs/KNOWN_GOOD_MCPS.md).
 
       - path: integrations.observability
         type: enum

@@ -156,8 +156,8 @@ testing:
   unit:
     framework_node: "vitest"
     framework_python: "pytest"
-    coverage_threshold: 80
-    coverage_branches_threshold: 75
+    coverage_threshold: 90
+    coverage_branches_threshold: 85
   integration:
     framework_node: "vitest"
     framework_python: "pytest"
