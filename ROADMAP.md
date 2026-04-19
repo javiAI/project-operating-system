@@ -7,7 +7,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | Fase | Descripción | Estado |
 |---|---|---|
 | A | Skeleton & bootstrap | ✅ |
-| B | Cuestionario + profiles + runner | ⏳ pendiente |
+| B | Cuestionario + profiles + runner | 🔄 en curso (B1) |
 | C | Templates + renderers | ⏳ pendiente |
 | D | Hooks (Python) | ⏳ pendiente |
 | E1 | Skills orquestación | ⏳ pendiente |
@@ -20,7 +20,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | Rama | Scope breve | Estado | PR |
 |---|---|---|---|
 | `feat/a-skeleton` | Bootstrap estructura + docs canónicos + policy | ✅ | — (commit inicial sin PR) |
-| `feat/b1-questionnaire-schema` | Schema + questions YAML + validator | ⏳ siguiente | — |
+| `feat/b1-questionnaire-schema` | Schema + questions YAML + validator | 🔄 abierta | (por abrir) |
 | `feat/b2-profiles-starter` | nextjs-app / agent-sdk / cli-tool | ⏳ | — |
 | `feat/b3-generator-runner` | `generator/run.ts` + zod + token budget check | ⏳ | — |
 | `feat/c1-renderers-core-docs` | CLAUDE/MASTER_PLAN/ROADMAP/HANDOFF/AGENTS/README renderers | ⏳ | — |
@@ -60,6 +60,24 @@ Entregables:
 - `.gitignore`, `README.md`.
 
 **Siguiente acción**: arrancar Fase -1 de `feat/b1-questionnaire-schema`.
+
+## Progreso Fase B
+
+### `feat/b1-questionnaire-schema` — en curso
+
+Entregables (en rama):
+
+- `tools/lib/condition-parser.ts` — DSL mínimo (==, !=, in, &&, ||, !, paren, literales, paths).
+- `tools/lib/meta-schema.ts` — zod schemas para `schema.yaml` + `questions.yaml`.
+- `tools/lib/cross-validate.ts` — maps_to coverage, section coherence, enum option check.
+- `tools/validate-questionnaire.ts` — CLI con exit 0/1/2 + `formatReport`.
+- `tools/__fixtures__/` — valid / invalid-maps-to / bad-yaml.
+- `questionnaire/schema.yaml` — 7 secciones A-G, 18 fields.
+- `questionnaire/questions.yaml` — 22 questions con condicionales `when:`.
+- `.github/workflows/ci.yml` — matrix ubuntu+macos, node 20, actions pineadas por SHA, corre typecheck + validate + coverage.
+- `package.json`, `tsconfig.json`, `vitest.config.ts`, `.nvmrc`.
+
+Estado: 49 tests verdes, coverage 95.66% líneas, typecheck limpio. Pendiente: abrir PR.
 
 ## Convenciones de este archivo
 
