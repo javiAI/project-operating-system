@@ -1,0 +1,15 @@
+version: "0.1.0"
+questions:
+  - id: q_identity_name
+    section: A
+    type: text
+    text: "Project name"
+    maps_to: identity.name
+  - id: q_stack_language
+    section: C
+    type: single
+    text: "Language"
+    options:
+      - { value: typescript, label: TypeScript }
+      - { value: python, label: Python }
+    maps_to: stack.language

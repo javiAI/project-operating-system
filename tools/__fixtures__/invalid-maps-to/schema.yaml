@@ -1,0 +1,8 @@
+version: "0.1.0"
+sections:
+  - id: A
+    name: Identity
+    fields:
+      - path: identity.name
+        type: string
+        required: true
