@@ -19,29 +19,46 @@ export async function validateQuestionnaire(
   questionsPath: string
 ): Promise<ValidationResult> {
   const errors: string[] = [];
-  let schemaRaw: unknown;
-  let questionsRaw: unknown;
 
-  try {
-    schemaRaw = parseYaml(await readFile(schemaPath, "utf8"));
-  } catch (err) {
-    return { ok: false, issues: [], errors: [`cannot parse ${schemaPath}: ${(err as Error).message}`], exitCode: 2 };
+  const schemaRead = await readAndParseYaml(schemaPath);
+  if (!schemaRead.ok) {
+    return { ok: false, issues: [], errors: [schemaRead.error], exitCode: 2 };
+  }
+
+  const questionsRead = await readAndParseYaml(questionsPath);
+  if (!questionsRead.ok) {
+    return { ok: false, issues: [], errors: [questionsRead.error], exitCode: 2 };
   }
 
   try {
-    questionsRaw = parseYaml(await readFile(questionsPath, "utf8"));
-  } catch (err) {
-    return { ok: false, issues: [], errors: [`cannot parse ${questionsPath}: ${(err as Error).message}`], exitCode: 2 };
-  }
-
-  try {
-    const schema = parseSchemaFile(schemaRaw);
-    const questions = parseQuestionsFile(questionsRaw);
+    const schema = parseSchemaFile(schemaRead.value);
+    const questions = parseQuestionsFile(questionsRead.value);
     const issues = crossValidate(schema, questions);
     return { ok: issues.length === 0, issues, errors: [], exitCode: issues.length === 0 ? 0 : 1 };
   } catch (err) {
-    errors.push((err as Error).message);
+    errors.push(errorMessage(err));
     return { ok: false, issues: [], errors, exitCode: 1 };
+  }
+}
+
+function errorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
+async function readAndParseYaml(
+  path: string
+): Promise<{ ok: true; value: unknown } | { ok: false; error: string }> {
+  let raw: string;
+  try {
+    raw = await readFile(path, "utf8");
+  } catch (err) {
+    return { ok: false, error: `cannot read ${path}: ${errorMessage(err)}` };
+  }
+  try {
+    return { ok: true, value: parseYaml(raw) };
+  } catch (err) {
+    return { ok: false, error: `cannot parse ${path}: ${errorMessage(err)}` };
   }
 }
 

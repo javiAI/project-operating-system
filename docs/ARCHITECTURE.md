@@ -75,7 +75,7 @@ El schema NO es JSON Schema. Es un DSL propio YAML declarativo, validado por [to
 - Operadores: `==`, `!=`, `in`, `&&`, `||`, `!`, paréntesis.
 - Evaluable sobre el profile parcial durante el runner interactivo (B3).
 
-**Validador CLI**: `npx tsx tools/validate-questionnaire.ts` — exit 0 (ok), 1 (issues estructurales o meta-schema), 2 (YAML ilegible o archivo ausente). Corre en CI matrix (ubuntu+macos, node 20) además de pre-push local.
+**Validador CLI**: `npx tsx tools/validate-questionnaire.ts` — exit 0 (ok), 1 (issues estructurales o meta-schema), 2 (YAML ilegible o archivo ausente). Corre en CI matrix (ubuntu+macos, node 20).
 
 ## 3. Generador (TypeScript + tsx)
 
