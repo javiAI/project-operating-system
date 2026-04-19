@@ -1,0 +1,26 @@
+{
+  "name": "project-operating-system",
+  "version": "0.0.1",
+  "description": "Meta-repo generator for Claude Code projects. Plugin: pos.",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "validate:questionnaire": "tsx tools/validate-questionnaire.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "20.14.10",
+    "@vitest/coverage-v8": "3.0.5",
+    "tsx": "4.19.3",
+    "typescript": "5.6.3",
+    "vitest": "3.0.5",
+    "yaml": "2.8.3",
+    "zod": "3.23.8"
+  }
+}
