@@ -45,7 +45,7 @@ export async function validateQuestionnaire(
   }
 }
 
-function formatReport(result: ValidationResult, schemaPath: string, questionsPath: string): string {
+export function formatReport(result: ValidationResult, schemaPath: string, questionsPath: string): string {
   const lines: string[] = [];
   lines.push(`validate-questionnaire:`);
   lines.push(`  schema:    ${schemaPath}`);
@@ -64,6 +64,7 @@ function formatReport(result: ValidationResult, schemaPath: string, questionsPat
   return lines.join("\n");
 }
 
+/* v8 ignore start */
 async function main(): Promise<void> {
   const { values } = parseArgs({
     options: {
@@ -91,3 +92,4 @@ if (isDirectRun) {
     process.exit(2);
   });
 }
+/* v8 ignore stop */

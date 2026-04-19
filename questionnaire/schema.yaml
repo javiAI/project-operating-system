@@ -1,0 +1,151 @@
+# questionnaire/schema.yaml — meta-schema del project_profile.yaml
+#
+# Fuente de verdad para la forma del perfil que el generador consume. Cada
+# field tiene un path canónico (snake_case dotted), un type, y constraints.
+# Validado por tools/validate-questionnaire.ts + tools/lib/meta-schema.ts.
+
+version: "0.1.0"
+
+sections:
+  # ─────────────────────────────────────────────
+  - id: A
+    name: Identidad
+    description: Datos básicos del proyecto generado.
+    fields:
+      - path: identity.name
+        type: string
+        required: true
+        pattern: "^[a-z][a-z0-9-]{2,}$"
+        minLength: 3
+        maxLength: 64
+        description: Slug del repositorio (minúsculas, guiones, sin espacios).
+
+      - path: identity.description
+        type: string
+        required: true
+        minLength: 10
+        maxLength: 240
+        description: Descripción de una línea para README y plugin.json.
+
+      - path: identity.license
+        type: enum
+        values: ["MIT", "Apache-2.0", "BSD-3-Clause", "ISC", "PROPRIETARY"]
+        default: "MIT"
+        description: Licencia del repo.
+
+      - path: identity.owner
+        type: string
+        required: true
+        minLength: 2
+        description: Owner (user u org en GitHub).
+
+  # ─────────────────────────────────────────────
+  - id: B
+    name: Dominio
+    description: Qué tipo de proyecto es.
+    fields:
+      - path: domain.type
+        type: enum
+        values: ["web-app", "cli", "agent-sdk", "library", "api"]
+        required: true
+
+  # ─────────────────────────────────────────────
+  - id: C
+    name: Stack
+    description: Lenguajes, runtime, base de datos.
+    fields:
+      - path: stack.language
+        type: enum
+        values: ["typescript", "javascript", "python", "go", "rust"]
+        required: true
+
+      - path: stack.database
+        type: enum
+        values: ["none", "postgres", "sqlite", "mongodb", "redis"]
+        default: "none"
+
+  # ─────────────────────────────────────────────
+  - id: D
+    name: Testing
+    description: Frameworks y thresholds de tests.
+    fields:
+      - path: testing.unit_framework
+        type: enum
+        values: ["vitest", "jest", "pytest", "go-test", "cargo-test"]
+        required: true
+
+      - path: testing.coverage_threshold
+        type: number
+        default: 80
+        min: 0
+        max: 100
+        description: Mínimo porcentaje de cobertura de líneas.
+
+      - path: testing.e2e_framework
+        type: enum
+        values: ["none", "playwright", "cypress"]
+        default: "none"
+        description: Solo aplica a stacks TS/JS. Si el language no es web, dejar 'none'.
+
+  # ─────────────────────────────────────────────
+  - id: E
+    name: Integraciones
+    description: MCPs opt-in y observabilidad.
+    fields:
+      - path: integrations.mcps
+        type: array
+        items: string
+        default: []
+        description: Lista de MCPs opt-in aprobados (mempalace, notebooklm, ...).
+
+      - path: integrations.observability
+        type: enum
+        values: ["none", "sentry", "datadog", "opentelemetry"]
+        default: "none"
+
+  # ─────────────────────────────────────────────
+  - id: F
+    name: Workflow
+    description: CI/CD, release, presupuesto de tokens.
+    fields:
+      - path: workflow.ci_host
+        type: enum
+        values: ["github", "gitlab", "bitbucket"]
+        default: "github"
+
+      - path: workflow.release_strategy
+        type: enum
+        values: ["manual", "semantic-release", "changesets", "conventional"]
+        default: "manual"
+
+      - path: workflow.branch_protection
+        type: boolean
+        default: true
+        description: Si se aplica branch protection declarativa a main.
+
+      - path: workflow.token_budget_session_soft
+        type: number
+        default: 150000
+        min: 50000
+        max: 500000
+        description: Soft limit de tokens por sesión (warning).
+
+  # ─────────────────────────────────────────────
+  - id: G
+    name: Claude Code
+    description: Configuración del plugin pos en el proyecto generado.
+    fields:
+      - path: claude_code.default_model
+        type: enum
+        values: ["claude-sonnet-4-6", "claude-opus-4-7", "claude-haiku-4-5"]
+        default: "claude-sonnet-4-6"
+
+      - path: claude_code.team_size
+        type: enum
+        values: ["solo", "team"]
+        default: "solo"
+
+      - path: claude_code.persistent_memory
+        type: boolean
+        default: false
+        description: Activar MemPalace (opt-in, ver docs/SAFETY_POLICY.md).

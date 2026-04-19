@@ -152,11 +152,11 @@ describe("meta-schema / questions.yaml", () => {
     expect(() => parseQuestionsFile(bad)).toThrow(/maps_to/i);
   });
 
-  it("rejects single question without options", () => {
+  it("rejects single question with empty options", () => {
     const bad = {
       version: "0.1.0",
       questions: [
-        { id: "q1", section: "A", type: "single", text: "?", maps_to: "x.y" },
+        { id: "q1", section: "A", type: "single", text: "?", maps_to: "x.y", options: [] },
       ],
     };
     expect(() => parseQuestionsFile(bad)).toThrow(/options/i);

@@ -131,7 +131,7 @@ const BooleanQuestion = QuestionCommon.extend({
 const SingleQuestion = QuestionCommon.extend({
   type: z.literal("single"),
   maps_to: z.string().regex(PATH_RE),
-  options: z.array(QuestionOption).min(2, "single needs ≥2 options"),
+  options: z.array(QuestionOption).min(1, "single needs ≥1 option"),
 });
 
 const MultiQuestion = QuestionCommon.extend({
