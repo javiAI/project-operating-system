@@ -75,6 +75,16 @@ El schema NO es JSON Schema. Es un DSL propio YAML declarativo, validado por [to
 - Operadores: `==`, `!=`, `in`, `&&`, `||`, `!`, paréntesis.
 - Evaluable sobre el profile parcial durante el runner interactivo (B3).
 
+**Validaciones semánticas cross-file** ([tools/lib/cross-validate.ts](../tools/lib/cross-validate.ts)):
+
+- `maps_to-unknown-path` — `questions[].maps_to` apunta a un path no declarado en el schema.
+- `required-uncovered` — field `required: true` sin pregunta y sin `default`.
+- `section-unknown` — `questions[].section` no existe en el schema.
+- `option-outside-enum` — opción de `single`/`multi` fuera de los `values` del enum.
+- `question-field-type-mismatch` — `question.type` incompatible con `field.type` (`text→string`, `number→number`, `bool→boolean`, `single→enum`, `multi→array`).
+- `question-section-mismatch` — la pregunta vive en una sección distinta a la del field al que apunta.
+- `when-unknown-path` — expresión `when:` referencia un path no declarado en el schema.
+
 **Validador CLI**: `npx tsx tools/validate-questionnaire.ts` — exit 0 (ok), 1 (issues estructurales o meta-schema), 2 (YAML ilegible o archivo ausente). Corre en CI matrix (ubuntu+macos, node 20).
 
 ## 3. Generador (TypeScript + tsx)

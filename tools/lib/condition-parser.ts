@@ -291,6 +291,28 @@ function describe(t: Token | undefined): string {
   return "null";
 }
 
+export function collectPaths(ast: ConditionAst): string[] {
+  const out: string[] = [];
+  const walk = (node: ConditionAst): void => {
+    switch (node.kind) {
+      case "and":
+      case "or":
+        walk(node.left);
+        walk(node.right);
+        return;
+      case "not":
+        walk(node.expr);
+        return;
+      case "compare":
+        if (node.left.kind === "path") out.push(node.left.segments.join("."));
+        if (node.right.kind === "path") out.push(node.right.segments.join("."));
+        return;
+    }
+  };
+  walk(ast);
+  return out;
+}
+
 export function parseCondition(input: string): ConditionAst {
   const trimmed = input.trim();
   if (trimmed.length === 0) throw new Error("condition-parser: empty expression");
