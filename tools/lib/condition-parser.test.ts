@@ -49,6 +49,24 @@ describe("condition-parser / parse", () => {
   it("rejects empty input", () => {
     expect(() => parseCondition("")).toThrow(/empty/i);
   });
+
+  it("rejects array element that is not a literal", () => {
+    expect(() => parseCondition("x in [y, 'z']")).toThrow(/literal/i);
+  });
+
+  it("rejects unterminated array literal", () => {
+    expect(() => parseCondition("x in ['y', 'z'")).toThrow();
+  });
+
+  it("parses empty array literal", () => {
+    const ast = parseCondition("x in []");
+    expect(ast.kind).toBe("compare");
+  });
+
+  it("parses not operator on a parenthesized comparison", () => {
+    const ast = parseCondition("!(x == 'y')");
+    expect(ast.kind).toBe("not");
+  });
 });
 
 describe("condition-parser / evaluate", () => {
@@ -126,5 +144,15 @@ describe("condition-parser / evaluate", () => {
     expect(
       evaluateCondition(parseCondition("testing.coverage_threshold == 80"), ctx)
     ).toBe(true);
+  });
+
+  it("evaluates not operator", () => {
+    expect(
+      evaluateCondition(parseCondition("!(stack.language == 'go')"), ctx)
+    ).toBe(true);
+  });
+
+  it("evaluates 'in' returning false when right side is not an array", () => {
+    expect(evaluateCondition(parseCondition("'x' in 'y'"), ctx)).toBe(false);
   });
 });
