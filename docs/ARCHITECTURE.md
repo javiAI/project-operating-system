@@ -59,6 +59,24 @@ El meta-repo nunca ejecuta código del proyecto destino. El proyecto destino nun
 
 Extensible en `questionnaire/profiles/*.yaml`. El generador soporta override key-por-key.
 
+### Schema DSL (entregado en B1)
+
+El schema NO es JSON Schema. Es un DSL propio YAML declarativo, validado por [tools/lib/meta-schema.ts](../tools/lib/meta-schema.ts) usando zod.
+
+**Razones para DSL propio**:
+
+- Permite verificar coherencia cross-file (`questions[].maps_to` ↔ paths de `schema.yaml`) sin ecosistema externo.
+- Más legible al editar a mano: secciones A-G con `fields[]` discriminados por `type` (`string | number | boolean | enum | array`), constraints inline (`required`, `default`, `pattern`, `min/max`, `values`).
+- Sin deps pesadas: solo `zod` + `yaml`.
+
+**Condiciones en `questions[].when:`** — subset mínimo parseado por [tools/lib/condition-parser.ts](../tools/lib/condition-parser.ts):
+
+- Operandos: path dotted (`stack.language`), literales (string, number, bool, null), array literal (`['a', 'b']`).
+- Operadores: `==`, `!=`, `in`, `&&`, `||`, `!`, paréntesis.
+- Evaluable sobre el profile parcial durante el runner interactivo (B3).
+
+**Validador CLI**: `npx tsx tools/validate-questionnaire.ts` — exit 0 (ok), 1 (issues estructurales o meta-schema), 2 (YAML ilegible o archivo ausente). Corre en CI matrix (ubuntu+macos, node 20) además de pre-push local.
+
 ## 3. Generador (TypeScript + tsx)
 
 ### Entrypoint

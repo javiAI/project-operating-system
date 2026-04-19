@@ -5,7 +5,7 @@
 ## 1. Snapshot
 
 - Repo: `project-operating-system` (plugin `pos`).
-- Fase actual: **A completada** (bootstrap). Siguiente: **B1 — `feat/b1-questionnaire-schema`**.
+- Fase actual: **B1 en curso** (`feat/b1-questionnaire-schema`, PR en apertura). Siguiente: **B2 — `feat/b2-profiles-starter`**.
 - Fuente de verdad ejecutable: [MASTER_PLAN.md](MASTER_PLAN.md).
 - Estado vivo: [ROADMAP.md](ROADMAP.md).
 - Arquitectura canonical: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -84,17 +84,39 @@ Hasta que `pos` tenga sus propias skills:
 
 ## 9. Próxima rama
 
-**B1 — `feat/b1-questionnaire-schema`**
+**B2 — `feat/b2-profiles-starter`**
 
-Scope (ver [MASTER_PLAN.md § Rama B1](MASTER_PLAN.md#rama-b1--featb1-questionnaire-schema)):
-- `questionnaire/schema.yaml` — define estructura de `project_profile.yaml`.
-- `questionnaire/questions.yaml` — preguntas agrupadas por categoría (A-G).
-- Tests vitest que validan schema.
-- Tool `tools/validate-questionnaire.ts` para uso en CI.
+Scope (ver [MASTER_PLAN.md § Rama B2](MASTER_PLAN.md)):
+
+- `questionnaire/profiles/nextjs-app.yaml`, `agent-sdk.yaml`, `cli-tool.yaml`.
+- Cada profile responde automáticamente ~60% del cuestionario.
+- Fixture test en `generator/__fixtures__/profiles/` (carpeta no existe aún — se crea en rama).
+- Criterio salida: los 3 profiles validan contra `questionnaire/schema.yaml` (B1).
 
 Lectura mínima:
-- [MASTER_PLAN.md § Rama B1](MASTER_PLAN.md)
-- [docs/ARCHITECTURE.md § Cuestionario](docs/ARCHITECTURE.md)
+
+- [MASTER_PLAN.md § Rama B2](MASTER_PLAN.md)
+- [questionnaire/schema.yaml](questionnaire/schema.yaml) — schema que deben cumplir.
+- [docs/ARCHITECTURE.md § Cuestionario — Profiles predefinidos](docs/ARCHITECTURE.md)
 - [.claude/rules/generator.md](.claude/rules/generator.md)
 
-Tras merge: actualizar esta sección + "Progreso Fase B" en ROADMAP.md. Todo dentro de la misma rama.
+Checklist Fase -1 pendiente antes de abrir B2:
+
+- [ ] Resumen técnico ≤300 palabras.
+- [ ] Resumen conceptual ≤150 palabras.
+- [ ] Ambigüedades (si las hay).
+- [ ] 2 alternativas evaluadas.
+- [ ] Test plan.
+- [ ] Docs plan.
+- [ ] Aprobación explícita del usuario + marker `.claude/branch-approvals/feat_b2-profiles-starter.approved`.
+
+## 10. Estado B1 (cerrando)
+
+Entregado en rama `feat/b1-questionnaire-schema`:
+
+- `tools/validate-questionnaire.ts` + `tools/lib/{condition-parser,meta-schema,cross-validate}.ts`.
+- `questionnaire/schema.yaml` (7 secciones A-G, 18 fields) + `questionnaire/questions.yaml` (22 preguntas con condicionales `when:`).
+- `.github/workflows/ci.yml` (matrix ubuntu+macos, node 20, actions pineadas por SHA).
+- `package.json`, `tsconfig.json`, `vitest.config.ts`, `.nvmrc` — toolchain TS + tsx + vitest + zod + yaml.
+- 49 tests verdes, coverage 95.66% líneas, typecheck limpio.
+- 6 commits: kickoff + parser + meta-schema + cross-validate + CLI/fixtures + questionnaire/docs.
