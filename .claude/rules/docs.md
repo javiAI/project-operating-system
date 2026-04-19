@@ -52,5 +52,6 @@ Antes de cerrar la rama (Fase N+3), validar:
 - `docs/ARCHITECTURE.md` — si la rama introdujo un patrón estructural nuevo, añadir sub-sección.
 - `.claude/rules/*.md` — si la rama introdujo patrones que se repetirán, crear o actualizar rule path-scoped.
 - `docs/KNOWN_GOOD_MCPS.md` — si la rama aprobó un MCP vía `/pos:audit-plugin`.
+- **Trazabilidad de contexto**: si la rama se inició con `/compact` o `/clear` (emitido en Fase N+7 de la rama anterior), el primer commit de kickoff referencia el resume prompt usado (archivos releídos + decisiones preservadas). Ver [HANDOFF.md §3](../../HANDOFF.md).
 
 El hook `pre-pr-gate.sh` verifica que al menos `ROADMAP.md` y `HANDOFF.md` están en el diff de la rama. Si la rama tocó `generator/**` o `hooks/**`, también exige diff en `docs/ARCHITECTURE.md` o justificación (`// no-arch-change: <reason>`).

@@ -73,6 +73,7 @@ Fase N+3 │ Docs-sync dentro de la rama (ROADMAP + HANDOFF + AGENTS + rules/pat
 Fase N+4 │ Pre-PR gate (hook valida: tests ✓, coverage ✓, docs-sync ✓, invariants ✓, CI-dry-run ✓)
 Fase N+5 │ PR + CI en GitHub → merge
 Fase N+6 │ /pos:compound (si el diff toca paths configurados; emite PR separado con patrones extraídos)
+Fase N+7 │ Context gate: decide continue | /compact focus="..." | /clear | sesión nueva según HANDOFF.md §3 + emite resume prompt con archivos a recargar (puerta de entrada a la siguiente rama)
 ```
 
 ## Determinismo

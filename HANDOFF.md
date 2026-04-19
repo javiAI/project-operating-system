@@ -23,7 +23,9 @@ Qué deberías ver:
 
 Si el ROADMAP no coincide con `git log` → ROADMAP desfasado, actualizarlo antes de arrancar.
 
-## 3. Decisión `/clear` vs `/compact` vs sesión nueva
+## 3. Decisión `/clear` vs `/compact` vs sesión nueva (Fase N+7 Context gate)
+
+**Última fase de la rama anterior**, ejecutada post-merge / post-`/pos:compound`. Puerta de entrada obligatoria a Fase -1 de la siguiente rama. AGENTS.md regla #1.
 
 | Caso | Acción |
 |---|---|
@@ -33,6 +35,17 @@ Si el ROADMAP no coincide con `git log` → ROADMAP desfasado, actualizarlo ante
 | Cambio de rama ortogonal | Sesión nueva (MEMORY.md + CLAUDE.md cargan solos) |
 
 Regla dura: contexto crítico NO en git + docs + memoria → **NO `/clear`**. Persiste primero.
+
+### Checklist pre-Fase-1
+
+- [ ] Evaluar contexto actual: ¿tamaño?, ¿decisiones sin grabar?, ¿rama previa cerrada en docs?
+- [ ] Elegir acción según la tabla: `continuar` | `/compact focus="..."` | `/clear` | sesión nueva.
+- [ ] Si `compact` o `clear` o sesión nueva: **emitir resume prompt** con:
+  - Archivos a releer (MASTER_PLAN § rama + "Contexto a leer" + schema/rules relevantes).
+  - Decisiones ya tomadas que deben sobrevivir (shape, alternativa elegida, ambigüedades resueltas).
+  - Tareas pendientes dentro de la rama nueva.
+- [ ] Solo entonces proceder con Fase -1 (§2.1 MASTER_PLAN.md).
+- [ ] Si la siguiente rama se inicia con `/compact` o `/clear`, el primer commit de kickoff referencia el resume prompt (trazabilidad).
 
 ## 4. Orden óptimo de lectura al arrancar rama
 
@@ -66,6 +79,10 @@ Ejecuta §2.1 Fase -1 completo. Espera aprobación explícita antes de `git chec
 - [ ] Fase -1 aprobada explícitamente.
 - [ ] Marker creado: `.claude/branch-approvals/<slug-sanitized>.approved`.
 - [ ] `git checkout -b feat/<rama>` tras el marker.
+
+## 6b. Carry-over a fases futuras
+
+- **C1 (`feat/c1-renderers-core-docs`)**: propagar Fase N+7 Context gate al repo generado. `templates/HANDOFF.md.hbs` debe incluir la matriz de decisión + checklist post-merge; `templates/AGENTS.md.hbs` debe incluir Fase N+7 como última fase de rama en el flujo; `templates/.claude/rules/docs.md.hbs` debe incluir el checkbox de trazabilidad. Todo proyecto generado con `pos` hereda la misma disciplina de context-management.
 
 ## 7. Gotchas del entorno
 
