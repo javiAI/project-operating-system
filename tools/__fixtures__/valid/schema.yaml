@@ -1,0 +1,19 @@
+version: "0.1.0"
+sections:
+  - id: A
+    name: Identity
+    fields:
+      - path: identity.name
+        type: string
+        required: true
+      - path: identity.license
+        type: enum
+        values: ["MIT", "Apache-2.0"]
+        default: "MIT"
+  - id: C
+    name: Stack
+    fields:
+      - path: stack.language
+        type: enum
+        values: ["typescript", "python"]
+        required: true

@@ -1,0 +1,12 @@
+version: "0.1.0"
+questions:
+  - id: q_identity_name
+    section: A
+    type: text
+    text: "Project name"
+    maps_to: identity.name
+  - id: q_orphan
+    section: A
+    type: text
+    text: "Ghost"
+    maps_to: identity.ghost
