@@ -1,0 +1,24 @@
+# questionnaire/profiles/cli-tool.yaml
+#
+# Arranque canónico: TypeScript CLI + oclif + vitest.
+# Perfil parcial: omite identity.name / description / owner (user-specific).
+# Validado en CI por tools/validate-profile.ts.
+
+version: "0.1.0"
+
+profile:
+  name: "cli-tool"
+  description: "TypeScript CLI with oclif + vitest for distributable command-line utilities."
+
+answers:
+  "domain.type": "cli"
+  "stack.language": "typescript"
+  "stack.database": "none"
+  "testing.unit_framework": "vitest"
+  "testing.coverage_threshold": 85
+  "testing.e2e_framework": "none"
+  "workflow.ci_host": "github"
+  "workflow.release_strategy": "semantic-release"
+  "workflow.branch_protection": true
+  "claude_code.default_model": "claude-sonnet-4-6"
+  "claude_code.team_size": "solo"

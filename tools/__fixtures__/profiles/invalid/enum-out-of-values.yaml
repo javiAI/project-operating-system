@@ -1,0 +1,12 @@
+# Fixture negativo: valor de enum fuera de la lista declarada en el schema.
+# Issue esperado: answer-value-not-in-enum
+
+version: "0.1.0"
+
+profile:
+  name: "enum-out-of-values"
+  description: "Profile with an enum value that is not in the schema's allowed list."
+
+answers:
+  "stack.language": "cobol"
+  "testing.unit_framework": "vitest"

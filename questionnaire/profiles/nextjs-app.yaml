@@ -1,0 +1,25 @@
+# questionnaire/profiles/nextjs-app.yaml
+#
+# Arranque canónico: Next.js 15 + Prisma + PostgreSQL + Vitest + Playwright.
+# Perfil parcial: omite identity.name / description / owner (user-specific).
+# Validado en CI por tools/validate-profile.ts.
+
+version: "0.1.0"
+
+profile:
+  name: "nextjs-app"
+  description: "Next.js 15 + Prisma + PostgreSQL + Vitest + Playwright starter for full-stack web apps."
+
+answers:
+  "domain.type": "web-app"
+  "stack.language": "typescript"
+  "stack.database": "postgres"
+  "testing.unit_framework": "vitest"
+  "testing.coverage_threshold": 85
+  "testing.e2e_framework": "playwright"
+  "integrations.observability": "sentry"
+  "workflow.ci_host": "github"
+  "workflow.release_strategy": "changesets"
+  "workflow.branch_protection": true
+  "claude_code.default_model": "claude-sonnet-4-6"
+  "claude_code.team_size": "team"

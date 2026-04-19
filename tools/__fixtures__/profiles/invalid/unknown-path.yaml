@@ -1,0 +1,12 @@
+# Fixture negativo: answer apunta a un path que no existe en el schema.
+# Issue esperado: answer-unknown-path
+
+version: "0.1.0"
+
+profile:
+  name: "unknown-path"
+  description: "Profile with an answer on a non-existent path."
+
+answers:
+  "stack.language": "typescript"
+  "stack.ghost_field": "bogus"
