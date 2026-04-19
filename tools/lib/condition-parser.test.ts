@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluateCondition, parseCondition } from "./condition-parser.ts";
+import { collectPaths, evaluateCondition, parseCondition } from "./condition-parser.ts";
 
 describe("condition-parser / parse", () => {
   it("parses equality with string literal", () => {
@@ -154,5 +154,32 @@ describe("condition-parser / evaluate", () => {
 
   it("evaluates 'in' returning false when right side is not an array", () => {
     expect(evaluateCondition(parseCondition("'x' in 'y'"), ctx)).toBe(false);
+  });
+});
+
+describe("condition-parser / collectPaths", () => {
+  it("collects the path from a simple comparison", () => {
+    expect(collectPaths(parseCondition("stack.language == 'python'"))).toEqual(["stack.language"]);
+  });
+
+  it("ignores string/number/bool/null literals and array literals", () => {
+    expect(collectPaths(parseCondition("'x' == 'y'"))).toEqual([]);
+    expect(collectPaths(parseCondition("1 == 2"))).toEqual([]);
+    expect(collectPaths(parseCondition("true == false"))).toEqual([]);
+    expect(collectPaths(parseCondition("'a' in ['a', 'b']"))).toEqual([]);
+  });
+
+  it("walks and/or/not recursively and de-dups order-preserving", () => {
+    const ast = parseCondition(
+      "!(stack.language == 'python') && (domain.type == 'api' || stack.language in ['go', 'rust'])"
+    );
+    expect(collectPaths(ast)).toEqual(["stack.language", "domain.type", "stack.language"]);
+  });
+
+  it("collects paths on both sides of a comparison", () => {
+    expect(collectPaths(parseCondition("stack.language == domain.type"))).toEqual([
+      "stack.language",
+      "domain.type",
+    ]);
   });
 });

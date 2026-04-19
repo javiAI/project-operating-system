@@ -1,3 +1,4 @@
+import { collectPaths, parseCondition } from "./condition-parser.ts";
 import type { QuestionsFile, SchemaFile } from "./meta-schema.ts";
 
 export type CrossValidationIssue = {
@@ -5,32 +6,66 @@ export type CrossValidationIssue = {
     | "maps_to-unknown-path"
     | "required-uncovered"
     | "section-unknown"
-    | "option-outside-enum";
+    | "option-outside-enum"
+    | "question-field-type-mismatch"
+    | "question-section-mismatch"
+    | "when-unknown-path";
   where: string;
   detail: string;
 };
 
+type Field = SchemaFile["sections"][number]["fields"][number];
+type NonInfoQuestionType = "text" | "number" | "bool" | "single" | "multi";
+
+const QUESTION_TO_FIELD_TYPE: Record<NonInfoQuestionType, Field["type"]> = {
+  text: "string",
+  number: "number",
+  bool: "boolean",
+  single: "enum",
+  multi: "array",
+};
+
 export function crossValidate(schema: SchemaFile, questions: QuestionsFile): CrossValidationIssue[] {
   const issues: CrossValidationIssue[] = [];
-  const fieldByPath = new Map<string, SchemaFile["sections"][number]["fields"][number]>();
+  const fieldByPath = new Map<string, Field>();
+  const sectionByFieldPath = new Map<string, string>();
   const sectionIds = new Set<string>();
 
   for (const section of schema.sections) {
     sectionIds.add(section.id);
     for (const field of section.fields) {
       fieldByPath.set(field.path, field);
+      sectionByFieldPath.set(field.path, section.id);
     }
   }
 
   const coveredPaths = new Set<string>();
 
   for (const q of questions.questions) {
-    if (!sectionIds.has(q.section)) {
+    const sectionKnown = sectionIds.has(q.section);
+    if (!sectionKnown) {
       issues.push({
         kind: "section-unknown",
         where: q.id,
         detail: `question references section '${q.section}' not declared in schema`,
       });
+    }
+
+    if (q.when !== undefined) {
+      try {
+        const ast = parseCondition(q.when);
+        for (const p of collectPaths(ast)) {
+          if (!fieldByPath.has(p)) {
+            issues.push({
+              kind: "when-unknown-path",
+              where: q.id,
+              detail: `when references unknown path '${p}'`,
+            });
+          }
+        }
+      } catch {
+        // syntactic errors are surfaced by meta-schema; skip here.
+      }
     }
 
     if (q.type === "info") continue;
@@ -46,6 +81,26 @@ export function crossValidate(schema: SchemaFile, questions: QuestionsFile): Cro
     }
 
     coveredPaths.add(q.maps_to);
+
+    const expectedFieldType = QUESTION_TO_FIELD_TYPE[q.type];
+    if (field.type !== expectedFieldType) {
+      issues.push({
+        kind: "question-field-type-mismatch",
+        where: q.id,
+        detail: `question type '${q.type}' expects field type '${expectedFieldType}' but '${field.path}' is '${field.type}'`,
+      });
+    }
+
+    if (sectionKnown) {
+      const fieldSection = sectionByFieldPath.get(field.path);
+      if (fieldSection && fieldSection !== q.section) {
+        issues.push({
+          kind: "question-section-mismatch",
+          where: q.id,
+          detail: `question is in section '${q.section}' but field '${field.path}' lives in section '${fieldSection}'`,
+        });
+      }
+    }
 
     if ((q.type === "single" || q.type === "multi") && field.type === "enum") {
       for (const opt of q.options) {

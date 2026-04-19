@@ -121,6 +121,90 @@ describe("cross-validate", () => {
     expect(issues.some((i) => i.kind === "section-unknown" && i.where === "q_orphan")).toBe(true);
   });
 
+  it("reports question-field-type-mismatch when question type doesn't match field type", () => {
+    const questions = parseQuestionsFile({
+      version: "0.1.0",
+      questions: [
+        { id: "q_name_wrong", section: "A", type: "number", text: "?", maps_to: "identity.name" },
+        {
+          id: "q_language",
+          section: "C",
+          type: "single",
+          text: "?",
+          maps_to: "stack.language",
+          options: [{ value: "typescript" }, { value: "python" }],
+        },
+      ],
+    });
+    const issues = crossValidate(baseSchema, questions);
+    const mismatch = issues.find((i) => i.kind === "question-field-type-mismatch");
+    expect(mismatch?.where).toBe("q_name_wrong");
+    expect(mismatch?.detail).toMatch(/'number' expects field type 'number' but 'identity\.name' is 'string'/);
+  });
+
+  it("reports question-section-mismatch when question sits in a different section than its field", () => {
+    const questions = parseQuestionsFile({
+      version: "0.1.0",
+      questions: [
+        { id: "q_name", section: "A", type: "text", text: "?", maps_to: "identity.name" },
+        {
+          id: "q_language_wrong_section",
+          section: "A",
+          type: "single",
+          text: "?",
+          maps_to: "stack.language",
+          options: [{ value: "typescript" }, { value: "python" }],
+        },
+      ],
+    });
+    const issues = crossValidate(baseSchema, questions);
+    const mismatch = issues.find((i) => i.kind === "question-section-mismatch");
+    expect(mismatch?.where).toBe("q_language_wrong_section");
+    expect(mismatch?.detail).toMatch(/section 'A'.*field 'stack\.language' lives in section 'C'/);
+  });
+
+  it("reports when-unknown-path when a when expression references a missing path", () => {
+    const questions = parseQuestionsFile({
+      version: "0.1.0",
+      questions: [
+        { id: "q_name", section: "A", type: "text", text: "?", maps_to: "identity.name" },
+        {
+          id: "q_language",
+          section: "C",
+          type: "single",
+          text: "?",
+          maps_to: "stack.language",
+          when: "stack.langage == 'python'",
+          options: [{ value: "typescript" }, { value: "python" }],
+        },
+      ],
+    });
+    const issues = crossValidate(baseSchema, questions);
+    const unknown = issues.find((i) => i.kind === "when-unknown-path");
+    expect(unknown?.where).toBe("q_language");
+    expect(unknown?.detail).toMatch(/'stack\.langage'/);
+  });
+
+  it("accepts when expressions that only reference existing schema paths", () => {
+    const questions = parseQuestionsFile({
+      version: "0.1.0",
+      questions: [
+        { id: "q_name", section: "A", type: "text", text: "?", maps_to: "identity.name" },
+        {
+          id: "q_language",
+          section: "C",
+          type: "single",
+          text: "?",
+          maps_to: "stack.language",
+          when: "stack.language in ['typescript', 'python']",
+          options: [{ value: "typescript" }, { value: "python" }],
+        },
+      ],
+    });
+    const issues = crossValidate(baseSchema, questions);
+    expect(issues.filter((i) => i.kind === "when-unknown-path")).toEqual([]);
+  });
+
   it("reports option value outside enum values for single/multi", () => {
     const questions = parseQuestionsFile({
       version: "0.1.0",
