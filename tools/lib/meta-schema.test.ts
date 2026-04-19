@@ -122,6 +122,98 @@ describe("meta-schema / schema.yaml", () => {
     expect(() => parseSchemaFile(bad)).toThrow(/duplicate/i);
   });
 
+  it("rejects array field default with element of wrong type for declared items", () => {
+    const bad = {
+      ...validSchema,
+      sections: [
+        {
+          id: "A",
+          name: "x",
+          fields: [
+            { path: "integrations.mcps", type: "array", items: "string", default: ["ok", 42] },
+          ],
+        },
+      ],
+    };
+    expect(() => parseSchemaFile(bad)).toThrow(/default\[1\] must be string/);
+  });
+
+  it("rejects array field default with length below minItems", () => {
+    const bad = {
+      ...validSchema,
+      sections: [
+        {
+          id: "A",
+          name: "x",
+          fields: [
+            { path: "integrations.mcps", type: "array", items: "string", minItems: 2, default: ["a"] },
+          ],
+        },
+      ],
+    };
+    expect(() => parseSchemaFile(bad)).toThrow(/below minItems/);
+  });
+
+  it("rejects array field default with length above maxItems", () => {
+    const bad = {
+      ...validSchema,
+      sections: [
+        {
+          id: "A",
+          name: "x",
+          fields: [
+            { path: "integrations.mcps", type: "array", items: "string", maxItems: 1, default: ["a", "b"] },
+          ],
+        },
+      ],
+    };
+    expect(() => parseSchemaFile(bad)).toThrow(/above maxItems/);
+  });
+
+  it("rejects array field default element not in values allowlist", () => {
+    const bad = {
+      ...validSchema,
+      sections: [
+        {
+          id: "A",
+          name: "x",
+          fields: [
+            {
+              path: "integrations.mcps",
+              type: "array",
+              items: "string",
+              values: ["mempalace", "notebooklm"],
+              default: ["mempalace", "rogue-mcp"],
+            },
+          ],
+        },
+      ],
+    };
+    expect(() => parseSchemaFile(bad)).toThrow(/not in values allowlist/);
+  });
+
+  it("accepts array field with consistent items/values/default", () => {
+    const ok = {
+      ...validSchema,
+      sections: [
+        {
+          id: "A",
+          name: "x",
+          fields: [
+            {
+              path: "integrations.mcps",
+              type: "array",
+              items: "string",
+              values: ["mempalace", "notebooklm"],
+              default: ["mempalace"],
+            },
+          ],
+        },
+      ],
+    };
+    expect(() => parseSchemaFile(ok)).not.toThrow();
+  });
+
   it("rejects field with invalid path format", () => {
     const bad = {
       ...validSchema,

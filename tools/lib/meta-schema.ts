@@ -40,6 +40,7 @@ const EnumField = FieldCommon.extend({
 const ArrayField = FieldCommon.extend({
   type: z.literal("array"),
   items: z.enum(["string", "number", "boolean"]),
+  values: z.array(z.union([z.string(), z.number(), z.boolean()])).min(1, "array values allowlist needs at least one entry").optional(),
   default: z.array(z.union([z.string(), z.number(), z.boolean()])).optional(),
   minItems: z.number().int().nonnegative().optional(),
   maxItems: z.number().int().positive().optional(),
@@ -83,6 +84,45 @@ const SchemaFile = z.object({
           message: `enum field '${field.path}' default '${String(field.default)}' not in values`,
           path: ["sections"],
         });
+      }
+      if (field.type === "array") {
+        if (field.default !== undefined) {
+          for (const [idx, val] of field.default.entries()) {
+            const expected = field.items;
+            const ok =
+              (expected === "string" && typeof val === "string") ||
+              (expected === "number" && typeof val === "number") ||
+              (expected === "boolean" && typeof val === "boolean");
+            if (!ok) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: `array field '${field.path}' default[${idx}] must be ${expected}`,
+                path: ["sections"],
+              });
+            }
+            if (field.values !== undefined && !field.values.includes(val as string | number | boolean)) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: `array field '${field.path}' default[${idx}] '${String(val)}' not in values allowlist`,
+                path: ["sections"],
+              });
+            }
+          }
+          if (field.minItems !== undefined && field.default.length < field.minItems) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `array field '${field.path}' default has ${field.default.length} items, below minItems ${field.minItems}`,
+              path: ["sections"],
+            });
+          }
+          if (field.maxItems !== undefined && field.default.length > field.maxItems) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `array field '${field.path}' default has ${field.default.length} items, above maxItems ${field.maxItems}`,
+              path: ["sections"],
+            });
+          }
+        }
       }
     }
   }

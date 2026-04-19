@@ -67,6 +67,7 @@ El schema NO es JSON Schema. Es un DSL propio YAML declarativo, validado por [to
 
 - Permite verificar coherencia cross-file (`questions[].maps_to` ↔ paths de `schema.yaml`) sin ecosistema externo.
 - Más legible al editar a mano: secciones A-G con `fields[]` discriminados por `type` (`string | number | boolean | enum | array`), constraints inline (`required`, `default`, `pattern`, `min/max`, `values`).
+- `array` fields aceptan `items` (primitivo) y `values:` opcional (allowlist) para restringir elementos permitidos, simétrico con `enum.values`. `default` debe ser coherente con `items`, respetar `minItems/maxItems` y, si hay `values`, estar contenido en el allowlist.
 - Sin deps pesadas: solo `zod` + `yaml`.
 
 **Condiciones en `questions[].when:`** — subset mínimo parseado por [tools/lib/condition-parser.ts](../tools/lib/condition-parser.ts):

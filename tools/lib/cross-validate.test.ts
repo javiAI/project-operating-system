@@ -205,7 +205,74 @@ describe("cross-validate", () => {
     expect(issues.filter((i) => i.kind === "when-unknown-path")).toEqual([]);
   });
 
-  it("reports option value outside enum values for single/multi", () => {
+  it("reports multi option value outside values allowlist on array field", () => {
+    const schema = parseSchemaFile({
+      version: "0.1.0",
+      sections: [
+        {
+          id: "E",
+          name: "Integraciones",
+          fields: [
+            {
+              path: "integrations.mcps",
+              type: "array",
+              items: "string",
+              values: ["mempalace", "notebooklm"],
+              default: [],
+            },
+          ],
+        },
+      ],
+    });
+    const questions = parseQuestionsFile({
+      version: "0.1.0",
+      questions: [
+        {
+          id: "q_mcps",
+          section: "E",
+          type: "multi",
+          text: "?",
+          maps_to: "integrations.mcps",
+          options: [{ value: "mempalace" }, { value: "rogue-mcp" }],
+        },
+      ],
+    });
+    const issues = crossValidate(schema, questions);
+    const bad = issues.find((i) => i.kind === "option-outside-enum");
+    expect(bad?.where).toBe("q_mcps");
+    expect(bad?.detail).toMatch(/rogue-mcp.*integrations\.mcps/);
+  });
+
+  it("does not flag multi options when array field has no values allowlist", () => {
+    const schema = parseSchemaFile({
+      version: "0.1.0",
+      sections: [
+        {
+          id: "E",
+          name: "Integraciones",
+          fields: [
+            { path: "integrations.mcps", type: "array", items: "string", default: [] },
+          ],
+        },
+      ],
+    });
+    const questions = parseQuestionsFile({
+      version: "0.1.0",
+      questions: [
+        {
+          id: "q_mcps",
+          section: "E",
+          type: "multi",
+          text: "?",
+          maps_to: "integrations.mcps",
+          options: [{ value: "anything" }, { value: "else" }],
+        },
+      ],
+    });
+    expect(crossValidate(schema, questions).filter((i) => i.kind === "option-outside-enum")).toEqual([]);
+  });
+
+  it("reports option value outside enum values for a single question on an enum field", () => {
     const questions = parseQuestionsFile({
       version: "0.1.0",
       questions: [

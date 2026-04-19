@@ -292,7 +292,14 @@ function describe(t: Token | undefined): string {
 }
 
 export function collectPaths(ast: ConditionAst): string[] {
+  const seen = new Set<string>();
   const out: string[] = [];
+  const push = (p: string): void => {
+    if (!seen.has(p)) {
+      seen.add(p);
+      out.push(p);
+    }
+  };
   const walk = (node: ConditionAst): void => {
     switch (node.kind) {
       case "and":
@@ -304,8 +311,8 @@ export function collectPaths(ast: ConditionAst): string[] {
         walk(node.expr);
         return;
       case "compare":
-        if (node.left.kind === "path") out.push(node.left.segments.join("."));
-        if (node.right.kind === "path") out.push(node.right.segments.join("."));
+        if (node.left.kind === "path") push(node.left.segments.join("."));
+        if (node.right.kind === "path") push(node.right.segments.join("."));
         return;
     }
   };
