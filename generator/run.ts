@@ -12,11 +12,20 @@ import {
   completenessCheck,
   type CompletenessEntry,
 } from "./lib/validators.ts";
+import { buildProfile } from "./lib/profile-model.ts";
+import {
+  isDirEmpty,
+  renderAll,
+  writeFiles,
+  type FileWrite,
+} from "./lib/render-pipeline.ts";
+import { coreDocRenderers } from "./renderers/index.ts";
 
 const SCHEMA_PATH = "questionnaire/schema.yaml";
-const DEFERRED_FLAG_MSG = (flag: string) => `flag --${flag} not supported in B3; planned for C1`;
 
-type ExitCode = 0 | 1 | 2;
+type ExitCode = 0 | 1 | 2 | 3;
+
+export type Mode = "validate-only" | "dry-run" | "write";
 
 export type RunResult = {
   ok: boolean;
@@ -53,6 +62,24 @@ export async function runValidation(profilePath: string): Promise<RunResult> {
   };
 }
 
+export async function runRender(profilePath: string): Promise<
+  | { ok: true; files: FileWrite[]; warnings: CompletenessEntry[] }
+  | { ok: false; error: string }
+> {
+  const loaded = await loadProfile(profilePath);
+  if (!loaded.ok) {
+    return { ok: false, error: loaded.error };
+  }
+  const schema = await loadSchema(SCHEMA_PATH);
+  if (!schema.ok) {
+    return { ok: false, error: schema.error };
+  }
+  const { warnings } = completenessCheck(schema.value, loaded.profile);
+  const profile = buildProfile(loaded.profile);
+  const files = renderAll(profile, [...coreDocRenderers]);
+  return { ok: true, files, warnings };
+}
+
 export function formatReport(result: RunResult, profilePath: string): string {
   const lines: string[] = [];
   lines.push(`generator/run:`);
@@ -73,6 +100,27 @@ export function formatReport(result: RunResult, profilePath: string): string {
     lines.push(`  issue [${issue.kind}] ${issue.path}: ${issue.detail}`);
   }
   for (const warn of result.warnings) {
+    lines.push(`  warning [user-specific-missing] ${warn.path}: ${warn.detail}`);
+  }
+  return lines.join("\n");
+}
+
+export function formatRenderSummary(
+  files: FileWrite[],
+  warnings: CompletenessEntry[],
+  mode: "dry-run" | "write",
+  outDir?: string,
+): string {
+  const lines: string[] = [];
+  if (mode === "dry-run") {
+    lines.push(`generator/render [dry-run]: ${files.length} file(s) would be emitted:`);
+  } else {
+    lines.push(`generator/render [write]: wrote ${files.length} file(s) to ${outDir}:`);
+  }
+  for (const file of files) {
+    lines.push(`  ${file.path} (${file.content.length} bytes)`);
+  }
+  for (const warn of warnings) {
     lines.push(`  warning [user-specific-missing] ${warn.path}: ${warn.detail}`);
   }
   return lines.join("\n");
@@ -121,25 +169,61 @@ async function main(): Promise<void> {
   }
 
   const { values } = parsed;
+  const profilePath = values.profile;
+  const validateOnly = values["validate-only"] === true;
+  const dryRun = values["dry-run"] === true;
+  const outDir = values.out;
 
-  if (values.out !== undefined) {
-    process.stderr.write(`generator/run: ${DEFERRED_FLAG_MSG("out")}\n`);
-    process.exit(2);
-  }
-  if (values["dry-run"] !== undefined) {
-    process.stderr.write(`generator/run: ${DEFERRED_FLAG_MSG("dry-run")}\n`);
-    process.exit(2);
-  }
-  if (!values.profile) {
+  if (!profilePath) {
     process.stderr.write(
-      "generator/run: --profile <path> is required. Usage: generator/run.ts --profile <path> [--validate-only]\n",
+      "generator/run: --profile <path> is required. " +
+        "Usage: generator/run.ts --profile <path> [--validate-only | --dry-run | --out <dir>]\n",
     );
     process.exit(2);
   }
 
-  const result = await runValidation(values.profile);
-  process.stdout.write(formatReport(result, values.profile) + "\n");
-  process.exit(result.exitCode);
+  const modes = [validateOnly, dryRun, outDir !== undefined].filter(Boolean).length;
+  if (modes > 1) {
+    process.stderr.write(
+      "generator/run: --validate-only, --dry-run and --out are mutually exclusive\n",
+    );
+    process.exit(2);
+  }
+
+  const validation = await runValidation(profilePath);
+  process.stdout.write(formatReport(validation, profilePath) + "\n");
+  if (!validation.ok) {
+    process.exit(validation.exitCode);
+  }
+
+  const mode: Mode = outDir !== undefined ? "write" : dryRun ? "dry-run" : "validate-only";
+  if (mode === "validate-only") {
+    process.exit(0);
+  }
+
+  if (mode === "write" && outDir !== undefined) {
+    if (!(await isDirEmpty(outDir))) {
+      process.stderr.write(
+        `generator/run: --out target '${outDir}' is not empty; aborting (exit 3)\n`,
+      );
+      process.exit(3);
+    }
+  }
+
+  const rendered = await runRender(profilePath);
+  if (!rendered.ok) {
+    process.stderr.write(`generator/run: render failed: ${rendered.error}\n`);
+    process.exit(2);
+  }
+
+  if (mode === "write" && outDir !== undefined) {
+    await writeFiles(outDir, rendered.files);
+  }
+
+  process.stdout.write(
+    formatRenderSummary(rendered.files, rendered.warnings, mode, outDir) + "\n",
+  );
+  process.exit(0);
 }
 
 const isDirectRun = (() => {
