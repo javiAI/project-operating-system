@@ -33,15 +33,15 @@ generator/
 │   ├── token-budget.ts     # [diferido] checker de presupuesto
 │   └── __tests__/          # test pairs
 └── renderers/
-    ├── index.ts            # tuple congelada coreDocRenderers
+    ├── index.ts            # coreDocRenderers + policyAndRulesRenderers + allRenderers (congeladas)
     ├── claude-md.ts        # C1
     ├── master-plan.ts      # C1
     ├── roadmap.ts          # C1
     ├── handoff.ts          # C1
     ├── agents.ts           # C1
     ├── readme.ts           # C1
-    ├── policy.ts           # C2 (pendiente)
-    ├── rules.ts            # C2 (pendiente) — .claude/rules/*.md
+    ├── policy.ts           # C2 — policy.yaml
+    ├── rules.ts            # C2 — .claude/rules/{docs,patterns}.md
     ├── tests.ts            # C3 (pendiente) — test harness según stack
     ├── ci-cd.ts            # C4 (pendiente) — .github/workflows/*.yml
     ├── hooks.ts            # C5 (pendiente) — copia + customiza paths
@@ -89,25 +89,27 @@ Los renderers deben producir **byte-identical output** para el mismo profile. Si
 - **Fixtures de integración**: [generator/__fixtures__/profiles/{valid-partial,missing-required,invalid-value}/](../../generator/__fixtures__/profiles/) — uno por clase de outcome (exit 0 con warnings / exit 1 completeness / exit 1 value).
 - **Smoke CI**: script `npm run validate:generator` corre el runner sobre los 3 profiles canónicos; step homónimo en [.github/workflows/ci.yml](../../.github/workflows/ci.yml) detecta regresiones antes de los unit tests.
 
-## Renderers (entregado en C1)
+## Renderers (entregado en C1, ampliado en C2)
 
 - **Pipeline**: [generator/lib/render-pipeline.ts](../../generator/lib/render-pipeline.ts). `renderAll(profile, renderers)` concatena `FileWrite[]` y **falla por invariante** ante colisión de paths (incluye índices de los dos renderers que colisionan). `writeFiles(dir, files)` crea subdirs (`mkdir -p`). `isDirEmpty(dir)` gate pre-`--out`.
-- **`FileWrite` shape**: `{ path: string; content: string }`. `path` relativo al root del repo generado (subdirs permitidos). Sin `mode` en C1 — se añade en C5 si hooks ejecutables lo requieren.
+- **`FileWrite` shape**: `{ path: string; content: string }`. `path` relativo al root del repo generado (subdirs permitidos). Sin `mode` en C1/C2 — se añade en C5 si hooks ejecutables lo requieren.
 - **Renderer contract**: función pura `(profile: Profile) => FileWrite[]`. Sin `Date.now()`, sin `Math.random()`, sin env vars. Byte-identical entre runs (tests lo validan con `JSON.stringify` comparativo).
-- **Core docs (C1)**: 6 renderers (`claude-md`, `master-plan`, `roadmap`, `handoff`, `agents`, `readme`) expuestos como tuple congelada `coreDocRenderers` en [generator/renderers/index.ts](../../generator/renderers/index.ts). Añadir un 7º = crear renderer + registrarlo en el array adecuado.
-- **Templates**: Handlebars en `templates/*.hbs` cargados sincronamente al eval del módulo renderer vía [generator/lib/template-loader.ts](../../generator/lib/template-loader.ts) (4ª aplicación pattern-before-abstraction: evita duplicar `Handlebars.create() + registerHelpers + compile` en cada renderer).
+- **Composición en [generator/renderers/index.ts](../../generator/renderers/index.ts)** (decisión Fase -1 de C2): tres arrays congelados — `coreDocRenderers` (6 renderers, C1), `policyAndRulesRenderers` (2 renderers, C2), `allRenderers = Object.freeze([...coreDocRenderers, ...policyAndRulesRenderers])`. `generator/run.ts` importa **sólo** `allRenderers` — la composición no vive en `run.ts`. Añadir un nuevo grupo (C3, C4, C5) = crear array congelado nuevo y concatenarlo dentro de `allRenderers`, no tocar `run.ts`.
+- **Core docs (C1)**: `claude-md`, `master-plan`, `roadmap`, `handoff`, `agents`, `readme`.
+- **Policy + rules (C2)**: `policy.ts` (emite `policy.yaml` vía un único template Handlebars con conditionals inline por stack; `type: "generated-project"` hardcoded; `project:` vía `{{answers.identity.name}}` → `TODO(identity.name)` cuando el profile no resuelve el path). `rules.ts` (emite 2 archivos: `.claude/rules/docs.md` con bullet "Trazabilidad de contexto" que referencia `HANDOFF.md §3`, cerrando el carry-over Fase N+7 iniciado en C1; `.claude/rules/patterns.md` con doctrina stack-agnóstica). Otros rules (`generator.md`, `templates.md`, `tests.md`, `ci-cd.md`, `skills-map.md`) quedan fuera del scope C2.
+- **Templates**: Handlebars en `templates/*.hbs` + subdirs (p.ej. `templates/.claude/rules/docs.md.hbs`) cargados sincronamente al eval del módulo renderer vía [generator/lib/template-loader.ts](../../generator/lib/template-loader.ts) (4ª aplicación pattern-before-abstraction: evita duplicar `Handlebars.create() + registerHelpers + compile` en cada renderer).
 - **Helpers**: [generator/lib/handlebars-helpers.ts](../../generator/lib/handlebars-helpers.ts) — `eq`, `neq`, `includes`, `kebabCase`, `upperFirst`, `jsonStringify`. Registrados sobre instancia privada. Ampliar aquí si un nuevo template lo exige, con tests de compilación real.
 - **Profile model**: [generator/lib/profile-model.ts](../../generator/lib/profile-model.ts) — `buildProfile(file)` expande dotted-answers a objeto nested e inyecta `TODO(identity.X)` para los 3 paths user-specific faltantes (`identity.name|description|owner`). Los templates referencian `{{answers.identity.name}}` sin `{{#if}}` guards.
 - **CLI modes**: `--validate-only` (default), `--dry-run`, `--out <dir>` — mutuamente exclusivos. `--out` sobre dir no vacío → exit 3. Validación fallida (exit 1) corta antes del render. Ver [docs/ARCHITECTURE.md § 3 Entrypoint](../../docs/ARCHITECTURE.md).
-- **Snapshots**: `generator/__snapshots__/<profile-slug>/<path>.snap` (3 profiles × 6 templates = 18 en C1). Añadir template = revisar 3 nuevos diffs pre-commit.
+- **Snapshots**: `generator/__snapshots__/<profile-slug>/<path>.snap` (3 profiles × 9 templates = 27 tras C2; era 18 en C1). Añadir template = revisar 3 nuevos diffs pre-commit.
 - **CI smoke**: scripts `validate:generator` (exit 0 sobre 3 canonicals) + `render:generator` (dry-run sobre 3 canonicals); ambos son steps en [.github/workflows/ci.yml](../../.github/workflows/ci.yml).
 
-## Deferrals (B3 / C1)
+## Deferrals (B3 / C1 / C2)
 
 - **`generator/lib/token-budget.ts`** — **diferido**. Motivo: `questionnaire/schema.yaml` no declara `workflow.token_budget` todavía; implementar el checker sin campo que leer sería abstracción prematura (CLAUDE.md regla #7). Reintroducir en rama posterior cuando el schema añada el campo. No crear el archivo hasta entonces.
 - **`--schema` flag** — diferido. Mientras haya un único schema canónico, hard-coded basta. Abrir cuando aparezca un 2º schema (por ejemplo, variante Python-only).
-- **`--force` flag** — fuera de scope C1. `--out` sobre dir no vacío aborta con exit 3 protegiendo output del usuario. Reabrir cuando un flujo legítimo lo exija.
-- **`templates/.claude/rules/docs.md.hbs`** — diferido a C2 (coherencia de scope con `.claude/rules/*.md`). Completa el carry-over Fase N+7 iniciado en C1.
+- **`--force` flag** — fuera de scope C1/C2. `--out` sobre dir no vacío aborta con exit 3 protegiendo output del usuario. Reabrir cuando un flujo legítimo lo exija.
+- **Rules path-scoped adicionales (`generator.md`, `templates.md`, `tests.md`, `ci-cd.md`, `skills-map.md`)** — fuera de scope C2. Se añadirán en ramas posteriores sólo cuando aparezca señal de stack-specificidad real o de duplicación entre el meta-repo y el proyecto generado.
 
 ## Reuso desde `tools/lib/` (pattern-before-abstraction, 4ª aplicación)
 

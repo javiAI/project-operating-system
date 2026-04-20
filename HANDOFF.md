@@ -5,7 +5,7 @@
 ## 1. Snapshot
 
 - Repo: `project-operating-system` (plugin `pos`).
-- Fase actual: **C1 ✅ cerrada en rama** (`feat/c1-renderers-core-docs`, PR #4). Anterior: **B3 ✅ PR #3** (`5388a80`). Siguiente: **C2 — `feat/c2-renderers-policy-rules`**.
+- Fase actual: **C2 ✅ cerrada en rama** (`feat/c2-renderers-policy-rules`, PR pendiente de abrir). Anterior: **C1 ✅ PR #4** (`d361c9b`). Siguiente: **C3 — `feat/c3-renderers-tests-harness`**.
 - Fuente de verdad ejecutable: [MASTER_PLAN.md](MASTER_PLAN.md).
 - Estado vivo: [ROADMAP.md](ROADMAP.md).
 - Arquitectura canonical: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -85,7 +85,7 @@ Ejecuta §2.1 Fase -1 completo. Espera aprobación explícita antes de `git chec
 ## 6b. Carry-over a fases futuras
 
 - **C1 (`feat/c1-renderers-core-docs`)** ✅ [parcial completada]: Fase N+7 propagada en `templates/HANDOFF.md.hbs` (matriz + checklist) y `templates/AGENTS.md.hbs` (Fase N+7 como última fase del flujo de rama).
-- **C2 (`feat/c2-renderers-policy-rules`)**: completa el carry-over. `templates/.claude/rules/docs.md.hbs` debe incluir el checkbox de trazabilidad (originalmente planeado en C1, diferido a C2 por coherencia de scope con `.claude/rules/*.md`). Todo proyecto generado con `pos` hereda la misma disciplina de context-management una vez C2 cierra.
+- **C2 (`feat/c2-renderers-policy-rules`)** ✅ **carry-over cerrado**: `templates/.claude/rules/docs.md.hbs` incluye el bullet "Trazabilidad de contexto" referenciando `HANDOFF.md §3`. Todo proyecto generado con `pos` hereda ya la disciplina completa de context-management.
 
 ## 7. Gotchas del entorno
 
@@ -104,28 +104,29 @@ Hasta que `pos` tenga sus propias skills:
 
 ## 9. Próxima rama
 
-**C2 — `feat/c2-renderers-policy-rules`**
+**C3 — `feat/c3-renderers-tests-harness`**
 
-Scope (ver [MASTER_PLAN.md § Rama C2](MASTER_PLAN.md)):
+Scope (ver [MASTER_PLAN.md § Rama C3](MASTER_PLAN.md)):
 
-- Renderer para `policy.yaml` + `.claude/rules/*.md` según stack/paths del profile.
-- Templates + helpers Handlebars adicionales (si el diseño lo exige).
-- Completa el carry-over Fase N+7: `templates/.claude/rules/docs.md.hbs` con checkbox de trazabilidad (diferido desde C1 por coherencia de scope).
+- Renderer para test harness por stack (Node/Python/Go/Rust): configs (vitest/jest, pytest, go test, cargo), scripts en `package.json` / `Makefile`, ejemplo smoke test, `tests/README.md`.
+- Registrarse en un nuevo array (p.ej. `testsHarnessRenderers`) y componerse en `allRenderers` desde `generator/renderers/index.ts` (patrón establecido en C2).
 
 Lectura mínima al arrancar:
 
-- [MASTER_PLAN.md § Rama C2](MASTER_PLAN.md)
+- [MASTER_PLAN.md § Rama C3](MASTER_PLAN.md)
 - [docs/ARCHITECTURE.md § Renderers](docs/ARCHITECTURE.md)
-- [.claude/rules/generator.md](.claude/rules/generator.md) + [.claude/rules/templates.md](.claude/rules/templates.md)
-- `generator/renderers/` + `generator/lib/render-pipeline.ts` entregados en C1.
+- [.claude/rules/generator.md](.claude/rules/generator.md) + [.claude/rules/tests.md](.claude/rules/tests.md) + [.claude/rules/templates.md](.claude/rules/templates.md)
+- `generator/renderers/index.ts` + `generator/lib/render-pipeline.ts` (patrón de composición entregado en C1/C2).
 
-## 10. Estado C1 (cerrada en rama)
+## 10. Estado C2 (cerrada en rama)
 
-Primera emisión real de archivos completada. Pipeline `Profile → FileWrite[] → fs` viva. Detalle de entregables en [ROADMAP.md § Progreso Fase C](ROADMAP.md) y la pipeline está documentada en [docs/ARCHITECTURE.md § Renderers](docs/ARCHITECTURE.md).
+Policy + rules path-scoped emitidas. 9 archivos por profile (6 docs + `policy.yaml` + 2 rules). Pipeline `allRenderers` compone `coreDocRenderers + policyAndRulesRenderers` desde `generator/renderers/index.ts`. Detalle de entregables en [ROADMAP.md § Progreso Fase C](ROADMAP.md); pipeline documentada en [docs/ARCHITECTURE.md § Renderers](docs/ARCHITECTURE.md).
 
-Apuntes para quien arranque C2:
+Apuntes para quien arranque C3:
 
-- Punto de extensión: añadir un renderer implica crear `generator/renderers/<x>.ts` (usa `loadTemplate`) + test pair + registrarlo en el array apropiado (`coreDocRenderers` o un nuevo array para C2). Colisiones de paths fallan el pipeline — garantía de invariante.
-- `buildProfile` vive en `generator/lib/profile-model.ts`; si C2 necesita más placeholders user-specific, ampliar `USER_SPECIFIC_PATHS` allí.
-- Snapshots por convención en `generator/__snapshots__/<slug>/<path>.snap`. Añadir un template = añadir 3 snapshots (uno por profile canónico).
-- Helpers Handlebars se registran en `generator/lib/handlebars-helpers.ts`; si C2 introduce nuevos, añadir tests de compilación real allí.
+- Patrón de composición: añadir un nuevo grupo de renderers = crear array congelado en `generator/renderers/index.ts` (p.ej. `testsHarnessRenderers`) y componerlo dentro de `allRenderers`. `run.ts` no se toca. Esto evita que `run.ts` se convierta en sitio de composición creciente.
+- Colisiones de paths fallan el pipeline por invariante. `renderAll` reporta índices de los dos renderers que colisionan.
+- Snapshots por convención en `generator/__snapshots__/<slug>/<path>.snap`. Añadir 1 template = 3 snapshots nuevos (uno por profile canónico). C3 presumiblemente añadirá varios templates por stack.
+- Conditionals Handlebars del estilo `{{#if (eq answers.stack.language "typescript")}}` funcionan ya; `testing.unit.framework_node` / `framework_python` están resueltos en los 3 profiles canónicos.
+- Helpers Handlebars se registran en `generator/lib/handlebars-helpers.ts`; si C3 necesita helpers stack-específicos, añadir tests de compilación real allí.
+- Carry-over Fase N+7: **cerrado en C2**. No hay carry-over abierto al arrancar C3.

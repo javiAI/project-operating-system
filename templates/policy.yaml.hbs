@@ -1,0 +1,164 @@
+{{!-- templates/policy.yaml.hbs — declarative policy for the generated repo (C2) --}}
+# policy.yaml — política declarativa de {{answers.identity.name}}
+#
+# Fuente de verdad para qué skills/hooks deben correr en cada punto del ciclo.
+# Leído por:
+#   - .claude/hooks/*.py (gate enforcement)
+#   - pos:audit-session (compara logs vs policy)
+#   - pos:audit-plugin (valida nuevos MCPs/plugins)
+
+version: "0.1.0"
+project: "{{answers.identity.name}}"
+type: "generated-project"
+
+# ─────────────────────────────────────────────
+# Presupuesto de tokens (por sesión)
+# ─────────────────────────────────────────────
+token_budget:
+  session_soft_limit: 150000
+  session_hard_limit: 180000
+  warn_at: 120000
+  auto_compact_at: 160000
+  claude_md_max_lines: 200
+  rules_total_max_kb: 40
+  rules_autoload_max_kb: 25
+
+# ─────────────────────────────────────────────
+# Model routing
+# ─────────────────────────────────────────────
+model_routing:
+  default: "{{#if answers.claude_code.default_model}}{{answers.claude_code.default_model}}{{else}}claude-sonnet-4-6{{/if}}"
+  overrides:
+    architecture: "claude-opus-4-7"
+    review: "claude-sonnet-4-6"
+    lookup: "claude-haiku-4-5-20251001"
+    generation: "claude-sonnet-4-6"
+  escalation:
+    allow_skill_override_model: true
+    require_justification_in_frontmatter: true
+
+# ─────────────────────────────────────────────
+# Lifecycle — qué skills/hooks deben correr cuándo
+# ─────────────────────────────────────────────
+lifecycle:
+
+  session_start:
+    hooks_required: ["session-start.py"]
+    skills_invoked: []
+
+  branch_creation:
+    prerequisites:
+      - type: marker
+        path: ".claude/branch-approvals/{branch-slug}.approved"
+      - type: skill_log
+        skill: "pos:branch-plan"
+        must_exist_for_branch: true
+    hooks_required: ["pre-branch-gate.py"]
+    blocking: true
+
+  pre_commit:
+    hooks_required: ["pre-write-guard.py"]
+    skills_required: ["pos:pre-commit-review"]
+    blocking: true
+
+  pre_push:
+    checks_required:
+{{#if (eq answers.stack.language "typescript")}}
+      - name: "typecheck"
+        command_meta: "npx tsc --noEmit"
+      - name: "unit-tests"
+        command_meta: "npx vitest run"
+      - name: "lint"
+        command_meta: "npx eslint ."
+{{/if}}
+{{#if (eq answers.stack.language "python")}}
+      - name: "typecheck"
+        command_meta: "python3 -m mypy ."
+      - name: "unit-tests"
+        command_meta: "python3 -m pytest"
+      - name: "lint"
+        command_meta: "python3 -m ruff check ."
+{{/if}}
+      - name: "coverage-threshold"
+        threshold_source: "testing.unit.coverage_threshold"
+    blocking: true
+
+  pre_pr:
+    skills_required:
+      - "pos:simplify"
+      - "pos:pre-commit-review"
+      - "pos:pattern-audit"
+    docs_sync_required:
+      - "ROADMAP.md"
+      - "HANDOFF.md"
+    ci_dry_run_required: true
+    invariants_check: true
+    blocking: true
+
+  post_merge:
+    hooks_required: ["post-action.py"]
+
+  pre_compact:
+    hooks_required: ["pre-compact.py"]
+    persist:
+      - decisions_in_flight
+      - phase_minus_one_state
+
+# ─────────────────────────────────────────────
+# Safety — community tools
+# ─────────────────────────────────────────────
+safety:
+  community_tool_gate:
+    skill_required: "pos:audit-plugin"
+    block_install_without_pass: true
+    trusted_sources:
+      - "anthropic-mcp-registry"
+      - "plugin://anthropics/*"
+    optin_starter_mcps: []
+    denylist: []
+  hook_audit_rules:
+    - "no_curl_wget_in_hooks"
+    - "no_env_read_without_declaration"
+    - "no_network_without_declaration"
+    - "no_shell_true_subprocess"
+
+# ─────────────────────────────────────────────
+# Testing
+# ─────────────────────────────────────────────
+testing:
+  unit:
+{{#if (eq answers.stack.language "typescript")}}
+    framework_node: "{{answers.testing.unit_framework}}"
+{{/if}}
+{{#if (eq answers.stack.language "python")}}
+    framework_python: "{{answers.testing.unit_framework}}"
+{{/if}}
+    coverage_threshold: {{answers.testing.coverage_threshold}}
+  enforcement:
+    test_before_impl: true
+    block_push_if_failing: true
+    block_pr_if_coverage_below_threshold: true
+
+# ─────────────────────────────────────────────
+# CI/CD
+# ─────────────────────────────────────────────
+ci_cd:
+  host: "{{answers.workflow.ci_host}}"
+{{#if answers.workflow.branch_protection}}
+  branch_protection:
+    main:
+      enforce_admins: false
+      required_pull_request_reviews: 1
+{{/if}}
+
+# ─────────────────────────────────────────────
+# Auditing
+# ─────────────────────────────────────────────
+audit:
+  log_dirs:
+    - ".claude/logs/"
+  required_logs:
+    - "skills.jsonl"
+    - "hooks.jsonl"
+    - "phase-gates.jsonl"
+  retention_days: 90

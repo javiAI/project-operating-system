@@ -108,17 +108,20 @@ describe("formatReport", () => {
 });
 
 describe("runRender (unit)", () => {
-  it("returns 6 FileWrite entries and user-specific warnings for valid-partial", async () => {
+  it("returns 9 FileWrite entries and user-specific warnings for valid-partial", async () => {
     const r = await runRender(VALID);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.files.map((f) => f.path).sort()).toEqual([
+      ".claude/rules/docs.md",
+      ".claude/rules/patterns.md",
       "AGENTS.md",
       "CLAUDE.md",
       "HANDOFF.md",
       "MASTER_PLAN.md",
       "README.md",
       "ROADMAP.md",
+      "policy.yaml",
     ]);
     for (const file of r.files) {
       expect(file.content.length).toBeGreaterThan(0);
@@ -142,8 +145,10 @@ describe("formatRenderSummary", () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     const out = formatRenderSummary(r.files, r.warnings, "dry-run");
-    expect(out).toMatch(/dry-run.*6 file\(s\) would be emitted/);
+    expect(out).toMatch(/dry-run.*9 file\(s\) would be emitted/);
     expect(out).toContain("CLAUDE.md");
+    expect(out).toContain("policy.yaml");
+    expect(out).toContain(".claude/rules/docs.md");
     expect(out).toMatch(/warning .*identity\.name/);
   });
 
@@ -152,7 +157,7 @@ describe("formatRenderSummary", () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     const out = formatRenderSummary(r.files, r.warnings, "write", "/tmp/demo");
-    expect(out).toMatch(/wrote 6 file\(s\) to \/tmp\/demo/);
+    expect(out).toMatch(/wrote 9 file\(s\) to \/tmp\/demo/);
   });
 });
 
@@ -181,33 +186,42 @@ describe("generator/run.ts CLI (integration)", () => {
     expect(r.stdout).toMatch(/answer-value-not-in-enum/);
   }, 30000);
 
-  it("exits 0 and lists 6 files with --dry-run for valid-partial", () => {
+  it("exits 0 and lists 9 files with --dry-run for valid-partial", () => {
     const r = runCli(["--profile", VALID, "--dry-run"]);
     expect(r.code).toBe(0);
-    expect(r.stdout).toMatch(/dry-run.*6 file\(s\) would be emitted/);
+    expect(r.stdout).toMatch(/dry-run.*9 file\(s\) would be emitted/);
     expect(r.stdout).toContain("CLAUDE.md");
     expect(r.stdout).toContain("MASTER_PLAN.md");
     expect(r.stdout).toContain("ROADMAP.md");
     expect(r.stdout).toContain("HANDOFF.md");
     expect(r.stdout).toContain("AGENTS.md");
     expect(r.stdout).toContain("README.md");
+    expect(r.stdout).toContain("policy.yaml");
+    expect(r.stdout).toContain(".claude/rules/docs.md");
+    expect(r.stdout).toContain(".claude/rules/patterns.md");
   }, 30000);
 
-  it("exits 0 and writes 6 files into an empty --out directory", () => {
+  it("exits 0 and writes 9 files into an empty --out directory", () => {
     const outDir = mkdtempSync(join(tmpdir(), "run-out-"));
     const r = runCli(["--profile", VALID, "--out", outDir]);
     expect(r.code).toBe(0);
     const written = readdirSync(outDir).sort();
     expect(written).toEqual([
+      ".claude",
       "AGENTS.md",
       "CLAUDE.md",
       "HANDOFF.md",
       "MASTER_PLAN.md",
       "README.md",
       "ROADMAP.md",
+      "policy.yaml",
     ]);
     expect(readFileSync(join(outDir, "CLAUDE.md"), "utf8").length).toBeGreaterThan(0);
-    expect(r.stdout).toMatch(/wrote 6 file\(s\)/);
+    expect(readFileSync(join(outDir, ".claude/rules/docs.md"), "utf8"))
+      .toContain("Trazabilidad de contexto");
+    expect(readFileSync(join(outDir, "policy.yaml"), "utf8"))
+      .toContain("type: \"generated-project\"");
+    expect(r.stdout).toMatch(/wrote 9 file\(s\)/);
   }, 30000);
 
   it("exits 3 when --out target is not empty", () => {

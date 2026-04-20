@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { coreDocRenderers } from "./index.ts";
+import {
+  allRenderers,
+  coreDocRenderers,
+  policyAndRulesRenderers,
+} from "./index.ts";
 import { renderAll } from "../lib/render-pipeline.ts";
 import { loadCanonicalProfiles } from "../__tests__/load-canonical-profiles.ts";
+
+const profiles = loadCanonicalProfiles();
 
 describe("renderers/index — coreDocRenderers", () => {
   it("exposes exactly 6 renderers (C1 scope)", () => {
@@ -11,8 +17,6 @@ describe("renderers/index — coreDocRenderers", () => {
   it("is frozen to prevent accidental mutation", () => {
     expect(Object.isFrozen(coreDocRenderers)).toBe(true);
   });
-
-  const profiles = loadCanonicalProfiles();
 
   it.each(profiles)(
     "produces the 6 expected file paths through the pipeline for $slug without collisions",
@@ -34,6 +38,49 @@ describe("renderers/index — coreDocRenderers", () => {
     ({ profile }) => {
       const a = renderAll(profile, [...coreDocRenderers]);
       const b = renderAll(profile, [...coreDocRenderers]);
+      expect(JSON.stringify(a)).toEqual(JSON.stringify(b));
+    }
+  );
+});
+
+describe("renderers/index — policyAndRulesRenderers (C2)", () => {
+  it("exposes exactly 2 renderers (policy + rules, C2 scope)", () => {
+    expect(policyAndRulesRenderers).toHaveLength(2);
+  });
+
+  it("is frozen to prevent accidental mutation", () => {
+    expect(Object.isFrozen(policyAndRulesRenderers)).toBe(true);
+  });
+});
+
+describe("renderers/index — allRenderers (C2 composition)", () => {
+  it("is frozen", () => {
+    expect(Object.isFrozen(allRenderers)).toBe(true);
+  });
+
+  it.each(profiles)(
+    "produces the 9 expected file paths through the pipeline for $slug without collisions",
+    ({ profile }) => {
+      const files = renderAll(profile, [...allRenderers]);
+      expect(files.map((f) => f.path).sort()).toEqual([
+        ".claude/rules/docs.md",
+        ".claude/rules/patterns.md",
+        "AGENTS.md",
+        "CLAUDE.md",
+        "HANDOFF.md",
+        "MASTER_PLAN.md",
+        "README.md",
+        "ROADMAP.md",
+        "policy.yaml",
+      ]);
+    }
+  );
+
+  it.each(profiles)(
+    "is deterministic: byte-identical FileWrite[] across runs for $slug",
+    ({ profile }) => {
+      const a = renderAll(profile, [...allRenderers]);
+      const b = renderAll(profile, [...allRenderers]);
       expect(JSON.stringify(a)).toEqual(JSON.stringify(b));
     }
   );

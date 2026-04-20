@@ -1,0 +1,44 @@
+{{!-- templates/.claude/rules/docs.md.hbs — docs discipline for the generated repo (C2 carry-over Fase N+7) --}}
+---
+name: docs
+description: Reglas de escritura y docs-sync para los documentos canónicos del repo
+paths:
+  - "*.md"
+  - "docs/**"
+---
+
+# Reglas — Docs
+
+## Principio
+
+Los documentos canónicos son únicos y estables. No crear variantes (`NOTES.md`, `TODO.md`, `PLAN-V3.md`). Si necesitas persistir estado efímero, usa memoria persistente.
+
+## Archivos canónicos
+
+| Archivo | Propósito |
+|---|---|
+| `MASTER_PLAN.md` | Plan inmutable de ramas. Se edita sólo al cerrar una rama con decisiones que amplíen o contradigan el plan. |
+| `ROADMAP.md` | Estado vivo. Una sola tabla + progreso por fase. |
+| `HANDOFF.md` | Quickref 30s. Se reescribe al final de cada rama. |
+| `AGENTS.md` | Reglas de ejecución autónoma. Cambia raramente. |
+| `CLAUDE.md` | <200 líneas. Reglas del repo. |
+
+## Reglas de escritura
+
+1. **Enlaces relativos** siempre. `[texto](docs/X.md#seccion)`, nunca URLs absolutas al propio repo.
+2. **Sin timestamps** en el cuerpo (usa `git blame`).
+3. **Sin emojis** salvo `✅ ❌ ⚠️` en tablas de estado.
+4. **Líneas ≤120 chars**. Prefiere párrafos cortos.
+5. **Citación de código**: `path/al/archivo.ts:42-58`, nunca copia-pega extensa.
+
+## Docs-sync en cada rama (Fase N+3)
+
+Antes de cerrar la rama, validar:
+
+- [ ] `ROADMAP.md` refleja el nuevo estado (añadir fila o marcar ✅).
+- [ ] `HANDOFF.md` sección "Próxima rama" apunta a la siguiente.
+- [ ] `MASTER_PLAN.md § Rama X` — si la rama cerró con decisiones que amplíen o contradigan el plan, actualizar la sección de esa rama + explicar en kickoff.
+- [ ] `.claude/rules/*.md` — si la rama introdujo patrones que se repetirán, crear o actualizar rule path-scoped.
+- [ ] **Trazabilidad de contexto**: si la rama se inició con `/compact` o `/clear` (emitido en Fase N+7 de la rama anterior), el primer commit de kickoff referencia el resume prompt usado (archivos releídos + decisiones preservadas). Ver [HANDOFF.md §3](../../HANDOFF.md).
+
+El hook `pre-pr-gate.py` verifica que al menos `ROADMAP.md` y `HANDOFF.md` están en el diff de la rama.

@@ -1,0 +1,49 @@
+---
+name: patterns
+description: Reglas al editar registros de patrones extraídos por compound + invariants
+paths:
+  - ".claude/patterns/**"
+  - ".claude/invariants/**"
+  - ".claude/anti-patterns/**"
+---
+
+# Reglas — Patterns registry
+
+## Origen
+
+Los patrones no se escriben a mano al inicio. Emergen:
+
+1. `/pos:compound` (post-merge, con trigger por `touched_paths`) analiza el diff.
+2. Detecta repeticiones cross-rama con evidencia (≥2 commits distintos con estructura similar).
+3. Emite PR separado `chore/compound-YYYY-MM-DD` con:
+   - Nuevo archivo `.claude/patterns/<area>/<nombre>.md`.
+   - Evidencia: enlaces a commits + diffs minimales.
+   - Propuesta de antipattern counterpart si aplicable.
+
+## Formato de un pattern file
+
+El esqueleto obligatorio de un pattern es:
+
+- Frontmatter con `name`, `description`, `paths`, `evidence` (≥2 entradas con `commit` + `diff_range`), `introduced_in`, `supersedes`, `conflicts_with`.
+- Cuerpo con cuatro secciones: **Cuándo aplicar**, **Implementación canónica**, **Antipattern (qué NO hacer)**, **Excepciones justificadas**.
+
+Consulta `.claude/patterns/README.md` (cuando exista) para un ejemplo completo o inspecciona cualquier archivo existente bajo `.claude/patterns/<area>/`.
+
+## Antipatterns
+
+En `.claude/anti-patterns/common.md`. Formato declarativo (lo que está prohibido + por qué). El hook `PreToolUse(Write)` grepea y bloquea si detecta match sin waiver.
+
+## Invariants
+
+`.claude/invariants/INVARIANTS.md` — contratos cross-módulo. Cada invariante declara `Scope`, `Precondition`, `Postcondition`, `Enforcement` (script o test que lo valida) y `Origin`. Un invariante roto bloquea merge (hook `pre-pr-gate.py` lo valida con el script declarado en `enforcement`).
+
+## Reglas duras
+
+1. **No editar pattern files a mano** salvo para actualizar `evidence`/`supersedes` con nuevo commit. Nuevos patrones → `/pos:compound`.
+2. **Paths obligatorio** — sin `paths:` no se inyecta; un pattern global es casi siempre un smell (pon la regla en `CLAUDE.md` o `rules/`).
+3. **Un pattern, una cosa**. Si el archivo crece >200 líneas, se parte.
+4. **Conflict resolution**: si dos patterns aplican al mismo archivo y conflictan, uno debe declarar al otro como `supersedes`.
+
+## Purga
+
+Patterns que no se referencian en commits durante ≥6 meses son candidatos de purga. `/pos:audit-session --patterns` lo reporta.
