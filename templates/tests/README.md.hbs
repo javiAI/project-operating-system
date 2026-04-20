@@ -21,7 +21,9 @@ make test          # alias de test-unit
 make test-unit     # unit tests
 make test-coverage # unit tests con coverage
 {{#if (eq answers.stack.language "typescript")}}
+{{#if (neq answers.testing.e2e_framework "none")}}
 make test-e2e      # placeholder; ver sección E2E más abajo
+{{/if}}
 {{/if}}
 make clean         # limpia coverage + caches
 ```
@@ -47,7 +49,7 @@ Threshold declarado en el profile: `{{answers.testing.coverage_threshold}}%`.
 `vitest.config.ts` aplica el threshold en `coverage.thresholds` (lines/functions/branches/statements).
 {{/if}}
 {{#if (eq answers.stack.language "python")}}
-`pytest.ini` aplica `--cov-fail-under={{answers.testing.coverage_threshold}}` vía `addopts`.
+El target `make test-coverage` aplica `--cov-fail-under={{answers.testing.coverage_threshold}}` al invocar `pytest` (no vive en `pytest.ini` para que `make test-unit` no enforce threshold).
 {{/if}}
 
 {{#if (neq answers.testing.e2e_framework "none")}}

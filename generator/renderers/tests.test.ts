@@ -43,7 +43,7 @@ describe("renderers/tests — critical strings per stack", () => {
     }
   );
 
-  it("python profile agent-sdk — smoke has def test_ + assert, pytest.ini has [pytest] + --cov", () => {
+  it("python profile agent-sdk — smoke has def test_ + assert, pytest.ini has [pytest], coverage flags live in Makefile", () => {
     const files = render(bySlug["agent-sdk"]!);
     const smoke = files.find((f) => f.path === "tests/test_smoke.py");
     expect(smoke).toBeDefined();
@@ -52,7 +52,9 @@ describe("renderers/tests — critical strings per stack", () => {
     const config = files.find((f) => f.path === "pytest.ini");
     expect(config).toBeDefined();
     expect(config!.content).toMatch(/\[pytest\]/);
-    expect(config!.content).toMatch(/--cov/);
+    expect(config!.content).not.toMatch(/--cov/);
+    const mk = files.find((f) => f.path === "Makefile")!;
+    expect(mk.content).toMatch(/--cov/);
   });
 
   it.each(["nextjs-app", "cli-tool", "agent-sdk"])(
@@ -98,15 +100,17 @@ describe("renderers/tests — coverage threshold reflected in config", () => {
     }
   );
 
-  it("python profile agent-sdk reflects coverage threshold as --cov-fail-under=N in pytest.ini", () => {
+  it("python profile agent-sdk reflects coverage threshold as --cov-fail-under=N in Makefile's test-coverage target (not pytest.ini)", () => {
     const profile = bySlug["agent-sdk"]!;
     const threshold = (profile.answers.testing as Record<string, unknown>)
       .coverage_threshold as number;
     const files = render(profile);
-    const config = files.find((f) => f.path === "pytest.ini")!;
-    expect(config.content).toMatch(
+    const mk = files.find((f) => f.path === "Makefile")!;
+    expect(mk.content).toMatch(
       new RegExp(`--cov-fail-under=${threshold}\\b`)
     );
+    const ini = files.find((f) => f.path === "pytest.ini")!;
+    expect(ini.content).not.toMatch(/--cov-fail-under/);
   });
 });
 
@@ -127,6 +131,23 @@ describe("renderers/tests — e2e framework reflected only in README (no config 
       expect(readme.content.toLowerCase()).not.toMatch(/cypress/);
     }
   );
+
+  it("cli-tool (TS + e2e_framework=none) — README does not list `make test-e2e` and Makefile defines no test-e2e target", () => {
+    const files = render(bySlug["cli-tool"]!);
+    const readme = files.find((f) => f.path === "tests/README.md")!;
+    expect(readme.content).not.toMatch(/make test-e2e/);
+    const mk = files.find((f) => f.path === "Makefile")!;
+    expect(mk.content).not.toMatch(/^test-e2e:/m);
+    expect(mk.content).not.toMatch(/\btest-e2e\b/);
+  });
+
+  it("nextjs-app (TS + e2e_framework=playwright) — README lists `make test-e2e` and Makefile defines the target", () => {
+    const files = render(bySlug["nextjs-app"]!);
+    const readme = files.find((f) => f.path === "tests/README.md")!;
+    expect(readme.content).toMatch(/make test-e2e/);
+    const mk = files.find((f) => f.path === "Makefile")!;
+    expect(mk.content).toMatch(/^test-e2e:/m);
+  });
 
   it("python profile with e2e_framework!=none — README does NOT render the E2E section (Makefile has no test-e2e target in Python)", () => {
     const pythonWithE2e = buildProfile({

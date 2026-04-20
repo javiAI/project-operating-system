@@ -141,6 +141,38 @@ describe("runRender (unit)", () => {
     const r = await runRender("generator/__fixtures__/profiles/does-not-exist.yaml");
     expect(r.ok).toBe(false);
   });
+
+  it("returns { ok: false, error } when a renderer throws (deferred framework), not a fatal crash", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "run-deferred-"));
+    const path = join(dir, "profile.yaml");
+    writeFileSync(
+      path,
+      [
+        "version: \"0.1.0\"",
+        "profile:",
+        "  name: \"deferred-jest\"",
+        "  description: \"deferred framework fixture\"",
+        "answers:",
+        "  \"domain.type\": \"cli\"",
+        "  \"stack.language\": \"typescript\"",
+        "  \"stack.database\": \"none\"",
+        "  \"testing.unit_framework\": \"jest\"",
+        "  \"testing.coverage_threshold\": 80",
+        "  \"testing.e2e_framework\": \"none\"",
+        "  \"workflow.ci_host\": \"github\"",
+        "  \"workflow.release_strategy\": \"manual\"",
+        "  \"workflow.branch_protection\": true",
+        "  \"claude_code.default_model\": \"claude-sonnet-4-6\"",
+        "",
+      ].join("\n"),
+    );
+    const r = await runRender(path);
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error).toMatch(/jest/);
+    expect(r.error).toMatch(/deferred/i);
+    expect(r.error).toMatch(/testing\.unit_framework/);
+  });
 });
 
 describe("formatRenderSummary", () => {

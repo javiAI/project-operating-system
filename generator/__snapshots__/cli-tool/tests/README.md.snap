@@ -16,7 +16,6 @@ Todos los comandos se invocan desde el `Makefile` de la raíz:
 make test          # alias de test-unit
 make test-unit     # unit tests
 make test-coverage # unit tests con coverage
-make test-e2e      # placeholder; ver sección E2E más abajo
 make clean         # limpia coverage + caches
 ```
 

@@ -77,7 +77,12 @@ export async function runRender(profilePath: string): Promise<
   }
   const { warnings } = completenessCheck(schema.value, loaded.profile);
   const profile = buildProfile(loaded.profile);
-  const files = renderAll(profile, [...allRenderers]);
+  let files: FileWrite[];
+  try {
+    files = renderAll(profile, [...allRenderers]);
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
   return { ok: true, files, warnings };
 }
 

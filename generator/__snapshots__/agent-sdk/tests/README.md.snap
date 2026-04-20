@@ -29,7 +29,7 @@ Ejemplo inicial: `tests/test_smoke.py` — una assertion trivial que verifica qu
 
 Threshold declarado en el profile: `90%`.
 
-`pytest.ini` aplica `--cov-fail-under=90` vía `addopts`.
+El target `make test-coverage` aplica `--cov-fail-under=90` al invocar `pytest` (no vive en `pytest.ini` para que `make test-unit` no enforce threshold).
 
 
 ## Qué NO emite C3 (diferidos)

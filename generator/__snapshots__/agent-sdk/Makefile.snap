@@ -18,7 +18,7 @@ test-unit:
 	python3 -m pytest
 
 test-coverage:
-	python3 -m pytest --cov --cov-report=term-missing
+	python3 -m pytest --cov --cov-fail-under=90 --cov-report=term-missing
 
 clean:
 	rm -rf coverage/ .pytest_cache/ .vitest_cache/ .coverage

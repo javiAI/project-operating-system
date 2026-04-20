@@ -6,7 +6,9 @@
 #   make test-unit     # unit tests
 #   make test-coverage # unit tests con coverage
 {{#if (eq answers.stack.language "typescript")}}
+{{#if (neq answers.testing.e2e_framework "none")}}
 #   make test-e2e      # e2e placeholder (ver tests/README.md)
+{{/if}}
 {{/if}}
 #   make clean         # limpia artefactos de test/coverage
 #
@@ -14,7 +16,7 @@
 # queda pendiente de fase posterior. Los targets invocan binarios asumiendo
 # que el stack está instalado localmente.
 
-.PHONY: test test-unit test-coverage{{#if (eq answers.stack.language "typescript")}} test-e2e{{/if}} clean
+.PHONY: test test-unit test-coverage{{#if (eq answers.stack.language "typescript")}}{{#if (neq answers.testing.e2e_framework "none")}} test-e2e{{/if}}{{/if}} clean
 
 test: test-unit
 
@@ -25,15 +27,17 @@ test-unit:
 test-coverage:
 	npx vitest run --coverage
 
+{{#if (neq answers.testing.e2e_framework "none")}}
 test-e2e:
 	@echo "E2E: ver tests/README.md para configurar el framework elegido."
+{{/if}}
 {{/if}}
 {{#if (eq answers.stack.language "python")}}
 test-unit:
 	python3 -m pytest
 
 test-coverage:
-	python3 -m pytest --cov --cov-report=term-missing
+	python3 -m pytest --cov --cov-fail-under={{answers.testing.coverage_threshold}} --cov-report=term-missing
 {{/if}}
 
 clean:
