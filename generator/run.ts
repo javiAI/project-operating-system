@@ -126,7 +126,7 @@ async function main(): Promise<void> {
     process.stderr.write(`generator/run: ${DEFERRED_FLAG_MSG("out")}\n`);
     process.exit(2);
   }
-  if (values["dry-run"]) {
+  if (values["dry-run"] !== undefined) {
     process.stderr.write(`generator/run: ${DEFERRED_FLAG_MSG("dry-run")}\n`);
     process.exit(2);
   }

@@ -48,7 +48,15 @@ describe("runValidation (unit)", () => {
     const r = await runValidation(INVALID_VAL);
     expect(r.exitCode).toBe(1);
     expect(r.ok).toBe(false);
-    expect(r.issues.some((i) => i.kind === "answer-value-not-in-enum")).toBe(true);
+    expect(r.issues).toHaveLength(1);
+    expect(r.issues[0]?.kind).toBe("answer-value-not-in-enum");
+    expect(r.issues[0]?.path).toBe("stack.language");
+    expect(r.errors).toHaveLength(0);
+    expect(r.warnings.map((w) => w.path).sort()).toEqual([
+      "identity.description",
+      "identity.name",
+      "identity.owner",
+    ]);
   });
 
   it("exit 2 when the profile file is missing", async () => {
