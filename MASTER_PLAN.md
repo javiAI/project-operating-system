@@ -136,9 +136,19 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 
 **Criterio de salida** (cumplido): 9 `FileWrite` por profile (6 docs C1 + `policy.yaml` + `.claude/rules/docs.md` + `.claude/rules/patterns.md`), `yaml.parse(policy.yaml)` OK sobre los 3 canónicos, stack conditionals mutuamente exclusivos (no leaks), 27 snapshots (3 profiles × 9 templates) byte-estables entre runs, coverage ≥85%, CI verde.
 
-### Rama C3 — `feat/c3-renderers-tests-harness`
+### Rama C3 — `feat/c3-renderers-tests-harness` ✅
 
 **Scope**: renderer para test harness según stack (Node/Python/Go/Rust). Configs (vitest, jest, pytest, cargo, go.mod), README de tests, ejemplo smoke test.
+
+**Ajustes vs plan original** (Fase -1 aprobada):
+
+- Scope reformulado a **"test harness mínimo generado y estructuralmente coherente"** — no se promete ejecución real end-to-end. `package.json` (TS), `pyproject.toml` (Python) y `playwright.config.ts` quedan **fuera de C3** (diferidos). El `tests/README.md` emitido documenta el gap ("Qué NO emite C3").
+- Combinaciones soportadas: **`typescript+vitest`** y **`python+pytest`** únicamente (los 2 que aparecen en profiles canónicos). `jest`, `go-test`, `cargo-test` **diferidos con fallo explícito y testeado** dentro de `renderTests(...)`: el `Error` menciona el nombre concreto del framework, la palabra "deferred" y el path `testing.unit_framework` — no se mueve a `run.ts`. Razón: CLAUDE.md regla #7 (0 repeticiones documentadas).
+- `testsHarnessRenderers` como grupo de **1 renderer único** (no fragmentado por archivo emitido). El renderer devuelve 4 `FileWrite` según la combinación stack+framework. Consistente con `policyAndRulesRenderers` (1 renderer puede emitir varios paths si la condición gobierna el set).
+- **`Makefile` universal** (TS + Python) como entry-point común (`make test` / `test-unit` / `test-coverage` / `test-e2e` placeholder / `clean`). No se emite `package.json.scripts`. Los workflows C4 deberán invocar `make test-*` (no `npx vitest` / `pytest` directos).
+- **`valid-partial` fixture modificada**: añadidos `testing.coverage_threshold: 80` + `testing.e2e_framework: "none"` explícitos. Razón: `buildProfile` no materializa defaults del schema; los templates C3 los referencian. Defaults-in-profile queda diferido.
+- **Tests adicionales del plan original** (requeridos en Fase -1): trailing `\n` en todos los FileWrite emitidos; TS sin rastro de `pytest`; Python sin rastro de `vitest`; 1 test por framework diferido (no aggregated).
+- **`.claude/rules/tests.md` NO tocado** — expandirlo sin señal nueva sería ruido (guidance explícita Fase -1). La rule existente cubre la expectativa de patrón renderer-group + snapshot testing.
 
 ### Rama C4 — `feat/c4-renderers-ci-cd`
 
