@@ -20,7 +20,7 @@ import {
   writeFiles,
   type FileWrite,
 } from "./lib/render-pipeline.ts";
-import { coreDocRenderers } from "./renderers/index.ts";
+import { allRenderers } from "./renderers/index.ts";
 
 const SCHEMA_PATH = "questionnaire/schema.yaml";
 
@@ -77,7 +77,7 @@ export async function runRender(profilePath: string): Promise<
   }
   const { warnings } = completenessCheck(schema.value, loaded.profile);
   const profile = buildProfile(loaded.profile);
-  const files = renderAll(profile, [...coreDocRenderers]);
+  const files = renderAll(profile, [...allRenderers]);
   return { ok: true, files, warnings };
 }
 

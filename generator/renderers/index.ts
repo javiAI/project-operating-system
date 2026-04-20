@@ -5,6 +5,8 @@ import { render as renderRoadmap } from "./roadmap.ts";
 import { render as renderHandoff } from "./handoff.ts";
 import { render as renderAgents } from "./agents.ts";
 import { render as renderReadme } from "./readme.ts";
+import { render as renderPolicy } from "./policy.ts";
+import { render as renderRules } from "./rules.ts";
 
 export const coreDocRenderers: readonly Renderer[] = Object.freeze([
   renderClaudeMd,
@@ -13,4 +15,14 @@ export const coreDocRenderers: readonly Renderer[] = Object.freeze([
   renderHandoff,
   renderAgents,
   renderReadme,
+]);
+
+export const policyAndRulesRenderers: readonly Renderer[] = Object.freeze([
+  renderPolicy,
+  renderRules,
+]);
+
+export const allRenderers: readonly Renderer[] = Object.freeze([
+  ...coreDocRenderers,
+  ...policyAndRulesRenderers,
 ]);
