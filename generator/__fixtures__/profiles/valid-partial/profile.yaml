@@ -1,0 +1,16 @@
+# generator/__fixtures__/profiles/valid-partial/profile.yaml
+#
+# Profile válido parcial: cubre todos los required NON-user-specific,
+# omite los 3 user-specific (identity.name / description / owner).
+# Comportamiento esperado del runner B3: exit 0 + warning en stderr.
+
+version: "0.1.0"
+
+profile:
+  name: "valid-partial"
+  description: "Fixture: covers all non-user-specific required fields; expects exit 0 + user-specific warning."
+
+answers:
+  "domain.type": "web-app"
+  "stack.language": "typescript"
+  "testing.unit_framework": "vitest"

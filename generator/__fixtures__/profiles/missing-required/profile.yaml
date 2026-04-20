@@ -1,0 +1,14 @@
+# generator/__fixtures__/profiles/missing-required/profile.yaml
+#
+# Profile inválido por completeness: omite `domain.type` (required, NO user-specific).
+# Comportamiento esperado del runner B3: exit 1.
+
+version: "0.1.0"
+
+profile:
+  name: "missing-required"
+  description: "Fixture: omits a non-user-specific required (domain.type); expects exit 1."
+
+answers:
+  "stack.language": "typescript"
+  "testing.unit_framework": "vitest"
