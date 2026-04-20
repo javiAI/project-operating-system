@@ -1,0 +1,41 @@
+# MASTER_PLAN — TODO(identity.name)
+
+> Fuente de verdad ejecutable. Cada rama tiene scope fijo, Fase -1 y criterio de salida. No añadir scope a ramas en vuelo — o se refina el plan o se crea rama nueva.
+
+## §1. Convenciones
+
+- **Slug de rama**: `<tipo>/<fase-id>-<nombre-corto>` — ej. `feat/a-skeleton`, `feat/b1-nombre`.
+- **Marker de aprobación**: `.claude/branch-approvals/<slug-sanitized>.approved`. Sanitized = slashes → underscores.
+- **Kickoff block**: primer commit de cada rama, bloque `## Kickoff` con scope, archivos, risks, test plan, docs plan. Hook lo valida.
+- **PR target**: `main`. No feature branches de >5 días sin razón documentada.
+
+## §2.1 Fase -1 (gate, obligatoria)
+
+Antes de crear rama, emitir:
+
+1. **Resumen técnico** (≤300 palabras).
+2. **Resumen conceptual** (≤150 palabras).
+3. **Ambigüedades** (lista).
+4. **Alternativas evaluadas** (≥2, con por qué se descartaron).
+5. **Test plan** (unit, integration, selftest, CI).
+6. **Docs plan** (qué docs se actualizan dentro de la rama).
+
+Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
+
+## §2.2 Fases planeadas
+
+
+### Fase A — Skeleton & bootstrap
+
+**Scope**: bootstrap inicial (estructura de directorios, CLAUDE.md, AGENTS.md, HANDOFF.md, ROADMAP.md, policy.yaml, `.claude/settings.local.json`, CI stub). Excepción: se ejecuta sin Fase -1 formal porque es el bootstrap que crea la propia disciplina.
+
+### Fase B — (define tus ramas aquí)
+
+## §3. Progreso por fase
+
+Mantenido en [ROADMAP.md](ROADMAP.md). No duplicar estado aquí.
+
+## §4. Reglas de refinamiento
+
+- Si una rama descubre scope que no estaba en Fase -1 → parar, anotar en kickoff, pedir guía. No extender rama silenciosamente.
+- Si un criterio de salida no se puede cumplir → volver a Fase -1 documentando el obstáculo real.

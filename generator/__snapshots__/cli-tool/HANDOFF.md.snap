@@ -1,0 +1,72 @@
+# HANDOFF — quickref 30s
+
+> Leer al arrancar sesión. Diseñado para llegar a "puedo ejecutar Fase -1 de la siguiente rama" en <1 minuto.
+
+## 1. Snapshot
+
+- Repo: `TODO(identity.name)` (owner: `TODO(identity.owner)`).
+- Fase actual: **bootstrap** (aún sin ramas mergeadas).
+- Fuente de verdad ejecutable: [MASTER_PLAN.md](MASTER_PLAN.md).
+- Estado vivo: [ROADMAP.md](ROADMAP.md).
+
+## 2. Verificación de estado (1 comando)
+
+```bash
+git log --oneline -10 && git status -sb && ls .claude/branch-approvals/
+```
+
+Si el ROADMAP no coincide con `git log` → ROADMAP desfasado, actualizarlo antes de arrancar.
+
+## 3. Decisión `/clear` vs `/compact` vs sesión nueva (Fase N+7 Context gate)
+
+**Última fase de la rama anterior**, ejecutada post-merge. Puerta de entrada obligatoria a Fase -1 de la siguiente rama.
+
+| Caso | Acción |
+|---|---|
+| Rama anterior mergeada, docs + memoria al día | `/clear` |
+| Fase -1 de siguiente rama hecha en esta sesión, sin persistir | `/compact keep_recent_messages=50` + guardar decisiones como memoria `project` |
+| Sesión larga con decisiones sin grabar | `/compact focus="decisiones pendientes"` + memorias `project` |
+| Cambio de rama ortogonal | Sesión nueva |
+
+Regla dura: contexto crítico NO en git + docs + memoria → **NO `/clear`**. Persiste primero.
+
+### Checklist pre-Fase-1
+
+- [ ] Evaluar contexto actual: ¿tamaño?, ¿decisiones sin grabar?, ¿rama previa cerrada en docs?
+- [ ] **Claude presenta al usuario** las 4 opciones con recomendación razonada: `continuar` | `/compact focus="..."` | `/clear` | sesión nueva.
+- [ ] **Parar. Esperar elección explícita del usuario.** Claude nunca decide la opción por su cuenta.
+- [ ] Si elige `compact` / `clear` / sesión nueva: emitir **resume prompt** con archivos a releer + decisiones a preservar + tareas pendientes.
+- [ ] Solo tras decisión explícita proceder con Fase -1 (§2.1 MASTER_PLAN.md).
+- [ ] Si la siguiente rama se inicia con `/compact` o `/clear`, el primer commit de kickoff referencia el resume prompt (trazabilidad).
+
+## 4. Orden óptimo de lectura al arrancar rama
+
+1. Este archivo.
+2. **Sección entera de la rama** en MASTER_PLAN.md.
+3. Archivos citados en "Contexto a leer" de la rama — sólo esos.
+4. Ejecutar Fase -1 (ver MASTER_PLAN.md §2.1). Esperar aprobación del usuario.
+
+**Anti-patrón**: leer MASTER_PLAN.md entero cuando sólo necesitas una sección. Cita por rangos.
+
+## 5. Template de prompt para continuar tras merge
+
+```text
+Continúa con MASTER_PLAN.md.
+Rama mergeada: ✅ [nombre-rama] (PR #N).
+Siguiente rama: XY `feat/xy-nombre`.
+Lee solo:
+  - MASTER_PLAN.md § Rama XY
+  - Archivos citados en "Contexto a leer" de esa rama
+Ejecuta §2.1 Fase -1 completo. Espera aprobación explícita antes de `git checkout -b`.
+```
+
+## 6. Pre-flight checklist
+
+- [ ] `git pull origin main --ff-only`
+- [ ] Fase -1 aprobada explícitamente.
+- [ ] Marker creado: `.claude/branch-approvals/<slug-sanitized>.approved`.
+- [ ] `git checkout -b feat/<rama>` tras el marker.
+
+## 7. Próxima rama
+
+**(por definir)** — ver [MASTER_PLAN.md](MASTER_PLAN.md) §2.2.

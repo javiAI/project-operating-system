@@ -1,0 +1,51 @@
+# CLAUDE.md — TODO(identity.name)
+
+> TODO(identity.description)
+
+## Identidad
+
+- **Repo**: `TODO(identity.name)` (owner: `TODO(identity.owner)`).
+- **Tipo**: web-app.
+- **Stack**: typescript + postgres.
+- **Testing**: vitest (coverage ≥ 85%) + playwright e2e.
+
+## Orden de lectura (sesión nueva)
+
+1. Este archivo (`CLAUDE.md`).
+2. [AGENTS.md](AGENTS.md) — reglas de ejecución autónoma.
+3. [HANDOFF.md](HANDOFF.md) — snapshot 30s.
+4. [MASTER_PLAN.md § Rama actual](MASTER_PLAN.md) — sólo la sección de la rama en curso.
+
+Path-scoped rules en [.claude/rules/](.claude/rules/) se cargan solas según los archivos que toques. No leas docs enteros — cita por rango de líneas.
+
+## Reglas no negociables
+
+1. **Fase -1 antes de cada rama**. Sin `.claude/branch-approvals/<slug>.approved` no hay `git checkout -b`.
+2. **Docs dentro de la rama**. ROADMAP, HANDOFF, AGENTS y rules afectadas se actualizan en el mismo PR que el código.
+3. **Tests antes que implementación**. TDD estricto: primero test que falla, luego código que pasa.
+4. **Nunca `--no-verify`**, nunca `git reset --hard` sin OK explícito, nunca `git push --force` a `main`.
+5. **Fase N+7 Context gate al cerrar cada rama**. Claude presenta las 4 opciones (`continuar` / `/compact` / `/clear` / sesión nueva) y espera elección explícita del usuario. Ver [HANDOFF.md §3](HANDOFF.md).
+6. **Patrones antes de abstraer**. ≥2 repeticiones documentadas antes de crear helper compartido.
+
+## Stack declarado
+
+- TypeScript (Node 18+). Tooling con `tsx` o build step según template elegido.
+
+
+
+
+- Test framework: vitest.
+- CI host: github.
+- Release strategy: changesets.
+- Model default (Claude Code): claude-sonnet-4-6.
+- Team size: team.
+
+## Licencia
+
+MIT (default)
+
+## Qué NO hacer
+
+- No crear archivos `.md` de decisión/análisis fuera de `docs/`. Usa memoria persistente.
+- No meter lógica en `CLAUDE.md` que corresponda a `.claude/rules/` path-scoped.
+- No saltar Fase -1 ni Fase N+7 por "momentum".

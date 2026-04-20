@@ -1,0 +1,30 @@
+# TODO(identity.name)
+
+> TODO(identity.description)
+
+## Stack
+
+- **Tipo**: agent-sdk
+- **Lenguaje**: python
+- **Testing**: pytest (coverage ≥ 90%)
+- **Observabilidad**: opentelemetry
+- **CI**: github
+- **Release**: manual
+
+## Disciplina operativa
+
+Este repo sigue el flujo generado por `pos` (project-operating-system):
+
+- [CLAUDE.md](CLAUDE.md) — reglas de sesión.
+- [AGENTS.md](AGENTS.md) — ejecución autónoma de LLMs.
+- [HANDOFF.md](HANDOFF.md) — quickref 30s + Fase N+7 Context gate.
+- [MASTER_PLAN.md](MASTER_PLAN.md) — plan de ramas.
+- [ROADMAP.md](ROADMAP.md) — estado vivo.
+
+## Owner
+
+`TODO(identity.owner)`
+
+## Licencia
+
+MIT
