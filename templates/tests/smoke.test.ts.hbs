@@ -1,0 +1,8 @@
+{{!-- templates/tests/smoke.test.ts.hbs — smoke test for TS profiles (C3) --}}
+import { describe, expect, it } from "vitest";
+
+describe("smoke", () => {
+  it("runs and makes a trivial assertion", () => {
+    expect(1 + 1).toBe(2);
+  });
+});

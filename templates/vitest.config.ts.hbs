@@ -1,0 +1,21 @@
+{{!-- templates/vitest.config.ts.hbs — vitest config for TS profiles (C3) --}}
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  test: {
+    include: ["tests/**/*.test.ts"],
+    exclude: ["node_modules/**", "dist/**", "coverage/**"],
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "html"],
+      thresholds: {
+        lines: {{answers.testing.coverage_threshold}},
+        functions: {{answers.testing.coverage_threshold}},
+        branches: {{answers.testing.coverage_threshold}},
+        statements: {{answers.testing.coverage_threshold}},
+      },
+    },
+    clearMocks: true,
+    restoreMocks: true,
+  },
+});

@@ -1,0 +1,78 @@
+{{!-- templates/tests/README.md.hbs — tests guide for the generated project (C3) --}}
+# Tests — {{answers.identity.name}}
+
+Guia rapida del harness de tests emitido por `pos` (Fase C3).
+
+## Stack detectado
+
+- Language: `{{answers.stack.language}}`
+- Unit framework: `{{answers.testing.unit_framework}}`
+- Coverage threshold: `{{answers.testing.coverage_threshold}}%`
+{{#if (neq answers.testing.e2e_framework "none")}}
+- E2E framework declarado: `{{answers.testing.e2e_framework}}`
+{{/if}}
+
+## Entry-point universal
+
+Todos los comandos se invocan desde el `Makefile` de la raiz:
+
+```bash
+make test          # alias de test-unit
+make test-unit     # unit tests
+make test-coverage # unit tests con coverage
+{{#if (eq answers.stack.language "typescript")}}
+make test-e2e      # placeholder; ver seccion E2E mas abajo
+{{/if}}
+make clean         # limpia coverage + caches
+```
+
+## Unit tests
+
+{{#if (eq answers.stack.language "typescript")}}
+Runner: **vitest**. Config: `vitest.config.ts` (raiz). Discovery: `tests/**/*.test.ts`.
+
+Ejemplo inicial: `tests/smoke.test.ts` — una assertion trivial que verifica que el runner arranca.
+{{/if}}
+{{#if (eq answers.stack.language "python")}}
+Runner: **pytest**. Config: `pytest.ini` (raiz). Discovery: `tests/test_*.py`.
+
+Ejemplo inicial: `tests/test_smoke.py` — una assertion trivial que verifica que el runner arranca.
+{{/if}}
+
+## Coverage
+
+Threshold declarado en el profile: `{{answers.testing.coverage_threshold}}%`.
+
+{{#if (eq answers.stack.language "typescript")}}
+`vitest.config.ts` aplica el threshold en `coverage.thresholds` (lines/functions/branches/statements).
+{{/if}}
+{{#if (eq answers.stack.language "python")}}
+`pytest.ini` aplica `--cov-fail-under={{answers.testing.coverage_threshold}}` via `addopts`.
+{{/if}}
+
+{{#if (neq answers.testing.e2e_framework "none")}}
+## E2E — {{answers.testing.e2e_framework}}
+
+El profile declara `{{answers.testing.e2e_framework}}` como framework e2e. **C3 no emite `{{answers.testing.e2e_framework}}.config.ts` todavia**: la configuracion y los tests e2e se resuelven en una fase posterior del generador, o manualmente segun la documentacion oficial de `{{answers.testing.e2e_framework}}`.
+
+El target `make test-e2e` del `Makefile` es un placeholder que apunta a este README.
+{{/if}}
+
+## Que NO emite C3 (diferidos)
+
+- `package.json` (TS) / `pyproject.toml` (Python): la instalacion del stack es responsabilidad de una fase posterior del generador. Hasta entonces, asume el stack instalado en el entorno local.
+- Integration harness separado (solo unit + placeholder e2e).
+- Frameworks no canonicos: `jest`, `go-test`, `cargo-test` quedan diferidos hasta que aparezca un profile canonico que los use (CLAUDE.md regla #7: patrones antes de abstraer).
+
+## Anadir un test
+
+{{#if (eq answers.stack.language "typescript")}}
+1. Crea `tests/<nombre>.test.ts` siguiendo el patron de `smoke.test.ts`.
+2. Corre `make test` para ejecutar unit + cubrir el nuevo archivo.
+3. Si vas a tocar coverage, corre `make test-coverage` para verificar threshold.
+{{/if}}
+{{#if (eq answers.stack.language "python")}}
+1. Crea `tests/test_<nombre>.py` siguiendo el patron de `test_smoke.py`.
+2. Corre `make test` para ejecutar unit + cubrir el nuevo archivo.
+3. Si vas a tocar coverage, corre `make test-coverage` para verificar threshold.
+{{/if}}
