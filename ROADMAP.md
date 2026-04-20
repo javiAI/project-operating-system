@@ -7,8 +7,8 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | Fase | Descripción | Estado |
 |---|---|---|
 | A | Skeleton & bootstrap | ✅ |
-| B | Cuestionario + profiles + runner | 🔄 en curso (B3) |
-| C | Templates + renderers | ⏳ pendiente |
+| B | Cuestionario + profiles + runner | ✅ |
+| C | Templates + renderers | 🔄 en curso (C1) |
 | D | Hooks (Python) | ⏳ pendiente |
 | E1 | Skills orquestación | ⏳ pendiente |
 | E2 | Skills calidad | ⏳ pendiente |
@@ -22,8 +22,8 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | `feat/a-skeleton` | Bootstrap estructura + docs canónicos + policy | ✅ | — (commit inicial sin PR) |
 | `feat/b1-questionnaire-schema` | Schema + questions YAML + validator | ✅ | #1 |
 | `feat/b2-profiles-starter` | nextjs-app / agent-sdk / cli-tool | ✅ | #2 |
-| `feat/b3-generator-runner` | `generator/run.ts` + validate-only runner (token-budget diferido) | 🔄 abierta | (por abrir) |
-| `feat/c1-renderers-core-docs` | CLAUDE/MASTER_PLAN/ROADMAP/HANDOFF/AGENTS/README renderers | ⏳ | — |
+| `feat/b3-generator-runner` | `generator/run.ts` + validate-only runner (token-budget diferido) | ✅ | #3 |
+| `feat/c1-renderers-core-docs` | CLAUDE/MASTER_PLAN/ROADMAP/HANDOFF/AGENTS/README renderers + pipeline + `--out`/`--dry-run` wire-up | 🔄 abierta | (por abrir) |
 | `feat/c2-renderers-policy-rules` | policy.yaml + rules path-scoped | ⏳ | — |
 | `feat/c3-renderers-tests-harness` | Test harness por stack | ⏳ | — |
 | `feat/c4-renderers-ci-cd` | GitHub/GitLab/Bitbucket workflows | ⏳ | — |
@@ -96,20 +96,42 @@ Entregables:
 - `answer-value-not-in-array-allowlist` no se valida a nivel de instancia (ArrayField.values existe en schema).
 - Campos `enum` con valor array/objeto emiten `answer-value-not-in-enum` en lugar de `answer-type-mismatch`.
 
-### `feat/b3-generator-runner` — en curso
+### `feat/b3-generator-runner` — ✅ PR #3
 
-Scope:
+Entregables:
 
-- `generator/run.ts` — CLI entrypoint (`--profile`, `--validate-only`).
+- `generator/run.ts` — CLI entrypoint (`--profile`, `--validate-only`). `--out` y `--dry-run` rechazados con exit 2 + mensaje `flag --X not supported in B3; planned for C1`.
 - `generator/lib/profile-loader.ts` — carga YAML reusando `tools/lib/read-yaml.ts`.
 - `generator/lib/schema.ts` — re-exporta `parseSchemaFile` / `parseProfileFile` / `validateProfile` desde `tools/lib/` (3ª aplicación pattern-before-abstraction).
 - `generator/lib/validators.ts` — `completenessCheck`: required-missing → error (exit 1); los 3 paths user-specific (`identity.name`/`description`/`owner`) warning-only (exit 0).
-- `generator/__fixtures__/profiles/{complete,partial-user-specific,invalid}/` — fixtures integración.
+- `generator/__fixtures__/profiles/{valid-partial,missing-required,invalid-value}/` — fixtures integración CLI.
+- Smoke CI `validate:generator` + step homónimo en `.github/workflows/ci.yml`.
 - Tests unit + CLI (spawnSync). Coverage ≥85%.
 
 **Ajuste vs plan original**: `generator/lib/token-budget.ts` diferido — `schema.yaml` no declara `workflow.token_budget` todavía, implementarlo sería abstracción prematura. Reintroducir cuando exista el campo.
 
-**Flags diferidos a C1**: `--out` y `--dry-run` se rechazan explícitamente en B3 con exit 2 + mensaje `flag --X not supported in B3; planned for C1`.
+### `feat/c1-renderers-core-docs` — en curso
+
+Scope (ver [MASTER_PLAN.md § Rama C1](MASTER_PLAN.md)):
+
+- 6 renderers puros en `generator/renderers/{claude-md,master-plan,roadmap,handoff,agents,readme}.ts`, cada uno `render(profile: Profile): FileWrite[]`.
+- 6 templates Handlebars en `templates/*.hbs`.
+- `generator/lib/handlebars-helpers.ts` (`eq`, `neq`, `includes`, `kebabCase`, `upperFirst`, `jsonStringify`).
+- `generator/lib/render-pipeline.ts` — orquestador; **falla explícitamente** ante colisión de paths.
+- `generator/lib/profile-model.ts` — dotted-answers → objeto nested para templates.
+- Wire-up de `--out <dir>` y `--dry-run` en `generator/run.ts`. Sin flags = `--validate-only` (compat).
+- Snapshots por (profile × template) = 18 en `generator/__snapshots__/`.
+- Tests semánticos mínimos por renderer (paths emitidos + strings críticas) **además** de snapshots.
+- Coverage ≥85%.
+
+**Decisiones Fase -1 (aprobadas)**:
+
+- User-specific fields faltantes (`identity.name|description|owner`) → renderer inyecta placeholders literales `TODO(identity.<campo>)` + warning. Aplica a `--dry-run` y `--out`. No bloquea emisión.
+- `.claude/rules/docs.md.hbs` **diferido a C2** (scope C2 cubre `.claude/rules/*.md`). Carry-over Fase N+7 en C1 solo afecta `HANDOFF.md.hbs` + `AGENTS.md.hbs`.
+- `--out` soporta subdirectorios desde el primer día (`FileWrite.path` relativo + `mkdir -p`). Evita refactor en C2.
+- `FileWrite` shape mínimo: `{ path: string; content: string }`. Sin `mode`. Bits de permisos se añaden en C5 cuando apliquen.
+- `--force` fuera de scope en C1. `--out` sobre dir no vacío → exit 3 (según [.claude/rules/generator.md:56](.claude/rules/generator.md)).
+- Commit 1 de la rama = pre-kickoff chore (docs-sync B3→✅, HANDOFF §1/§9/§10, ROADMAP, MASTER_PLAN §C1) + kickoff block. **No parte funcional de renderers** — la implementación arranca en commit 2 con TDD estricto.
 
 ## Convenciones de este archivo
 
