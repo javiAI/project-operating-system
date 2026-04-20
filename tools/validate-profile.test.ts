@@ -65,20 +65,14 @@ describe("validateProfileFile (unit)", () => {
 });
 
 describe("validate-profile CLI (integration)", () => {
-  it("exits 0 for nextjs-app.yaml", () => {
-    const r = runCli(["questionnaire/profiles/nextjs-app.yaml"]);
+  it.each([
+    "questionnaire/profiles/nextjs-app.yaml",
+    "questionnaire/profiles/agent-sdk.yaml",
+    "questionnaire/profiles/cli-tool.yaml",
+  ])("exits 0 for canonical profile %s", (path) => {
+    const r = runCli([path]);
     expect(r.code).toBe(0);
     expect(r.stdout).toMatch(/status: OK/);
-  }, 30000);
-
-  it("exits 0 for agent-sdk.yaml", () => {
-    const r = runCli(["questionnaire/profiles/agent-sdk.yaml"]);
-    expect(r.code).toBe(0);
-  }, 30000);
-
-  it("exits 0 for cli-tool.yaml", () => {
-    const r = runCli(["questionnaire/profiles/cli-tool.yaml"]);
-    expect(r.code).toBe(0);
   }, 30000);
 
   it("exits 1 and prints the issue kind for unknown-path fixture", () => {

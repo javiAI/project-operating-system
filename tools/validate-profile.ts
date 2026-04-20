@@ -1,13 +1,12 @@
 #!/usr/bin/env tsx
-import { readFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
-import { parse as parseYaml } from "yaml";
 import { parseSchemaFile } from "./lib/meta-schema.ts";
 import {
   parseProfileFile,
   validateProfile,
   type ProfileIssue,
 } from "./lib/profile-validator.ts";
+import { errorMessage, readAndParseYaml } from "./lib/read-yaml.ts";
 
 type ExitCode = 0 | 1 | 2;
 
@@ -64,27 +63,6 @@ export function formatReport(result: ValidationResult, schemaPath: string, profi
     lines.push(`  issue [${issue.kind}] ${issue.path}: ${issue.detail}`);
   }
   return lines.join("\n");
-}
-
-function errorMessage(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  return String(err);
-}
-
-async function readAndParseYaml(
-  path: string,
-): Promise<{ ok: true; value: unknown } | { ok: false; error: string }> {
-  let raw: string;
-  try {
-    raw = await readFile(path, "utf8");
-  } catch (err) {
-    return { ok: false, error: `cannot read ${path}: ${errorMessage(err)}` };
-  }
-  try {
-    return { ok: true, value: parseYaml(raw) };
-  } catch (err) {
-    return { ok: false, error: `cannot parse ${path}: ${errorMessage(err)}` };
-  }
 }
 
 /* v8 ignore start */

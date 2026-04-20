@@ -70,7 +70,15 @@ function validateAnswer(path: string, value: unknown, field: Field, issues: Prof
         issues.push(typeMismatch(path, field.type, value));
         return;
       }
-      checkStringConstraints(path, value, field, issues);
+      if (field.pattern !== undefined && !new RegExp(field.pattern).test(value)) {
+        issues.push(violation(path, `value '${value}' does not match pattern /${field.pattern}/`));
+      }
+      if (field.minLength !== undefined && value.length < field.minLength) {
+        issues.push(violation(path, `length ${value.length} below minLength ${field.minLength}`));
+      }
+      if (field.maxLength !== undefined && value.length > field.maxLength) {
+        issues.push(violation(path, `length ${value.length} above maxLength ${field.maxLength}`));
+      }
       return;
 
     case "number":
@@ -79,10 +87,10 @@ function validateAnswer(path: string, value: unknown, field: Field, issues: Prof
         return;
       }
       if (field.min !== undefined && value < field.min) {
-        issues.push(constraintViolation(path, `value ${value} below min ${field.min}`));
+        issues.push(violation(path, `value ${value} below min ${field.min}`));
       }
       if (field.max !== undefined && value > field.max) {
-        issues.push(constraintViolation(path, `value ${value} above max ${field.max}`));
+        issues.push(violation(path, `value ${value} above max ${field.max}`));
       }
       return;
 
@@ -107,48 +115,22 @@ function validateAnswer(path: string, value: unknown, field: Field, issues: Prof
         issues.push(typeMismatch(path, field.type, value));
         return;
       }
-      checkArrayItems(path, value, field, issues);
+      for (const [idx, item] of value.entries()) {
+        if (typeof item !== field.items) {
+          issues.push({
+            kind: "answer-array-item-type-mismatch",
+            path,
+            detail: `item[${idx}] '${String(item)}' is ${typeof item}, expected ${field.items}`,
+          });
+        }
+      }
       if (field.minItems !== undefined && value.length < field.minItems) {
-        issues.push(constraintViolation(path, `has ${value.length} items, below minItems ${field.minItems}`));
+        issues.push(violation(path, `has ${value.length} items, below minItems ${field.minItems}`));
       }
       if (field.maxItems !== undefined && value.length > field.maxItems) {
-        issues.push(constraintViolation(path, `has ${value.length} items, above maxItems ${field.maxItems}`));
+        issues.push(violation(path, `has ${value.length} items, above maxItems ${field.maxItems}`));
       }
       return;
-  }
-}
-
-function checkStringConstraints(
-  path: string,
-  value: string,
-  field: Extract<Field, { type: "string" }>,
-  issues: ProfileIssue[],
-): void {
-  if (field.pattern !== undefined && !new RegExp(field.pattern).test(value)) {
-    issues.push(constraintViolation(path, `value '${value}' does not match pattern /${field.pattern}/`));
-  }
-  if (field.minLength !== undefined && value.length < field.minLength) {
-    issues.push(constraintViolation(path, `length ${value.length} below minLength ${field.minLength}`));
-  }
-  if (field.maxLength !== undefined && value.length > field.maxLength) {
-    issues.push(constraintViolation(path, `length ${value.length} above maxLength ${field.maxLength}`));
-  }
-}
-
-function checkArrayItems(
-  path: string,
-  value: unknown[],
-  field: Extract<Field, { type: "array" }>,
-  issues: ProfileIssue[],
-): void {
-  for (const [idx, item] of value.entries()) {
-    if (typeof item !== field.items) {
-      issues.push({
-        kind: "answer-array-item-type-mismatch",
-        path,
-        detail: `item[${idx}] '${String(item)}' is ${typeof item}, expected ${field.items}`,
-      });
-    }
   }
 }
 
@@ -160,7 +142,7 @@ function typeMismatch(path: string, expected: Field["type"], value: unknown): Pr
   };
 }
 
-function constraintViolation(path: string, detail: string): ProfileIssue {
+function violation(path: string, detail: string): ProfileIssue {
   return { kind: "answer-constraint-violation", path, detail };
 }
 
