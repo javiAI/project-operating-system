@@ -1,9 +1,10 @@
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { loadTemplate, TEMPLATES_DIR } from "./template-loader.ts";
 
 describe("loadTemplate", () => {
   it("resolves templates relative to the repo-level templates/ dir", () => {
-    expect(TEMPLATES_DIR.endsWith("/templates")).toBe(true);
+    expect(path.basename(TEMPLATES_DIR)).toBe("templates");
   });
 
   it("loads and compiles an existing template", () => {
@@ -28,5 +29,17 @@ describe("loadTemplate", () => {
 
   it("throws a descriptive error when the template does not exist", () => {
     expect(() => loadTemplate("does-not-exist.hbs")).toThrow(/ENOENT|no such file/i);
+  });
+
+  it("rejects an absolute path", () => {
+    expect(() => loadTemplate("/etc/passwd")).toThrow(/absolute path rejected/);
+  });
+
+  it("rejects a path that escapes TEMPLATES_DIR via ../", () => {
+    expect(() => loadTemplate("../package.json")).toThrow(/escapes templates dir/);
+  });
+
+  it("rejects a nested path that escapes TEMPLATES_DIR", () => {
+    expect(() => loadTemplate("a/../../package.json")).toThrow(/escapes templates dir/);
   });
 });

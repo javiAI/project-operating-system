@@ -65,6 +65,28 @@ describe("renderAll — collision detection (invariant, not test-only)", () => {
     const r3: Renderer = () => [{ path: "x.md", content: "3" }];
     expect(() => renderAll(emptyProfile, [r1, r2, r3])).toThrow(/renderer\[0\].*renderer\[2\]/);
   });
+
+  it("detects collisions under path normalization (a.md vs ./a.md)", () => {
+    const r1: Renderer = () => [{ path: "a.md", content: "1" }];
+    const r2: Renderer = () => [{ path: "./a.md", content: "2" }];
+    expect(() => renderAll(emptyProfile, [r1, r2])).toThrow(/collision.*a\.md/);
+  });
+
+  it("detects collisions after collapsing intermediate segments (docs/../a.md vs a.md)", () => {
+    const r1: Renderer = () => [{ path: "a.md", content: "1" }];
+    const r2: Renderer = () => [{ path: "docs/../a.md", content: "2" }];
+    expect(() => renderAll(emptyProfile, [r1, r2])).toThrow(/collision/);
+  });
+
+  it("rejects an absolute path emitted by a renderer", () => {
+    const r: Renderer = () => [{ path: "/etc/passwd", content: "x" }];
+    expect(() => renderAll(emptyProfile, [r])).toThrow(/absolute path/);
+  });
+
+  it("rejects a path that escapes via ../", () => {
+    const r: Renderer = () => [{ path: "../escape.md", content: "x" }];
+    expect(() => renderAll(emptyProfile, [r])).toThrow(/invalid path/);
+  });
 });
 
 describe("renderAll — determinism", () => {

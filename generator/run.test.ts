@@ -218,6 +218,15 @@ describe("generator/run.ts CLI (integration)", () => {
     expect(r.stderr).toMatch(/not empty/);
   }, 30000);
 
+  it("exits 2 when --out target is a file (not a directory)", () => {
+    const parent = mkdtempSync(join(tmpdir(), "run-out-"));
+    const filePath = join(parent, "iam-a-file.txt");
+    writeFileSync(filePath, "hi");
+    const r = runCli(["--profile", VALID, "--out", filePath]);
+    expect(r.code).toBe(2);
+    expect(r.stderr).toMatch(/not a directory/);
+  }, 30000);
+
   it("exits 2 when --validate-only and --dry-run are combined", () => {
     const r = runCli(["--profile", VALID, "--validate-only", "--dry-run"]);
     expect(r.code).toBe(2);

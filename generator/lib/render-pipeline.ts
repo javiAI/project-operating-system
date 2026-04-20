@@ -17,13 +17,24 @@ export function renderAll(profile: Profile, renderers: Renderer[]): FileWrite[] 
   for (const [i, renderer] of renderers.entries()) {
     const out = renderer(profile);
     for (const file of out) {
-      const prev = seen.get(file.path);
+      if (path.isAbsolute(file.path)) {
+        throw new Error(
+          `render-pipeline: absolute path '${file.path}' emitted by renderer[${i}]`
+        );
+      }
+      const key = path.posix.normalize(file.path.replace(/\\/g, "/"));
+      if (key.startsWith("../") || key === ".." || key === ".") {
+        throw new Error(
+          `render-pipeline: invalid path '${file.path}' emitted by renderer[${i}]`
+        );
+      }
+      const prev = seen.get(key);
       if (prev !== undefined) {
         throw new Error(
           `render-pipeline: path collision '${file.path}' emitted by renderer[${prev}] and renderer[${i}]`
         );
       }
-      seen.set(file.path, i);
+      seen.set(key, i);
       all.push(file);
     }
   }

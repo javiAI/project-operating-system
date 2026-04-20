@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { parseArgs } from "node:util";
+import { stat } from "node:fs/promises";
 import { readAndParseYaml, errorMessage } from "../tools/lib/read-yaml.ts";
 import { loadProfile } from "./lib/profile-loader.ts";
 import {
@@ -108,6 +109,17 @@ export function formatReport(result: RunResult, profilePath: string): string {
 export function formatRenderSummary(
   files: FileWrite[],
   warnings: CompletenessEntry[],
+  mode: "dry-run",
+): string;
+export function formatRenderSummary(
+  files: FileWrite[],
+  warnings: CompletenessEntry[],
+  mode: "write",
+  outDir: string,
+): string;
+export function formatRenderSummary(
+  files: FileWrite[],
+  warnings: CompletenessEntry[],
   mode: "dry-run" | "write",
   outDir?: string,
 ): string {
@@ -115,6 +127,11 @@ export function formatRenderSummary(
   if (mode === "dry-run") {
     lines.push(`generator/render [dry-run]: ${files.length} file(s) would be emitted:`);
   } else {
+    if (outDir === undefined) {
+      throw new Error(
+        "formatRenderSummary: outDir is required when mode === 'write'",
+      );
+    }
     lines.push(`generator/render [write]: wrote ${files.length} file(s) to ${outDir}:`);
   }
   for (const file of files) {
@@ -202,6 +219,22 @@ async function main(): Promise<void> {
   }
 
   if (mode === "write" && outDir !== undefined) {
+    try {
+      const s = await stat(outDir);
+      if (!s.isDirectory()) {
+        process.stderr.write(
+          `generator/run: --out target '${outDir}' is not a directory; aborting (exit 2)\n`,
+        );
+        process.exit(2);
+      }
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+        process.stderr.write(
+          `generator/run: cannot stat --out target '${outDir}': ${errorMessage(err)}\n`,
+        );
+        process.exit(2);
+      }
+    }
     if (!(await isDirEmpty(outDir))) {
       process.stderr.write(
         `generator/run: --out target '${outDir}' is not empty; aborting (exit 3)\n`,
@@ -218,11 +251,14 @@ async function main(): Promise<void> {
 
   if (mode === "write" && outDir !== undefined) {
     await writeFiles(outDir, rendered.files);
+    process.stdout.write(
+      formatRenderSummary(rendered.files, rendered.warnings, "write", outDir) + "\n",
+    );
+  } else {
+    process.stdout.write(
+      formatRenderSummary(rendered.files, rendered.warnings, "dry-run") + "\n",
+    );
   }
-
-  process.stdout.write(
-    formatRenderSummary(rendered.files, rendered.warnings, mode, outDir) + "\n",
-  );
   process.exit(0);
 }
 
