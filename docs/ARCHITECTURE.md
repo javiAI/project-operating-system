@@ -51,13 +51,40 @@ El meta-repo nunca ejecuta código del proyecto destino. El proyecto destino nun
 - **F. Workflow**: CI host, branch protection, release strategy, token budget.
 - **G. Claude Code**: modelo default, skills extra, equipo/solo.
 
-### Profiles predefinidos (Fase B2)
+### Profiles predefinidos (entregado en B2)
 
 - `nextjs-app` — Next.js 15 + Prisma + PostgreSQL + Vitest + Playwright.
 - `agent-sdk` — Agent SDK + Python + pytest + uv.
 - `cli-tool` — TypeScript CLI + oclif + vitest.
 
 Extensible en `questionnaire/profiles/*.yaml`. El generador soporta override key-por-key.
+
+**Shape canonical** (validado por [tools/lib/profile-validator.ts](../tools/lib/profile-validator.ts)):
+
+```yaml
+version: "0.1.0"
+profile:
+  name: <slug>
+  description: <one-liner>
+answers:
+  "<path.dotted>": <value>
+```
+
+Claves dotted (`"stack.language": "typescript"`) alineadas 1:1 con `field.path` del schema. Facilita override key-por-key en el runner (B3) y evita ambigüedades al renombrar fields.
+
+**Profiles son parciales por diseño.** No tienen que cubrir todos los `required` del project_profile final. Los 3 campos user-specific (`identity.name`, `identity.description`, `identity.owner`) quedan **fuera** de los profiles y se resuelven en el runner interactivo. El validator sólo verifica que los paths declarados existan en el schema y que sus valores respeten los constraints del field.
+
+**Validaciones del profile validator** ([tools/lib/profile-validator.ts](../tools/lib/profile-validator.ts)):
+
+- `answer-unknown-path` — path declarado en `answers` no existe en el schema.
+- `answer-type-mismatch` — tipo del valor no coincide con `field.type` (string/number/boolean/array).
+- `answer-value-not-in-enum` — valor de enum fuera de `field.values`.
+- `answer-array-item-type-mismatch` — un elemento del array no coincide con `field.items`.
+- `answer-constraint-violation` — `pattern` / `minLength` / `maxLength` / `min` / `max` / `minItems` / `maxItems` violado.
+
+**Brecha conocida** (decisión B2): el check `answer-value-not-in-array-allowlist` no se implementa todavía. `ArrayField.values` existe en el schema (ver `integrations.mcps`) pero la validación a nivel de instancia se difiere — ampliar en una rama posterior cuando el tema se reabra.
+
+**Validador CLI**: `npx tsx tools/validate-profile.ts <profile.yaml> [--schema ...]` — exit 0 (OK), 1 (issues), 2 (YAML ilegible / archivo ausente / falta arg). Corre en CI (step `Validate profiles`, matrix ubuntu+macos, node 20).
 
 ### Schema DSL (entregado en B1)
 

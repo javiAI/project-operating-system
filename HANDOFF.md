@@ -5,7 +5,7 @@
 ## 1. Snapshot
 
 - Repo: `project-operating-system` (plugin `pos`).
-- Fase actual: **B1 en curso** (`feat/b1-questionnaire-schema`, PR en apertura). Siguiente: **B2 — `feat/b2-profiles-starter`**.
+- Fase actual: **B2 en curso** (`feat/b2-profiles-starter`, PR en apertura). Siguiente: **B3 — `feat/b3-generator-runner`**.
 - Fuente de verdad ejecutable: [MASTER_PLAN.md](MASTER_PLAN.md).
 - Estado vivo: [ROADMAP.md](ROADMAP.md).
 - Arquitectura canonical: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -101,39 +101,43 @@ Hasta que `pos` tenga sus propias skills:
 
 ## 9. Próxima rama
 
-**B2 — `feat/b2-profiles-starter`**
+**B3 — `feat/b3-generator-runner`**
 
-Scope (ver [MASTER_PLAN.md § Rama B2](MASTER_PLAN.md)):
+Scope (ver [MASTER_PLAN.md § Rama B3](MASTER_PLAN.md)):
 
-- `questionnaire/profiles/nextjs-app.yaml`, `agent-sdk.yaml`, `cli-tool.yaml`.
-- Cada profile responde automáticamente ~60% del cuestionario.
-- Fixture test en `generator/__fixtures__/profiles/` (carpeta no existe aún — se crea en rama).
-- Criterio salida: los 3 profiles validan contra `questionnaire/schema.yaml` (B1).
+- `generator/run.ts` (CLI entrypoint), `generator/lib/schema.ts` (zod), `generator/lib/validators.ts`, `generator/lib/token-budget.ts`.
+- Sólo runner + validación. Sin renderers aún (llegan en C*).
+- Criterio salida: `npx tsx generator/run.ts --profile ... --out tmp/ --validate-only` retorna 0/1 según validez. Coverage 85%.
 
 Lectura mínima:
 
-- [MASTER_PLAN.md § Rama B2](MASTER_PLAN.md)
-- [questionnaire/schema.yaml](questionnaire/schema.yaml) — schema que deben cumplir.
-- [docs/ARCHITECTURE.md § Cuestionario — Profiles predefinidos](docs/ARCHITECTURE.md)
+- [MASTER_PLAN.md § Rama B3](MASTER_PLAN.md)
+- [questionnaire/profiles/](questionnaire/profiles/) — 3 profiles canónicos (entregados en B2).
+- [tools/lib/profile-validator.ts](tools/lib/profile-validator.ts) — lógica reutilizable para validar profile vs schema.
+- [docs/ARCHITECTURE.md § Generador](docs/ARCHITECTURE.md)
 - [.claude/rules/generator.md](.claude/rules/generator.md)
 
-Checklist Fase -1 pendiente antes de abrir B2:
+Checklist Fase -1 pendiente antes de abrir B3:
 
+- [ ] Fase N+7 Context gate: decidir `continuar | /compact | /clear | sesión nueva` (ver §3).
 - [ ] Resumen técnico ≤300 palabras.
 - [ ] Resumen conceptual ≤150 palabras.
 - [ ] Ambigüedades (si las hay).
 - [ ] 2 alternativas evaluadas.
 - [ ] Test plan.
 - [ ] Docs plan.
-- [ ] Aprobación explícita del usuario + marker `.claude/branch-approvals/feat_b2-profiles-starter.approved`.
+- [ ] Aprobación explícita del usuario + marker `.claude/branch-approvals/feat_b3-generator-runner.approved`.
 
-## 10. Estado B1 (cerrando)
+## 10. Estado B2 (cerrando)
 
-Entregado en rama `feat/b1-questionnaire-schema`:
+Entregado en rama `feat/b2-profiles-starter`:
 
-- `tools/validate-questionnaire.ts` + `tools/lib/{condition-parser,meta-schema,cross-validate}.ts`.
-- `questionnaire/schema.yaml` (7 secciones A-G, 18 fields) + `questionnaire/questions.yaml` (22 preguntas con condicionales `when:`).
-- `.github/workflows/ci.yml` (matrix ubuntu+macos, node 20, actions pineadas por SHA).
-- `package.json`, `tsconfig.json`, `vitest.config.ts`, `.nvmrc` — toolchain TS + tsx + vitest + zod + yaml.
-- 49 tests verdes, coverage 95.66% líneas, typecheck limpio.
-- 6 commits: kickoff + parser + meta-schema + cross-validate + CLI/fixtures + questionnaire/docs.
+- `questionnaire/profiles/{nextjs-app,agent-sdk,cli-tool}.yaml` — 3 profiles canónicos parciales (11-12 answers cada uno).
+- `tools/lib/profile-validator.ts` + `.test.ts` — ProfileFile zod parser + `validateProfile()` con 5 issue kinds.
+- `tools/validate-profile.ts` + `.test.ts` — CLI exit 0/1/2 + `formatReport`.
+- `tools/__fixtures__/profiles/{valid,invalid}/*.yaml` — 3 válidos (duplicados) + 4 negativos (unknown-path, type-mismatch, enum-out-of-values, pattern-violation).
+- `.github/workflows/ci.yml` — nuevo step `Validate profiles`.
+- `package.json` — script `validate:profiles`.
+- **Meta** (commit `chore(meta): apply Fase N+7 Context gate systematization`): sistematización en `CLAUDE.md` + `AGENTS.md` + `HANDOFF.md` + `.claude/rules/docs.md`.
+- 106 tests verdes, coverage 95.97% líneas, typecheck limpio.
+- Brecha conocida: `answer-value-not-in-array-allowlist` no validado a nivel de instancia (ArrayField.values existe en schema; check diferido).
