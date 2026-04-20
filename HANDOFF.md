@@ -5,7 +5,7 @@
 ## 1. Snapshot
 
 - Repo: `project-operating-system` (plugin `pos`).
-- Fase actual: **B2 en curso** (`feat/b2-profiles-starter`, PR en apertura). Siguiente: **B3 — `feat/b3-generator-runner`**.
+- Fase actual: **B3 en curso** (`feat/b3-generator-runner`, PR por abrir). Anterior: **B2 ✅ PR #2** (`f361c19`). Siguiente: **C1 — `feat/c1-renderers-core-docs`**.
 - Fuente de verdad ejecutable: [MASTER_PLAN.md](MASTER_PLAN.md).
 - Estado vivo: [ROADMAP.md](ROADMAP.md).
 - Arquitectura canonical: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -39,12 +39,13 @@ Regla dura: contexto crítico NO en git + docs + memoria → **NO `/clear`**. Pe
 ### Checklist pre-Fase-1
 
 - [ ] Evaluar contexto actual: ¿tamaño?, ¿decisiones sin grabar?, ¿rama previa cerrada en docs?
-- [ ] Elegir acción según la tabla: `continuar` | `/compact focus="..."` | `/clear` | sesión nueva.
-- [ ] Si `compact` o `clear` o sesión nueva: **emitir resume prompt** con:
+- [ ] **Claude presenta al usuario** las 4 opciones con recomendación razonada: `continuar` | `/compact focus="..."` | `/clear` | sesión nueva.
+- [ ] **Parar. Esperar elección explícita del usuario.** Claude nunca decide la opción por su cuenta, ni siquiera cuando `continuar` parezca obvio.
+- [ ] Si usuario elige `compact` / `clear` / sesión nueva: emitir **resume prompt** con:
   - Archivos a releer (MASTER_PLAN § rama + "Contexto a leer" + schema/rules relevantes).
   - Decisiones ya tomadas que deben sobrevivir (shape, alternativa elegida, ambigüedades resueltas).
   - Tareas pendientes dentro de la rama nueva.
-- [ ] Solo entonces proceder con Fase -1 (§2.1 MASTER_PLAN.md).
+- [ ] Solo tras la decisión explícita del usuario proceder con Fase -1 (§2.1 MASTER_PLAN.md).
 - [ ] Si la siguiente rama se inicia con `/compact` o `/clear`, el primer commit de kickoff referencia el resume prompt (trazabilidad).
 
 ## 4. Orden óptimo de lectura al arrancar rama
@@ -101,23 +102,23 @@ Hasta que `pos` tenga sus propias skills:
 
 ## 9. Próxima rama
 
-**B3 — `feat/b3-generator-runner`**
+**C1 — `feat/c1-renderers-core-docs`**
 
-Scope (ver [MASTER_PLAN.md § Rama B3](MASTER_PLAN.md)):
+Scope (ver [MASTER_PLAN.md § Rama C1](MASTER_PLAN.md)):
 
-- `generator/run.ts` (CLI entrypoint), `generator/lib/schema.ts` (zod), `generator/lib/validators.ts`, `generator/lib/token-budget.ts`.
-- Sólo runner + validación. Sin renderers aún (llegan en C*).
-- Criterio salida: `npx tsx generator/run.ts --profile ... --out tmp/ --validate-only` retorna 0/1 según validez. Coverage 85%.
+- Renderers para `CLAUDE.md`, `MASTER_PLAN.md`, `ROADMAP.md`, `HANDOFF.md`, `AGENTS.md`, `README.md`.
+- Templates Handlebars correspondientes en `templates/`.
+- Snapshot tests por renderer.
+- Propagación Fase N+7 Context gate al repo generado (ver §6b carry-over).
 
 Lectura mínima:
 
-- [MASTER_PLAN.md § Rama B3](MASTER_PLAN.md)
-- [questionnaire/profiles/](questionnaire/profiles/) — 3 profiles canónicos (entregados en B2).
-- [tools/lib/profile-validator.ts](tools/lib/profile-validator.ts) — lógica reutilizable para validar profile vs schema.
-- [docs/ARCHITECTURE.md § Generador](docs/ARCHITECTURE.md)
-- [.claude/rules/generator.md](.claude/rules/generator.md)
+- [MASTER_PLAN.md § Rama C1](MASTER_PLAN.md)
+- [docs/ARCHITECTURE.md § Generador](docs/ARCHITECTURE.md) + § Renderers.
+- [.claude/rules/generator.md](.claude/rules/generator.md) + [.claude/rules/templates.md](.claude/rules/templates.md) (si existe).
+- `generator/run.ts` + `generator/lib/` entregados en B3.
 
-Checklist Fase -1 pendiente antes de abrir B3:
+Checklist Fase -1 pendiente antes de abrir C1:
 
 - [ ] Fase N+7 Context gate: decidir `continuar | /compact | /clear | sesión nueva` (ver §3).
 - [ ] Resumen técnico ≤300 palabras.
@@ -126,18 +127,29 @@ Checklist Fase -1 pendiente antes de abrir B3:
 - [ ] 2 alternativas evaluadas.
 - [ ] Test plan.
 - [ ] Docs plan.
-- [ ] Aprobación explícita del usuario + marker `.claude/branch-approvals/feat_b3-generator-runner.approved`.
+- [ ] Aprobación explícita del usuario + marker `.claude/branch-approvals/feat_c1-renderers-core-docs.approved`.
 
-## 10. Estado B2 (cerrando)
+## 10. Estado B3 (en curso)
 
-Entregado en rama `feat/b2-profiles-starter`:
+Objetivo: primer código ejecutable del generador. Runner mínimo (profile YAML → zod-validado → completeness-checado → exit 0/1/2). Sin renderers — llegan en C*.
 
-- `questionnaire/profiles/{nextjs-app,agent-sdk,cli-tool}.yaml` — 3 profiles canónicos parciales (11-12 answers cada uno).
-- `tools/lib/profile-validator.ts` + `.test.ts` — ProfileFile zod parser + `validateProfile()` con 5 issue kinds.
-- `tools/validate-profile.ts` + `.test.ts` — CLI exit 0/1/2 + `formatReport`.
-- `tools/__fixtures__/profiles/{valid,invalid}/*.yaml` — 3 válidos (duplicados) + 4 negativos (unknown-path, type-mismatch, enum-out-of-values, pattern-violation).
-- `.github/workflows/ci.yml` — nuevo step `Validate profiles`.
-- `package.json` — script `validate:profiles`.
-- **Meta** (commit `chore(meta): apply Fase N+7 Context gate systematization`): sistematización en `CLAUDE.md` + `AGENTS.md` + `HANDOFF.md` + `.claude/rules/docs.md`.
-- 106 tests verdes, coverage 95.97% líneas, typecheck limpio.
-- Brecha conocida: `answer-value-not-in-array-allowlist` no validado a nivel de instancia (ArrayField.values existe en schema; check diferido).
+Decisiones Fase -1 (aprobadas):
+
+- CLI args: `--profile <path>` (req) + `--validate-only`. `--out` y `--dry-run` rechazados con exit 2 y mensaje `flag --X not supported in B3; planned for C1`.
+- Profile parcial con user-specific faltando (`identity.name`/`description`/`owner`) → exit 0 + warning. Otros required-missing → exit 1.
+- Schema hard-coded a `questionnaire/schema.yaml`. `--schema` diferido.
+- `generator/lib/schema.ts` re-exporta de `tools/lib/` (3ª aplicación pattern-before-abstraction; read-yaml fue la 2ª).
+- `generator/lib/token-budget.ts` **diferido**: `schema.yaml` no declara `workflow.token_budget` todavía. Reintroducir cuando el campo exista.
+
+Archivos previstos:
+
+- `generator/run.ts`, `generator/lib/profile-loader.ts`, `generator/lib/schema.ts`, `generator/lib/validators.ts`.
+- `generator/__fixtures__/profiles/{complete,partial-user-specific,invalid}/`.
+- Tests unit por lib + integración CLI vía `spawnSync`. Coverage ≥85%.
+
+Brechas heredadas de B2 (revisar si B3 las resuelve a coste marginal, si no re-diferir):
+
+- `answer-value-not-in-array-allowlist` no validado a nivel instancia.
+- `enum` con valor array/objeto emite `answer-value-not-in-enum` en vez de `answer-type-mismatch`.
+
+Commit 1 de la rama = **pre-kickoff chore**: bundle de (a) context-gate hardening heredado de sesión previa (AGENTS.md regla #1 + §3 paso 3; HANDOFF.md §3 checklist) + (b) docs sync previo (ROADMAP B2→✅ PR #2 + B3→🔄, HANDOFF §1/§9/§10, MASTER_PLAN §B3 nota ajuste). **No parte funcional del runner B3** — la implementación arranca en commit 2 con TDD estricto.

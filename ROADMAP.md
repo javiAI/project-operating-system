@@ -7,7 +7,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | Fase | Descripción | Estado |
 |---|---|---|
 | A | Skeleton & bootstrap | ✅ |
-| B | Cuestionario + profiles + runner | 🔄 en curso (B2) |
+| B | Cuestionario + profiles + runner | 🔄 en curso (B3) |
 | C | Templates + renderers | ⏳ pendiente |
 | D | Hooks (Python) | ⏳ pendiente |
 | E1 | Skills orquestación | ⏳ pendiente |
@@ -21,8 +21,8 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 |---|---|---|---|
 | `feat/a-skeleton` | Bootstrap estructura + docs canónicos + policy | ✅ | — (commit inicial sin PR) |
 | `feat/b1-questionnaire-schema` | Schema + questions YAML + validator | ✅ | #1 |
-| `feat/b2-profiles-starter` | nextjs-app / agent-sdk / cli-tool | 🔄 abierta | (por abrir) |
-| `feat/b3-generator-runner` | `generator/run.ts` + zod + token budget check | ⏳ | — |
+| `feat/b2-profiles-starter` | nextjs-app / agent-sdk / cli-tool | ✅ | #2 |
+| `feat/b3-generator-runner` | `generator/run.ts` + validate-only runner (token-budget diferido) | 🔄 abierta | (por abrir) |
 | `feat/c1-renderers-core-docs` | CLAUDE/MASTER_PLAN/ROADMAP/HANDOFF/AGENTS/README renderers | ⏳ | — |
 | `feat/c2-renderers-policy-rules` | policy.yaml + rules path-scoped | ⏳ | — |
 | `feat/c3-renderers-tests-harness` | Test harness por stack | ⏳ | — |
@@ -77,12 +77,13 @@ Entregables:
 - `.github/workflows/ci.yml` — matrix ubuntu+macos, node 20, actions pineadas por SHA.
 - `package.json`, `tsconfig.json`, `vitest.config.ts`, `.nvmrc`.
 
-### `feat/b2-profiles-starter` — en curso
+### `feat/b2-profiles-starter` — ✅ PR #2
 
-Entregables (en rama):
+Entregables:
 
 - `questionnaire/profiles/{nextjs-app,agent-sdk,cli-tool}.yaml` — 3 profiles canónicos parciales.
 - `tools/lib/profile-validator.ts` — parser ProfileFile + `validateProfile()` emitiendo 5 issue kinds.
+- `tools/lib/read-yaml.ts` — shared YAML I/O (reuso desde `validate-profile` + `validate-questionnaire`, pattern-before-abstraction 2ª aplicación).
 - `tools/validate-profile.ts` — CLI con exit 0/1/2 + `formatReport`.
 - `tools/__fixtures__/profiles/valid/` — duplicados de los 3 canónicos.
 - `tools/__fixtures__/profiles/invalid/` — 4 negativos (unknown-path, type-mismatch, enum-out-of-values, pattern-violation).
@@ -90,7 +91,25 @@ Entregables (en rama):
 - `package.json` — script `validate:profiles`.
 - **Meta** (commit `chore(meta)`): sistematización Fase N+7 Context gate en CLAUDE/AGENTS/HANDOFF/rules.
 
-**Brecha conocida**: `answer-value-not-in-array-allowlist` no se valida a nivel de instancia en B2 (ArrayField.values existe en schema pero el check se difiere a una rama posterior).
+**Brechas conocidas** (diferidas a rama posterior):
+
+- `answer-value-not-in-array-allowlist` no se valida a nivel de instancia (ArrayField.values existe en schema).
+- Campos `enum` con valor array/objeto emiten `answer-value-not-in-enum` en lugar de `answer-type-mismatch`.
+
+### `feat/b3-generator-runner` — en curso
+
+Scope:
+
+- `generator/run.ts` — CLI entrypoint (`--profile`, `--validate-only`).
+- `generator/lib/profile-loader.ts` — carga YAML reusando `tools/lib/read-yaml.ts`.
+- `generator/lib/schema.ts` — re-exporta `parseSchemaFile` / `parseProfileFile` / `validateProfile` desde `tools/lib/` (3ª aplicación pattern-before-abstraction).
+- `generator/lib/validators.ts` — `completenessCheck`: required-missing → error (exit 1); los 3 paths user-specific (`identity.name`/`description`/`owner`) warning-only (exit 0).
+- `generator/__fixtures__/profiles/{complete,partial-user-specific,invalid}/` — fixtures integración.
+- Tests unit + CLI (spawnSync). Coverage ≥85%.
+
+**Ajuste vs plan original**: `generator/lib/token-budget.ts` diferido — `schema.yaml` no declara `workflow.token_budget` todavía, implementarlo sería abstracción prematura. Reintroducir cuando exista el campo.
+
+**Flags diferidos a C1**: `--out` y `--dry-run` se rechazan explícitamente en B3 con exit 2 + mensaje `flag --X not supported in B3; planned for C1`.
 
 ## Convenciones de este archivo
 
