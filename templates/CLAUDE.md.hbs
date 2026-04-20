@@ -1,0 +1,52 @@
+{{!-- CLAUDE.md — governance rules for the generated repo --}}
+# CLAUDE.md — {{answers.identity.name}}
+
+> {{answers.identity.description}}
+
+## Identidad
+
+- **Repo**: `{{answers.identity.name}}` (owner: `{{answers.identity.owner}}`).
+- **Tipo**: {{answers.domain.type}}.
+- **Stack**: {{answers.stack.language}}{{#if answers.stack.database}}{{#if (neq answers.stack.database "none")}} + {{answers.stack.database}}{{/if}}{{/if}}.
+- **Testing**: {{answers.testing.unit_framework}}{{#if answers.testing.coverage_threshold}} (coverage ≥ {{answers.testing.coverage_threshold}}%){{/if}}{{#if answers.testing.e2e_framework}}{{#if (neq answers.testing.e2e_framework "none")}} + {{answers.testing.e2e_framework}} e2e{{/if}}{{/if}}.
+
+## Orden de lectura (sesión nueva)
+
+1. Este archivo (`CLAUDE.md`).
+2. [AGENTS.md](AGENTS.md) — reglas de ejecución autónoma.
+3. [HANDOFF.md](HANDOFF.md) — snapshot 30s.
+4. [MASTER_PLAN.md § Rama actual](MASTER_PLAN.md) — sólo la sección de la rama en curso.
+
+Path-scoped rules en [.claude/rules/](.claude/rules/) se cargan solas según los archivos que toques. No leas docs enteros — cita por rango de líneas.
+
+## Reglas no negociables
+
+1. **Fase -1 antes de cada rama**. Sin `.claude/branch-approvals/<slug>.approved` no hay `git checkout -b`.
+2. **Docs dentro de la rama**. ROADMAP, HANDOFF, AGENTS y rules afectadas se actualizan en el mismo PR que el código.
+3. **Tests antes que implementación**. TDD estricto: primero test que falla, luego código que pasa.
+4. **Nunca `--no-verify`**, nunca `git reset --hard` sin OK explícito, nunca `git push --force` a `main`.
+5. **Fase N+7 Context gate al cerrar cada rama**. Claude presenta las 4 opciones (`continuar` / `/compact` / `/clear` / sesión nueva) y espera elección explícita del usuario. Ver [HANDOFF.md §3](HANDOFF.md).
+6. **Patrones antes de abstraer**. ≥2 repeticiones documentadas antes de crear helper compartido.
+
+## Stack declarado
+
+{{#if (eq answers.stack.language "typescript")}}- TypeScript (Node 18+). Tooling con `tsx` o build step según template elegido.{{/if}}
+{{#if (eq answers.stack.language "javascript")}}- JavaScript (Node 18+).{{/if}}
+{{#if (eq answers.stack.language "python")}}- Python 3.10+.{{/if}}
+{{#if (eq answers.stack.language "go")}}- Go 1.21+.{{/if}}
+{{#if (eq answers.stack.language "rust")}}- Rust stable.{{/if}}
+- Test framework: {{answers.testing.unit_framework}}.
+{{#if answers.workflow.ci_host}}- CI host: {{answers.workflow.ci_host}}.{{/if}}
+{{#if answers.workflow.release_strategy}}- Release strategy: {{answers.workflow.release_strategy}}.{{/if}}
+{{#if answers.claude_code.default_model}}- Model default (Claude Code): {{answers.claude_code.default_model}}.{{/if}}
+{{#if answers.claude_code.team_size}}- Team size: {{answers.claude_code.team_size}}.{{/if}}
+
+## Licencia
+
+{{#if answers.identity.license}}{{answers.identity.license}}{{else}}MIT (default){{/if}}
+
+## Qué NO hacer
+
+- No crear archivos `.md` de decisión/análisis fuera de `docs/`. Usa memoria persistente.
+- No meter lógica en `CLAUDE.md` que corresponda a `.claude/rules/` path-scoped.
+- No saltar Fase -1 ni Fase N+7 por "momentum".
