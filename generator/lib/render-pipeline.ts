@@ -14,8 +14,8 @@ export type Renderer = (profile: Profile) => FileWrite[];
 export function renderAll(profile: Profile, renderers: Renderer[]): FileWrite[] {
   const all: FileWrite[] = [];
   const seen = new Map<string, number>();
-  for (let i = 0; i < renderers.length; i++) {
-    const out = renderers[i](profile);
+  for (const [i, renderer] of renderers.entries()) {
+    const out = renderer(profile);
     for (const file of out) {
       const prev = seen.get(file.path);
       if (prev !== undefined) {
@@ -31,9 +31,25 @@ export function renderAll(profile: Profile, renderers: Renderer[]): FileWrite[] 
 }
 
 export async function writeFiles(outDir: string, files: FileWrite[]): Promise<void> {
-  await mkdir(outDir, { recursive: true });
+  const resolvedOut = path.resolve(outDir);
+  await mkdir(resolvedOut, { recursive: true });
   for (const file of files) {
-    const abs = path.join(outDir, file.path);
+    if (path.isAbsolute(file.path)) {
+      throw new Error(
+        `render-pipeline/writeFiles: absolute path rejected: '${file.path}'`
+      );
+    }
+    const abs = path.resolve(resolvedOut, file.path);
+    const relative = path.relative(resolvedOut, abs);
+    if (
+      relative === ".." ||
+      relative.startsWith(`..${path.sep}`) ||
+      path.isAbsolute(relative)
+    ) {
+      throw new Error(
+        `render-pipeline/writeFiles: path escapes outDir: '${file.path}'`
+      );
+    }
     await mkdir(path.dirname(abs), { recursive: true });
     await writeFile(abs, file.content, "utf8");
   }

@@ -8,24 +8,26 @@ describe("renderers/readme", () => {
   it.each(profiles)("emits a single README.md for $slug", ({ profile }) => {
     const out = render(profile);
     expect(out).toHaveLength(1);
-    expect(out[0].path).toBe("README.md");
+    const [file] = out;
+    expect(file?.path).toBe("README.md");
   });
 
   it.each(profiles)("links to the 5 governance docs for $slug", ({ profile }) => {
-    const content = render(profile)[0].content;
-    expect(content).toContain("(CLAUDE.md)");
-    expect(content).toContain("(AGENTS.md)");
-    expect(content).toContain("(HANDOFF.md)");
-    expect(content).toContain("(MASTER_PLAN.md)");
-    expect(content).toContain("(ROADMAP.md)");
+    const [file] = render(profile);
+    expect(file?.content).toContain("(CLAUDE.md)");
+    expect(file?.content).toContain("(AGENTS.md)");
+    expect(file?.content).toContain("(HANDOFF.md)");
+    expect(file?.content).toContain("(MASTER_PLAN.md)");
+    expect(file?.content).toContain("(ROADMAP.md)");
   });
 
   it.each(profiles)("references the project description for $slug", ({ profile }) => {
-    const content = render(profile)[0].content;
-    expect(content).toContain("TODO(identity.description)");
+    const [file] = render(profile);
+    expect(file?.content).toContain("TODO(identity.description)");
   });
 
   it.each(profiles)("ends the output with a newline for $slug", ({ profile }) => {
-    expect(render(profile)[0].content.endsWith("\n")).toBe(true);
+    const [file] = render(profile);
+    expect(file?.content.endsWith("\n")).toBe(true);
   });
 });

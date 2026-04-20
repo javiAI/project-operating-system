@@ -30,16 +30,34 @@ Path-scoped rules en [.claude/rules/](.claude/rules/) se cargan solas según los
 
 ## Stack declarado
 
-{{#if (eq answers.stack.language "typescript")}}- TypeScript (Node 18+). Tooling con `tsx` o build step según template elegido.{{/if}}
-{{#if (eq answers.stack.language "javascript")}}- JavaScript (Node 18+).{{/if}}
-{{#if (eq answers.stack.language "python")}}- Python 3.10+.{{/if}}
-{{#if (eq answers.stack.language "go")}}- Go 1.21+.{{/if}}
-{{#if (eq answers.stack.language "rust")}}- Rust stable.{{/if}}
+{{#if (eq answers.stack.language "typescript")}}
+- TypeScript (Node 18+). Tooling con `tsx` o build step según template elegido.
+{{/if}}
+{{#if (eq answers.stack.language "javascript")}}
+- JavaScript (Node 18+).
+{{/if}}
+{{#if (eq answers.stack.language "python")}}
+- Python 3.10+.
+{{/if}}
+{{#if (eq answers.stack.language "go")}}
+- Go 1.21+.
+{{/if}}
+{{#if (eq answers.stack.language "rust")}}
+- Rust stable.
+{{/if}}
 - Test framework: {{answers.testing.unit_framework}}.
-{{#if answers.workflow.ci_host}}- CI host: {{answers.workflow.ci_host}}.{{/if}}
-{{#if answers.workflow.release_strategy}}- Release strategy: {{answers.workflow.release_strategy}}.{{/if}}
-{{#if answers.claude_code.default_model}}- Model default (Claude Code): {{answers.claude_code.default_model}}.{{/if}}
-{{#if answers.claude_code.team_size}}- Team size: {{answers.claude_code.team_size}}.{{/if}}
+{{#if answers.workflow.ci_host}}
+- CI host: {{answers.workflow.ci_host}}.
+{{/if}}
+{{#if answers.workflow.release_strategy}}
+- Release strategy: {{answers.workflow.release_strategy}}.
+{{/if}}
+{{#if answers.claude_code.default_model}}
+- Model default (Claude Code): {{answers.claude_code.default_model}}.
+{{/if}}
+{{#if answers.claude_code.team_size}}
+- Team size: {{answers.claude_code.team_size}}.
+{{/if}}
 
 ## Licencia
 

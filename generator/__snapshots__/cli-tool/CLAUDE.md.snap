@@ -30,10 +30,6 @@ Path-scoped rules en [.claude/rules/](.claude/rules/) se cargan solas según los
 ## Stack declarado
 
 - TypeScript (Node 18+). Tooling con `tsx` o build step según template elegido.
-
-
-
-
 - Test framework: vitest.
 - CI host: github.
 - Release strategy: semantic-release.

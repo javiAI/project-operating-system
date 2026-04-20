@@ -6,13 +6,29 @@
 ## Stack
 
 - **Tipo**: {{answers.domain.type}}
-- **Lenguaje**: {{answers.stack.language}}{{#if answers.stack.database}}{{#if (neq answers.stack.database "none")}}
-- **Base de datos**: {{answers.stack.database}}{{/if}}{{/if}}
-- **Testing**: {{answers.testing.unit_framework}}{{#if answers.testing.coverage_threshold}} (coverage ≥ {{answers.testing.coverage_threshold}}%){{/if}}{{#if answers.testing.e2e_framework}}{{#if (neq answers.testing.e2e_framework "none")}}
-- **E2E**: {{answers.testing.e2e_framework}}{{/if}}{{/if}}
-{{#if answers.integrations.observability}}{{#if (neq answers.integrations.observability "none")}}- **Observabilidad**: {{answers.integrations.observability}}{{/if}}{{/if}}
-{{#if answers.workflow.ci_host}}- **CI**: {{answers.workflow.ci_host}}{{/if}}
-{{#if answers.workflow.release_strategy}}- **Release**: {{answers.workflow.release_strategy}}{{/if}}
+- **Lenguaje**: {{answers.stack.language}}
+{{#if answers.stack.database}}
+{{#if (neq answers.stack.database "none")}}
+- **Base de datos**: {{answers.stack.database}}
+{{/if}}
+{{/if}}
+- **Testing**: {{answers.testing.unit_framework}}{{#if answers.testing.coverage_threshold}} (coverage ≥ {{answers.testing.coverage_threshold}}%){{/if}}
+{{#if answers.testing.e2e_framework}}
+{{#if (neq answers.testing.e2e_framework "none")}}
+- **E2E**: {{answers.testing.e2e_framework}}
+{{/if}}
+{{/if}}
+{{#if answers.integrations.observability}}
+{{#if (neq answers.integrations.observability "none")}}
+- **Observabilidad**: {{answers.integrations.observability}}
+{{/if}}
+{{/if}}
+{{#if answers.workflow.ci_host}}
+- **CI**: {{answers.workflow.ci_host}}
+{{/if}}
+{{#if answers.workflow.release_strategy}}
+- **Release**: {{answers.workflow.release_strategy}}
+{{/if}}
 
 ## Disciplina operativa
 

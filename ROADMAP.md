@@ -23,7 +23,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | `feat/b1-questionnaire-schema` | Schema + questions YAML + validator | ✅ | #1 |
 | `feat/b2-profiles-starter` | nextjs-app / agent-sdk / cli-tool | ✅ | #2 |
 | `feat/b3-generator-runner` | `generator/run.ts` + validate-only runner (token-budget diferido) | ✅ | #3 |
-| `feat/c1-renderers-core-docs` | CLAUDE/MASTER_PLAN/ROADMAP/HANDOFF/AGENTS/README renderers + pipeline + `--out`/`--dry-run` wire-up | ✅ | (por abrir) |
+| `feat/c1-renderers-core-docs` | CLAUDE/MASTER_PLAN/ROADMAP/HANDOFF/AGENTS/README renderers + pipeline + `--out`/`--dry-run` wire-up | ✅ | #4 |
 | `feat/c2-renderers-policy-rules` | policy.yaml + rules path-scoped | ⏳ | — |
 | `feat/c3-renderers-tests-harness` | Test harness por stack | ⏳ | — |
 | `feat/c4-renderers-ci-cd` | GitHub/GitLab/Bitbucket workflows | ⏳ | — |
@@ -112,7 +112,7 @@ Entregables:
 
 ## Progreso Fase C
 
-### `feat/c1-renderers-core-docs` — ✅ (PR por abrir)
+### `feat/c1-renderers-core-docs` — ✅ (PR #4)
 
 Entregables:
 

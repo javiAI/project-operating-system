@@ -29,16 +29,11 @@ Path-scoped rules en [.claude/rules/](.claude/rules/) se cargan solas según los
 
 ## Stack declarado
 
-
-
 - Python 3.10+.
-
-
 - Test framework: pytest.
 - CI host: github.
 - Release strategy: manual.
 - Model default (Claude Code): claude-opus-4-7.
-
 
 ## Licencia
 

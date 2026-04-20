@@ -7,7 +7,6 @@
 - **Tipo**: cli
 - **Lenguaje**: typescript
 - **Testing**: vitest (coverage ≥ 85%)
-
 - **CI**: github
 - **Release**: semantic-release
 

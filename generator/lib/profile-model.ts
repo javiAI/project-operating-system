@@ -1,10 +1,7 @@
 import type { ProfileFile } from "./schema.ts";
+import { USER_SPECIFIC_PATHS } from "./validators.ts";
 
-export const USER_SPECIFIC_PATHS = [
-  "identity.name",
-  "identity.description",
-  "identity.owner",
-] as const;
+export { USER_SPECIFIC_PATHS };
 
 export type UserSpecificPath = (typeof USER_SPECIFIC_PATHS)[number];
 
@@ -45,9 +42,18 @@ export function buildProfile(input: ProfileFile): Profile {
 
 function setNested(root: Record<string, unknown>, dotted: string, value: unknown): void {
   const parts = dotted.split(".");
+  const leafKey = parts.pop();
+  if (leafKey === undefined || leafKey === "") {
+    throw new Error(`invalid dotted path: '${dotted}'`);
+  }
+
   let cursor: Record<string, unknown> = root;
-  for (let i = 0; i < parts.length - 1; i++) {
-    const key = parts[i];
+  const walked: string[] = [];
+  for (const key of parts) {
+    if (key === "") {
+      throw new Error(`invalid dotted path: '${dotted}'`);
+    }
+    walked.push(key);
     const existing = cursor[key];
     if (existing === undefined) {
       const child: Record<string, unknown> = {};
@@ -57,12 +63,12 @@ function setNested(root: Record<string, unknown>, dotted: string, value: unknown
     }
     if (!isPlainObject(existing)) {
       throw new Error(
-        `collision at '${parts.slice(0, i + 1).join(".")}': leaf value conflicts with nested path '${dotted}'`
+        `collision at '${walked.join(".")}': leaf value conflicts with nested path '${dotted}'`
       );
     }
     cursor = existing;
   }
-  const leafKey = parts[parts.length - 1];
+
   const existingLeaf = cursor[leafKey];
   if (existingLeaf !== undefined && isPlainObject(existingLeaf)) {
     throw new Error(

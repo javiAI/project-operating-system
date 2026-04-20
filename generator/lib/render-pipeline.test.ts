@@ -152,3 +152,37 @@ describe("writeFiles / isDirEmpty — filesystem", () => {
     expect(entries).toEqual(["a.md", "z.md"]);
   });
 });
+
+describe("writeFiles — path traversal hardening", () => {
+  let tmp: string;
+  beforeEach(async () => {
+    tmp = await mkdtemp(path.join(tmpdir(), "pos-pipeline-traversal-"));
+  });
+  afterEach(async () => {
+    await rm(tmp, { recursive: true, force: true });
+  });
+
+  it("rejects an absolute path", async () => {
+    const abs = path.join(tmp, "evil.md");
+    await expect(
+      writeFiles(tmp, [{ path: abs, content: "x" }])
+    ).rejects.toThrow(/absolute path rejected/);
+  });
+
+  it("rejects a path that escapes outDir via ../", async () => {
+    await expect(
+      writeFiles(tmp, [{ path: "../escape.md", content: "x" }])
+    ).rejects.toThrow(/escapes outDir/);
+  });
+
+  it("rejects a nested path that escapes outDir via ../../..", async () => {
+    await expect(
+      writeFiles(tmp, [{ path: "a/../../b.md", content: "x" }])
+    ).rejects.toThrow(/escapes outDir/);
+  });
+
+  it("accepts a valid relative path inside outDir", async () => {
+    await writeFiles(tmp, [{ path: "ok/fine.md", content: "ok\n" }]);
+    expect(await readFile(path.join(tmp, "ok/fine.md"), "utf8")).toBe("ok\n");
+  });
+});

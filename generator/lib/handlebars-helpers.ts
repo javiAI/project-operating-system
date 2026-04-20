@@ -15,7 +15,7 @@ export function registerHelpers(hb: HandlebarsInstance): void {
   );
   hb.registerHelper("upperFirst", (value: unknown) =>
     typeof value === "string" && value.length > 0
-      ? value[0].toUpperCase() + value.slice(1)
+      ? value.charAt(0).toUpperCase() + value.slice(1)
       : ""
   );
   hb.registerHelper("jsonStringify", (value: unknown) => JSON.stringify(value, null, 2));
