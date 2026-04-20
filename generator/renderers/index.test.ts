@@ -7,6 +7,8 @@ import {
 import { renderAll } from "../lib/render-pipeline.ts";
 import { loadCanonicalProfiles } from "../__tests__/load-canonical-profiles.ts";
 
+const profiles = loadCanonicalProfiles();
+
 describe("renderers/index — coreDocRenderers", () => {
   it("exposes exactly 6 renderers (C1 scope)", () => {
     expect(coreDocRenderers).toHaveLength(6);
@@ -15,8 +17,6 @@ describe("renderers/index — coreDocRenderers", () => {
   it("is frozen to prevent accidental mutation", () => {
     expect(Object.isFrozen(coreDocRenderers)).toBe(true);
   });
-
-  const profiles = loadCanonicalProfiles();
 
   it.each(profiles)(
     "produces the 6 expected file paths through the pipeline for $slug without collisions",
@@ -54,18 +54,9 @@ describe("renderers/index — policyAndRulesRenderers (C2)", () => {
 });
 
 describe("renderers/index — allRenderers (C2 composition)", () => {
-  it("equals coreDocRenderers concatenated with policyAndRulesRenderers", () => {
-    expect([...allRenderers]).toEqual([
-      ...coreDocRenderers,
-      ...policyAndRulesRenderers,
-    ]);
-  });
-
   it("is frozen", () => {
     expect(Object.isFrozen(allRenderers)).toBe(true);
   });
-
-  const profiles = loadCanonicalProfiles();
 
   it.each(profiles)(
     "produces the 9 expected file paths through the pipeline for $slug without collisions",

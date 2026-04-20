@@ -45,41 +45,27 @@ describe("renderers/policy", () => {
     }
   );
 
-  it("emits node framework without python framework for TS profiles (nextjs-app)", () => {
-    const entry = profiles.find((p) => p.slug === "nextjs-app");
-    const [file] = render(entry!.profile);
-    const content = file!.content;
-    const parsed = parseYaml(content) as Record<string, unknown>;
-    const testing = parsed.testing as Record<string, unknown>;
-    const unit = testing.unit as Record<string, unknown>;
-    expect(unit.framework_node).toBe("vitest");
-    expect(unit.framework_python).toBeUndefined();
-    expect(content).not.toMatch(/\bpytest\b/);
-  });
-
-  it("emits node framework without python framework for TS profiles (cli-tool)", () => {
-    const entry = profiles.find((p) => p.slug === "cli-tool");
-    const [file] = render(entry!.profile);
-    const content = file!.content;
-    const parsed = parseYaml(content) as Record<string, unknown>;
-    const testing = parsed.testing as Record<string, unknown>;
-    const unit = testing.unit as Record<string, unknown>;
-    expect(unit.framework_node).toBe("vitest");
-    expect(unit.framework_python).toBeUndefined();
-    expect(content).not.toMatch(/\bpytest\b/);
-  });
-
-  it("emits python framework without node framework for Python profiles (agent-sdk)", () => {
-    const entry = profiles.find((p) => p.slug === "agent-sdk");
-    const [file] = render(entry!.profile);
-    const content = file!.content;
-    const parsed = parseYaml(content) as Record<string, unknown>;
-    const testing = parsed.testing as Record<string, unknown>;
-    const unit = testing.unit as Record<string, unknown>;
-    expect(unit.framework_python).toBe("pytest");
-    expect(unit.framework_node).toBeUndefined();
-    expect(content).not.toMatch(/\bvitest\b/);
-  });
+  it.each(profiles)(
+    "stack conditionals do not leak the other stack's framework for $slug",
+    ({ profile }) => {
+      const [file] = render(profile);
+      const content = file!.content;
+      const parsed = parseYaml(content) as Record<string, unknown>;
+      const testing = parsed.testing as Record<string, unknown>;
+      const unit = testing.unit as Record<string, unknown>;
+      const language = (profile.answers.stack as Record<string, unknown>)
+        .language;
+      if (language === "typescript") {
+        expect(unit.framework_node).toBe("vitest");
+        expect(unit.framework_python).toBeUndefined();
+        expect(content).not.toMatch(/\bpytest\b/);
+      } else {
+        expect(unit.framework_python).toBe("pytest");
+        expect(unit.framework_node).toBeUndefined();
+        expect(content).not.toMatch(/\bvitest\b/);
+      }
+    }
+  );
 
   it.each(profiles)("ends output with a trailing newline for $slug", ({ profile }) => {
     const [file] = render(profile);
