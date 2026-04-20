@@ -1,15 +1,15 @@
 # Makefile — test entry-point para TODO(identity.name)
 #
-# Harness minimo emitido por pos (C3). Targets universales:
+# Harness mínimo emitido por pos (C3). Targets universales:
 #   make test          # alias de test-unit
 #   make test-unit     # unit tests
 #   make test-coverage # unit tests con coverage
 #   make test-e2e      # e2e placeholder (ver tests/README.md)
 #   make clean         # limpia artefactos de test/coverage
 #
-# Nota: C3 no emite package.json/pyproject.toml. La instalacion del stack
+# Nota: C3 no emite package.json/pyproject.toml. La instalación del stack
 # queda pendiente de fase posterior. Los targets invocan binarios asumiendo
-# que el stack esta instalado localmente.
+# que el stack está instalado localmente.
 
 .PHONY: test test-unit test-coverage test-e2e clean
 

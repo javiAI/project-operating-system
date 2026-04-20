@@ -1,6 +1,6 @@
 # Tests — TODO(identity.name)
 
-Guia rapida del harness de tests emitido por `pos` (Fase C3).
+Guía rápida del harness de tests emitido por `pos` (Fase C3).
 
 ## Stack detectado
 
@@ -10,7 +10,7 @@ Guia rapida del harness de tests emitido por `pos` (Fase C3).
 
 ## Entry-point universal
 
-Todos los comandos se invocan desde el `Makefile` de la raiz:
+Todos los comandos se invocan desde el `Makefile` de la raíz:
 
 ```bash
 make test          # alias de test-unit
@@ -21,7 +21,7 @@ make clean         # limpia coverage + caches
 
 ## Unit tests
 
-Runner: **pytest**. Config: `pytest.ini` (raiz). Discovery: `tests/test_*.py`.
+Runner: **pytest**. Config: `pytest.ini` (raíz). Discovery: `tests/test_*.py`.
 
 Ejemplo inicial: `tests/test_smoke.py` — una assertion trivial que verifica que el runner arranca.
 
@@ -29,17 +29,17 @@ Ejemplo inicial: `tests/test_smoke.py` — una assertion trivial que verifica qu
 
 Threshold declarado en el profile: `90%`.
 
-`pytest.ini` aplica `--cov-fail-under=90` via `addopts`.
+`pytest.ini` aplica `--cov-fail-under=90` vía `addopts`.
 
 
-## Que NO emite C3 (diferidos)
+## Qué NO emite C3 (diferidos)
 
-- `package.json` (TS) / `pyproject.toml` (Python): la instalacion del stack es responsabilidad de una fase posterior del generador. Hasta entonces, asume el stack instalado en el entorno local.
+- `package.json` (TS) / `pyproject.toml` (Python): la instalación del stack es responsabilidad de una fase posterior del generador. Hasta entonces, asume el stack instalado en el entorno local.
 - Integration harness separado (solo unit + placeholder e2e).
-- Frameworks no canonicos: `jest`, `go-test`, `cargo-test` quedan diferidos hasta que aparezca un profile canonico que los use (CLAUDE.md regla #7: patrones antes de abstraer).
+- Frameworks no canónicos: `jest`, `go-test`, `cargo-test` quedan diferidos hasta que aparezca un profile canónico que los use (CLAUDE.md regla #7: patrones antes de abstraer).
 
-## Anadir un test
+## Añadir un test
 
-1. Crea `tests/test_<nombre>.py` siguiendo el patron de `test_smoke.py`.
+1. Crea `tests/test_<nombre>.py` siguiendo el patrón de `test_smoke.py`.
 2. Corre `make test` para ejecutar unit + cubrir el nuevo archivo.
 3. Si vas a tocar coverage, corre `make test-coverage` para verificar threshold.

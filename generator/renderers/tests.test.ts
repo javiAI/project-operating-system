@@ -127,6 +127,31 @@ describe("renderers/tests — e2e framework reflected only in README (no config 
       expect(readme.content.toLowerCase()).not.toMatch(/cypress/);
     }
   );
+
+  it("python profile with e2e_framework!=none — README does NOT render the E2E section (Makefile has no test-e2e target in Python)", () => {
+    const pythonWithE2e = buildProfile({
+      version: "0.1.0",
+      profile: { name: "py-e2e-fixture", description: "python + e2e synthetic fixture" },
+      answers: {
+        "domain.type": "cli",
+        "stack.language": "python",
+        "stack.database": "none",
+        "testing.unit_framework": "pytest",
+        "testing.coverage_threshold": 80,
+        "testing.e2e_framework": "playwright",
+        "workflow.ci_host": "github",
+        "workflow.release_strategy": "manual",
+        "workflow.branch_protection": true,
+        "claude_code.default_model": "claude-sonnet-4-6",
+      },
+    });
+    const files = render(pythonWithE2e);
+    const readme = files.find((f) => f.path === "tests/README.md")!;
+    expect(readme.content).not.toMatch(/## E2E —/);
+    expect(readme.content).not.toMatch(/make test-e2e/);
+    const mk = files.find((f) => f.path === "Makefile")!;
+    expect(mk.content).not.toMatch(/^test-e2e:/m);
+  });
 });
 
 describe("renderers/tests — every FileWrite ends with a trailing newline", () => {
