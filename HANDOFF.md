@@ -5,7 +5,7 @@
 ## 1. Snapshot
 
 - Repo: `project-operating-system` (plugin `pos`).
-- Fase actual: **C1 en curso** (`feat/c1-renderers-core-docs`, PR por abrir). Anterior: **B3 ✅ PR #3** (`5388a80`). Siguiente: **C2 — `feat/c2-renderers-policy-rules`**.
+- Fase actual: **C1 ✅ cerrada en rama** (`feat/c1-renderers-core-docs`, PR por abrir). Anterior: **B3 ✅ PR #3** (`5388a80`). Siguiente: **C2 — `feat/c2-renderers-policy-rules`**.
 - Fuente de verdad ejecutable: [MASTER_PLAN.md](MASTER_PLAN.md).
 - Estado vivo: [ROADMAP.md](ROADMAP.md).
 - Arquitectura canonical: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -17,9 +17,10 @@ git log --oneline -10 && git status -sb && ls .claude/branch-approvals/
 ```
 
 Qué deberías ver:
-- Último commit: bootstrap Fase A.
+
+- Último commit: cierre de la rama anterior (merge commit o docs-sync final).
 - Working tree limpio.
-- `.claude/branch-approvals/` vacío (o con `.gitkeep`).
+- `.claude/branch-approvals/` con el marker de la rama en curso (si hay) o vacío.
 
 Si el ROADMAP no coincide con `git log` → ROADMAP desfasado, actualizarlo antes de arrancar.
 
@@ -83,7 +84,7 @@ Ejecuta §2.1 Fase -1 completo. Espera aprobación explícita antes de `git chec
 
 ## 6b. Carry-over a fases futuras
 
-- **C1 (`feat/c1-renderers-core-docs`)** [parcial]: propagar Fase N+7 Context gate al repo generado en los 2 templates de su scope. `templates/HANDOFF.md.hbs` debe incluir la matriz de decisión + checklist post-merge; `templates/AGENTS.md.hbs` debe incluir Fase N+7 como última fase de rama en el flujo.
+- **C1 (`feat/c1-renderers-core-docs`)** ✅ [parcial completada]: Fase N+7 propagada en `templates/HANDOFF.md.hbs` (matriz + checklist) y `templates/AGENTS.md.hbs` (Fase N+7 como última fase del flujo de rama).
 - **C2 (`feat/c2-renderers-policy-rules`)**: completa el carry-over. `templates/.claude/rules/docs.md.hbs` debe incluir el checkbox de trazabilidad (originalmente planeado en C1, diferido a C2 por coherencia de scope con `.claude/rules/*.md`). Todo proyecto generado con `pos` hereda la misma disciplina de context-management una vez C2 cierra.
 
 ## 7. Gotchas del entorno
@@ -118,31 +119,13 @@ Lectura mínima al arrancar:
 - [.claude/rules/generator.md](.claude/rules/generator.md) + [.claude/rules/templates.md](.claude/rules/templates.md)
 - `generator/renderers/` + `generator/lib/render-pipeline.ts` entregados en C1.
 
-## 10. Estado C1 (en curso)
+## 10. Estado C1 (cerrada en rama)
 
-Objetivo: primera emisión real de archivos. Pipeline `Profile → FileWrite[] → fs`. 6 renderers puros + 6 templates Handlebars + wire-up `--out`/`--dry-run`.
+Primera emisión real de archivos completada. Pipeline `Profile → FileWrite[] → fs` viva. Detalle de entregables en [ROADMAP.md § Progreso Fase C](ROADMAP.md) y la pipeline está documentada en [docs/ARCHITECTURE.md § Renderers](docs/ARCHITECTURE.md).
 
-Decisiones Fase -1 (aprobadas):
+Apuntes para quien arranque C2:
 
-- **User-specific placeholders**: faltantes (`identity.name|description|owner`) → renderer emite literal `TODO(identity.<campo>)` + warning. Aplica a `--dry-run` y `--out`; no bloquea emisión.
-- **Carry-over Fase N+7**: en C1 solo `HANDOFF.md.hbs` (matriz + checklist) y `AGENTS.md.hbs` (Fase N+7 en flujo). `docs.md.hbs` **diferido a C2**.
-- **`--out` con subdirs** desde el primer día. `FileWrite.path` relativo + `mkdir -p`.
-- **`FileWrite` shape**: `{ path: string; content: string }`. Sin `mode` (llega en C5).
-- **`render-pipeline`** falla explícitamente ante colisión de paths (no solo detecta en tests).
-- **Snapshots + tests semánticos**: snapshots por (profile × template) = 18, pero además tests unitarios por renderer verifican paths emitidos + strings críticas. Snapshots no son la única red de seguridad.
-- **`--validate-only`** se conserva por compat/transición. Sin flags = comportamiento validate-only. `--force` fuera de scope (queda diferido).
-- **Alternativas descartadas**: vertical slice (solo 2 templates) y "renderers sin wire-up CLI" — ambas fragmentarían la pipeline.
-
-Archivos previstos:
-
-- `generator/renderers/{claude-md,master-plan,roadmap,handoff,agents,readme}.ts` (+ `.test.ts` por cada uno).
-- `generator/lib/handlebars-helpers.ts`, `generator/lib/render-pipeline.ts`, `generator/lib/profile-model.ts` (+ tests).
-- `generator/run.ts` — wire-up `--out`/`--dry-run`.
-- `templates/{CLAUDE.md,MASTER_PLAN.md,ROADMAP.md,HANDOFF.md,AGENTS.md,README.md}.hbs`.
-- `templates/_partials/.gitkeep`.
-- `generator/__snapshots__/<profile-slug>/*.snap` — 18 snapshots.
-- CI: script `render:generator` + step en `.github/workflows/ci.yml`.
-
-Deps nuevas: `handlebars` (única).
-
-Commit 1 de la rama = **pre-kickoff chore**: docs-sync previo (ROADMAP B3→✅ PR #3 + C1→🔄 + Fase B→✅, HANDOFF §1/§9/§10, MASTER_PLAN §C1 decisiones Fase -1, §6b carry-over parcial) + kickoff block. **No parte funcional de renderers** — la implementación arranca en commit 2 con TDD estricto.
+- Punto de extensión: añadir un renderer implica crear `generator/renderers/<x>.ts` (usa `loadTemplate`) + test pair + registrarlo en el array apropiado (`coreDocRenderers` o un nuevo array para C2). Colisiones de paths fallan el pipeline — garantía de invariante.
+- `buildProfile` vive en `generator/lib/profile-model.ts`; si C2 necesita más placeholders user-specific, ampliar `USER_SPECIFIC_PATHS` allí.
+- Snapshots por convención en `generator/__snapshots__/<slug>/<path>.snap`. Añadir un template = añadir 3 snapshots (uno por profile canónico).
+- Helpers Handlebars se registran en `generator/lib/handlebars-helpers.ts`; si C2 introduce nuevos, añadir tests de compilación real allí.

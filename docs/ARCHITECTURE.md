@@ -117,62 +117,115 @@ El schema NO es JSON Schema. Es un DSL propio YAML declarativo, validado por [to
 
 ## 3. Generador (TypeScript + tsx)
 
-### Entrypoint (entregado en B3)
+### Entrypoint (entregado en B3, ampliado en C1)
 
-[generator/run.ts](../generator/run.ts) es el CLI del runner. Por diseño, B3 entrega **solo el runner de validación**; la parte de render + escritura llega en C* (y por eso `--out` y `--dry-run` se rechazan explícitamente).
+[generator/run.ts](../generator/run.ts) es el CLI del runner. B3 entregó el runner de validación; C1 añade render + escritura.
 
 **Signatures públicas** (usables desde tests y, en el futuro, desde skills):
 
 ```ts
 // generator/run.ts
+export type Mode = "validate-only" | "dry-run" | "write";
 export type RunResult = {
   ok: boolean;
   issues: ProfileIssue[];                 // de profile-validator
   errors: CompletenessEntry[];            // required-missing (non-user-specific)
   warnings: CompletenessEntry[];          // required-missing (user-specific)
   parseErrors: string[];                  // YAML ilegible, schema roto, etc.
-  exitCode: 0 | 1 | 2;
+  exitCode: 0 | 1 | 2 | 3;
 };
 
 export async function runValidation(profilePath: string): Promise<RunResult>;
+export async function runRender(profilePath: string): Promise<
+  | { ok: true; files: FileWrite[]; warnings: CompletenessEntry[] }
+  | { ok: false; error: string }
+>;
 export function formatReport(result: RunResult, profilePath: string): string;
+export function formatRenderSummary(
+  files: FileWrite[],
+  warnings: CompletenessEntry[],
+  mode: "dry-run" | "write",
+  outDir?: string,
+): string;
 ```
 
 **CLI**:
 
 ```bash
-tsx generator/run.ts --profile <path> [--validate-only]
+tsx generator/run.ts --profile <path> [--validate-only | --dry-run | --out <dir>]
 ```
 
-Schema hard-coded a `questionnaire/schema.yaml`. Flags `--out` y `--dry-run` se declaran en `parseArgs` pero el runner las rechaza con `flag --X not supported in B3; planned for C1` + exit 2.
+Los tres modos son mutuamente exclusivos (error → exit 2). Sin flags = `--validate-only` (compat con B3). `--out <dir>` requiere directorio vacío (exit 3 si no). `--dry-run` lista los 6 paths emitidos + tamaños sin tocar fs. Schema hard-coded a `questionnaire/schema.yaml`.
 
 **Exit codes**:
 
-- `0` — profile OK (warnings user-specific permitidas).
-- `1` — `validateProfile` emitió issues **o** `completenessCheck` emitió errors (required no-user-specific faltante).
-- `2` — archivo ausente, YAML ilegible, args inválidos, o flag diferido.
+- `0` — validación OK y, si aplica, render + escritura OK.
+- `1` — `validateProfile` emitió issues **o** `completenessCheck` emitió errors. Render no se ejecuta.
+- `2` — archivo ausente, YAML ilegible, args inválidos, modos mutuamente exclusivos combinados.
+- `3` — `--out <dir>` target no vacío (protege output del usuario; `--force` fuera de scope).
 
 **Composición**:
 
 - [generator/lib/schema.ts](../generator/lib/schema.ts) — **re-export puro** de `parseSchemaFile` / `parseProfileFile` / `validateProfile` + tipos desde `tools/lib/`. 3ª aplicación de pattern-before-abstraction.
 - [generator/lib/profile-loader.ts](../generator/lib/profile-loader.ts) — `loadProfile(path): Promise<LoadResult>` reusando `readAndParseYaml` de `tools/lib/read-yaml.ts`.
-- [generator/lib/validators.ts](../generator/lib/validators.ts) — `completenessCheck(schema, profile): { errors, warnings }`. Exporta `USER_SPECIFIC_PATHS` para que los tests asseverar la lista sin duplicarla.
+- [generator/lib/validators.ts](../generator/lib/validators.ts) — `completenessCheck(schema, profile): { errors, warnings }`. Exporta `USER_SPECIFIC_PATHS` para que los tests asseveren la lista sin duplicarla.
+- [generator/lib/profile-model.ts](../generator/lib/profile-model.ts) — `buildProfile(file): Profile` expande dotted-answers a objeto nested (`setNested` que revienta ante colisiones de tipo), inyecta placeholders literales `TODO(identity.<campo>)` para los 3 user-specific paths faltantes, y emite `placeholders[]` para el reporter.
+- [generator/lib/render-pipeline.ts](../generator/lib/render-pipeline.ts) — pipeline + I/O. Ver § Renderers.
+- [generator/lib/handlebars-helpers.ts](../generator/lib/handlebars-helpers.ts) — helpers Handlebars (`eq`, `neq`, `includes`, `kebabCase`, `upperFirst`, `jsonStringify`) registrados sobre una instancia privada vía `Handlebars.create()`.
+- [generator/lib/template-loader.ts](../generator/lib/template-loader.ts) — `loadTemplate(relativePath)` lee `templates/<path>` sincronamente al eval del módulo renderer y devuelve `CompiledTemplate`. 4ª aplicación de pattern-before-abstraction (evita duplicar el triple `create+registerHelpers+compile` en los 6 renderers).
 
-**Deferrals de B3** (documentados en [.claude/rules/generator.md](../.claude/rules/generator.md#deferrals-b3)):
+**Deferrals de B3/C1** (documentados en [.claude/rules/generator.md](../.claude/rules/generator.md)):
 
 - `generator/lib/token-budget.ts` — diferido hasta que `questionnaire/schema.yaml` declare `workflow.token_budget`.
 - `--schema` flag — diferido hasta que exista 2º schema.
-- Renderers + writers — llegan en C*.
+- `--force` flag — fuera de scope C1; `--out` sobre dir no vacío aborta con exit 3.
 
-### Renderers
+### Renderers (entregado en C1)
 
-Un renderer por output. Función pura. Input: profile + templates. Output: `FileWrite[]`.
+Un renderer por output. Función pura `Renderer = (profile: Profile) => FileWrite[]`. Sin efectos secundarios, sin `Date.now()`, sin `Math.random()`, sin env vars del host.
 
-Lista: CLAUDE.md, MASTER_PLAN.md, ROADMAP.md, HANDOFF.md, AGENTS.md, README.md, policy.yaml, `.claude/rules/*.md`, skills/copy, hooks/copy, agents/copy, `.github/workflows/*.yml`, test harness (vitest.config, pytest.ini, etc.), fixtures smoke.
+**`FileWrite` shape mínimo**:
 
-### Determinismo
+```ts
+type FileWrite = { path: string; content: string };
+```
 
-Los renderers NO leen `Date.now()`, `Math.random()`, ni variables de entorno del host. Todo viene de `profile`. Un timestamp requerido: `profile.metadata.generatedAt` inyectado desde el CLI (o `null` en tests). Esto permite snapshot testing sin flakes.
+`path` es relativo al root del repo generado (permite subdirs: `.claude/rules/docs.md`). `mode` no existe en C1 — se añadirá en C5 cuando aparezcan hooks ejecutables con bits de permiso.
+
+**Pipeline** ([generator/lib/render-pipeline.ts](../generator/lib/render-pipeline.ts)):
+
+```ts
+export function renderAll(profile: Profile, renderers: Renderer[]): FileWrite[];
+export async function writeFiles(outDir: string, files: FileWrite[]): Promise<void>;
+export async function isDirEmpty(dir: string): Promise<boolean>;
+```
+
+`renderAll` concatena las salidas de los renderers y **falla explícitamente** ante colisión de paths (`throw` con índices de los dos renderers que colisionan). Es una invariante, no solo una aserción de tests. `writeFiles` crea subdirs con `mkdir -p`. `isDirEmpty` gate pre-escritura.
+
+**Determinismo**: byte-identical entre runs. Tests asseveran con `JSON.stringify(renderAll(p, rs)) === JSON.stringify(renderAll(p, rs))`. Sin timestamps en templates (se añadirá `profile.metadata.generatedAt` inyectado desde fuera si una fase posterior lo requiere).
+
+**Lista actual** (C1): CLAUDE.md, MASTER_PLAN.md, ROADMAP.md, HANDOFF.md, AGENTS.md, README.md — expuestos como tuple congelada `coreDocRenderers` en [generator/renderers/index.ts](../generator/renderers/index.ts).
+
+**Pendientes en C\***: policy.yaml + `.claude/rules/*.md` (C2), test harness (C3), CI/CD workflows (C4), copia de skills + hooks (C5).
+
+**Cómo añadir un renderer**:
+
+1. Crear `templates/<Nombre>.hbs` (Handlebars).
+2. Crear `generator/renderers/<x>.ts`:
+   ```ts
+   import { loadTemplate } from "../lib/template-loader.ts";
+   import type { Renderer } from "../lib/render-pipeline.ts";
+   const template = loadTemplate("<Nombre>.hbs");
+   export const render: Renderer = (profile) => [
+     { path: "<Nombre>", content: template(profile) },
+   ];
+   ```
+3. Crear `generator/renderers/<x>.test.ts` primero (TDD): tests semánticos sobre paths emitidos + strings críticas.
+4. Registrar en el array correspondiente (p.ej. `coreDocRenderers` de [generator/renderers/index.ts](../generator/renderers/index.ts), o nuevo array si pertenece a otro grupo).
+5. Los 18 snapshots por profile × template se autogeneran en `generator/__snapshots__/<slug>/*.snap` al correr vitest — revisar diff antes de commit.
+6. Si el renderer requiere un nuevo helper Handlebars, añadirlo en [generator/lib/handlebars-helpers.ts](../generator/lib/handlebars-helpers.ts) con tests de compilación real.
+
+**User-specific placeholders**: `buildProfile` inyecta literal `TODO(identity.name|description|owner)` cuando el profile no los declara. Los templates usan `{{answers.identity.name}}` directamente — no necesitan `{{#if}}` guards para estos tres. Emite warning por path vía `completenessCheck`; no bloquea emisión. La sustitución real pasará por el runner interactivo de fase posterior.
 
 ## 4. Hooks (Python)
 

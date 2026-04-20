@@ -8,7 +8,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 |---|---|---|
 | A | Skeleton & bootstrap | ✅ |
 | B | Cuestionario + profiles + runner | ✅ |
-| C | Templates + renderers | 🔄 en curso (C1) |
+| C | Templates + renderers | 🔄 en curso (C1 ✅, C2 siguiente) |
 | D | Hooks (Python) | ⏳ pendiente |
 | E1 | Skills orquestación | ⏳ pendiente |
 | E2 | Skills calidad | ⏳ pendiente |
@@ -23,7 +23,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | `feat/b1-questionnaire-schema` | Schema + questions YAML + validator | ✅ | #1 |
 | `feat/b2-profiles-starter` | nextjs-app / agent-sdk / cli-tool | ✅ | #2 |
 | `feat/b3-generator-runner` | `generator/run.ts` + validate-only runner (token-budget diferido) | ✅ | #3 |
-| `feat/c1-renderers-core-docs` | CLAUDE/MASTER_PLAN/ROADMAP/HANDOFF/AGENTS/README renderers + pipeline + `--out`/`--dry-run` wire-up | 🔄 abierta | (por abrir) |
+| `feat/c1-renderers-core-docs` | CLAUDE/MASTER_PLAN/ROADMAP/HANDOFF/AGENTS/README renderers + pipeline + `--out`/`--dry-run` wire-up | ✅ | (por abrir) |
 | `feat/c2-renderers-policy-rules` | policy.yaml + rules path-scoped | ⏳ | — |
 | `feat/c3-renderers-tests-harness` | Test harness por stack | ⏳ | — |
 | `feat/c4-renderers-ci-cd` | GitHub/GitLab/Bitbucket workflows | ⏳ | — |
@@ -110,28 +110,25 @@ Entregables:
 
 **Ajuste vs plan original**: `generator/lib/token-budget.ts` diferido — `schema.yaml` no declara `workflow.token_budget` todavía, implementarlo sería abstracción prematura. Reintroducir cuando exista el campo.
 
-### `feat/c1-renderers-core-docs` — en curso
+## Progreso Fase C
 
-Scope (ver [MASTER_PLAN.md § Rama C1](MASTER_PLAN.md)):
+### `feat/c1-renderers-core-docs` — ✅ (PR por abrir)
 
-- 6 renderers puros en `generator/renderers/{claude-md,master-plan,roadmap,handoff,agents,readme}.ts`, cada uno `render(profile: Profile): FileWrite[]`.
-- 6 templates Handlebars en `templates/*.hbs`.
-- `generator/lib/handlebars-helpers.ts` (`eq`, `neq`, `includes`, `kebabCase`, `upperFirst`, `jsonStringify`).
-- `generator/lib/render-pipeline.ts` — orquestador; **falla explícitamente** ante colisión de paths.
-- `generator/lib/profile-model.ts` — dotted-answers → objeto nested para templates.
-- Wire-up de `--out <dir>` y `--dry-run` en `generator/run.ts`. Sin flags = `--validate-only` (compat).
-- Snapshots por (profile × template) = 18 en `generator/__snapshots__/`.
-- Tests semánticos mínimos por renderer (paths emitidos + strings críticas) **además** de snapshots.
-- Coverage ≥85%.
+Entregables:
 
-**Decisiones Fase -1 (aprobadas)**:
+- 6 renderers puros en `generator/renderers/{claude-md,master-plan,roadmap,handoff,agents,readme}.ts`, cada uno `render(profile: Profile): FileWrite[]`. Frozen tuple `coreDocRenderers` en `generator/renderers/index.ts`.
+- 6 templates Handlebars en `templates/{CLAUDE,MASTER_PLAN,ROADMAP,HANDOFF,AGENTS,README}.md.hbs`.
+- `generator/lib/handlebars-helpers.ts` — `eq`, `neq`, `includes`, `kebabCase`, `upperFirst`, `jsonStringify`.
+- `generator/lib/render-pipeline.ts` — `renderAll(profile, renderers)` falla explícitamente ante colisión de paths (invariante). `writeFiles(dir, files)` crea subdirs; `isDirEmpty(dir)` gate pre-escritura.
+- `generator/lib/profile-model.ts` — `buildProfile(file)` expande dotted-answers a objeto nested, inyecta placeholders `TODO(identity.X)` para user-specific paths faltantes y emite `placeholders[]`.
+- `generator/lib/template-loader.ts` — carga sincrónica desde `templates/` + registro de helpers (4ª aplicación pattern-before-abstraction).
+- `generator/run.ts` — wire-up de `--out <dir>` y `--dry-run` + exports `runRender` / `formatRenderSummary`. Exit codes: `0|1|2|3`.
+- 18 snapshots en `generator/__snapshots__/<slug>/*.md.snap` (3 profiles × 6 templates) vía `toMatchFileSnapshot`.
+- Tests semánticos por renderer (paths + strings críticas) **además** de snapshots.
+- Scripts `render:generator` + step CI homónimo en `.github/workflows/ci.yml`.
+- Coverage global ≥85% (292 tests verdes).
 
-- User-specific fields faltantes (`identity.name|description|owner`) → renderer inyecta placeholders literales `TODO(identity.<campo>)` + warning. Aplica a `--dry-run` y `--out`. No bloquea emisión.
-- `.claude/rules/docs.md.hbs` **diferido a C2** (scope C2 cubre `.claude/rules/*.md`). Carry-over Fase N+7 en C1 solo afecta `HANDOFF.md.hbs` + `AGENTS.md.hbs`.
-- `--out` soporta subdirectorios desde el primer día (`FileWrite.path` relativo + `mkdir -p`). Evita refactor en C2.
-- `FileWrite` shape mínimo: `{ path: string; content: string }`. Sin `mode`. Bits de permisos se añaden en C5 cuando apliquen.
-- `--force` fuera de scope en C1. `--out` sobre dir no vacío → exit 3 (según [.claude/rules/generator.md:56](.claude/rules/generator.md)).
-- Commit 1 de la rama = pre-kickoff chore (docs-sync B3→✅, HANDOFF §1/§9/§10, ROADMAP, MASTER_PLAN §C1) + kickoff block. **No parte funcional de renderers** — la implementación arranca en commit 2 con TDD estricto.
+**Ajuste vs plan original** (Fase -1): user-specific placeholders literales `TODO(identity.X)` con warning (no bloquea emisión); `docs.md.hbs` diferido a C2; `--out` con subdirs desde día 1; `FileWrite = { path, content }` sin `mode`; `render-pipeline` falla por invariante ante colisión; snapshots + tests semánticos coexisten; `--validate-only` conservado por compat; `--force` fuera de scope (dir no vacío → exit 3).
 
 ## Convenciones de este archivo
 
