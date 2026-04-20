@@ -1,0 +1,14 @@
+# Fixture negativo: valor de string viola el pattern declarado en el schema.
+# identity.name exige ^[a-z][a-z0-9-]{2,}$ — aquí va en mayúsculas con underscores.
+# Issue esperado: answer-constraint-violation (pattern)
+
+version: "0.1.0"
+
+profile:
+  name: "pattern-violation"
+  description: "Profile with an identity.name value that breaks the pattern constraint."
+
+answers:
+  "identity.name": "INVALID_NAME"
+  "stack.language": "typescript"
+  "testing.unit_framework": "vitest"

@@ -1,0 +1,24 @@
+# questionnaire/profiles/agent-sdk.yaml
+#
+# Arranque canónico: Agent SDK + Python + pytest + uv.
+# Perfil parcial: omite identity.name / description / owner (user-specific).
+# Validado en CI por tools/validate-profile.ts.
+
+version: "0.1.0"
+
+profile:
+  name: "agent-sdk"
+  description: "Claude Agent SDK integration in Python with pytest + uv + OpenTelemetry."
+
+answers:
+  "domain.type": "agent-sdk"
+  "stack.language": "python"
+  "stack.database": "none"
+  "testing.unit_framework": "pytest"
+  "testing.coverage_threshold": 90
+  "testing.e2e_framework": "none"
+  "integrations.observability": "opentelemetry"
+  "workflow.ci_host": "github"
+  "workflow.release_strategy": "manual"
+  "workflow.branch_protection": true
+  "claude_code.default_model": "claude-opus-4-7"

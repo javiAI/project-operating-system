@@ -1,9 +1,8 @@
 #!/usr/bin/env tsx
-import { readFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
-import { parse as parseYaml } from "yaml";
 import { crossValidate, type CrossValidationIssue } from "./lib/cross-validate.ts";
 import { parseQuestionsFile, parseSchemaFile } from "./lib/meta-schema.ts";
+import { errorMessage, readAndParseYaml } from "./lib/read-yaml.ts";
 
 type ExitCode = 0 | 1 | 2;
 
@@ -38,27 +37,6 @@ export async function validateQuestionnaire(
   } catch (err) {
     errors.push(errorMessage(err));
     return { ok: false, issues: [], errors, exitCode: 1 };
-  }
-}
-
-function errorMessage(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  return String(err);
-}
-
-async function readAndParseYaml(
-  path: string
-): Promise<{ ok: true; value: unknown } | { ok: false; error: string }> {
-  let raw: string;
-  try {
-    raw = await readFile(path, "utf8");
-  } catch (err) {
-    return { ok: false, error: `cannot read ${path}: ${errorMessage(err)}` };
-  }
-  try {
-    return { ok: true, value: parseYaml(raw) };
-  } catch (err) {
-    return { ok: false, error: `cannot parse ${path}: ${errorMessage(err)}` };
   }
 }
 

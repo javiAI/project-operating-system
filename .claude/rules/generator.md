@@ -59,3 +59,12 @@ Cada renderer exporta una función pura `render(profile: Profile): FileWrite[]`.
 ## Determinismo del output
 
 Los renderers deben producir **byte-identical output** para el mismo profile. Sin `Date.now()`, sin `Math.random()`, sin paths absolutos del host. Usar `profile.metadata.generatedAt` inyectado desde afuera para timestamps.
+
+## Profiles (entregado en B2)
+
+- **Location**: `questionnaire/profiles/<slug>.yaml`. Canonical source. El generador los lee desde aquí.
+- **Shape**: `{ version, profile: { name, description }, answers: { "<path.dotted>": <value> } }`. Claves dotted alineadas con `field.path` del schema. Top-level strict (no extra keys).
+- **Parcialidad**: un profile no tiene que cubrir todos los `required` del project_profile final. Los 3 campos user-specific (`identity.name`, `identity.description`, `identity.owner`) quedan fuera por diseño.
+- **Validator**: `npx tsx tools/validate-profile.ts <path>` — emite issues de 5 kinds (ver [docs/ARCHITECTURE.md §2 Profiles](../../docs/ARCHITECTURE.md)). CI corre un step `Validate profiles` sobre los 3 canónicos.
+- **Fixtures**: `tools/__fixtures__/profiles/{valid,invalid}/*.yaml`. Los `valid/` son duplicados literales de los canónicos (simplicidad; consolidar si B3 revela mejor mecanismo).
+- **Añadir un nuevo profile**: crear YAML en `questionnaire/profiles/`, duplicarlo en `tools/__fixtures__/profiles/valid/`, añadir invocación al script `validate:profiles` de `package.json`. Tests unitarios no necesitan cambio (reutilizan el schema base).

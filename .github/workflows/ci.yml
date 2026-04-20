@@ -38,5 +38,8 @@ jobs:
       - name: Validate questionnaire
         run: npm run validate:questionnaire
 
+      - name: Validate profiles
+        run: npm run validate:profiles
+
       - name: Test (with coverage)
         run: npm run test:coverage

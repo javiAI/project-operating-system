@@ -54,7 +54,7 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 
 ## FASE B — Cuestionario + profiles + generador esqueleto
 
-### Rama B1 — `feat/b1-questionnaire-schema`
+### Rama B1 — `feat/b1-questionnaire-schema` ✅ PR #1
 
 **Scope**: `questionnaire/schema.yaml` + `questionnaire/questions.yaml` + tests schema (vitest). Sin generador todavía.
 
@@ -64,11 +64,18 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 
 **Criterio de salida**: `npx tsx tools/validate-questionnaire.ts` valida ambos archivos. Tests >90% coverage.
 
-### Rama B2 — `feat/b2-profiles-starter`
+### Rama B2 — `feat/b2-profiles-starter` ✅
 
-**Scope**: `questionnaire/profiles/nextjs-app.yaml`, `agent-sdk.yaml`, `cli-tool.yaml`. Cada profile responde automáticamente ~60% del cuestionario.
+**Scope**: `questionnaire/profiles/nextjs-app.yaml`, `agent-sdk.yaml`, `cli-tool.yaml`. Cada profile responde ~60% del cuestionario (parcial por diseño; omite los 3 campos user-specific). Añade `tools/lib/profile-validator.ts` + `tools/validate-profile.ts` (CLI) + fixtures valid/invalid + CI step `Validate profiles`.
 
-**Criterio de salida**: los 3 profiles validan contra el schema de B1. Cada uno tiene fixture test en `generator/__fixtures__/profiles/`.
+**Ajuste vs plan original**: los fixtures viven en `tools/__fixtures__/profiles/` (no en `generator/__fixtures__/profiles/`) porque el generador no existe todavía. Consolidación diferida a B3 si aplica.
+
+**Brechas conocidas** (diferidas a B3):
+
+- `answer-value-not-in-array-allowlist` no se valida a nivel de instancia (ArrayField.values existe en schema).
+- Campos `enum` con valor array/objeto emiten `answer-value-not-in-enum` en lugar de `answer-type-mismatch` (taxonomía imprecisa, reporting subóptimo).
+
+**Criterio de salida**: los 3 profiles validan contra el schema de B1 (`npm run validate:profiles` exit 0). Fixtures válidos + inválidos cubren los 5 issue kinds del validator. Tests >90% coverage.
 
 ### Rama B3 — `feat/b3-generator-runner`
 

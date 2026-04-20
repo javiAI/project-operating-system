@@ -12,14 +12,15 @@
 
 ## Reglas no negociables
 
-1. **Fase -1 siempre**. Ningún `git checkout -b` sin aprobación explícita documentada + marker file.
-2. **Docs dentro de la rama**. Nada de "lo documentamos después". Todo docs-sync en el mismo PR.
-3. **TDD**. Test primero, implementación después. Hook lo enforza (cuando D3 esté entregado); hasta entonces, manual.
-4. **Patrones antes de abstraer**. ≥2 ocurrencias documentadas en evidencia antes de helper compartido.
-5. **Community tool gate**. Cualquier MCP/plugin nuevo → `/pos:audit-plugin` (o su equivalente manual si no existe todavía — seguir [docs/SAFETY_POLICY.md](docs/SAFETY_POLICY.md)).
-6. **Token budget**. CLAUDE.md <200 líneas. Rules path-scoped <30KB total. Si contexto >120k, invocar `/pos:compress` (o equivalente manual).
-7. **No leer lo que no vas a usar**. Cita por rango de línea. No leas `MASTER_PLAN.md` entero cuando necesitas una sección.
-8. **Ejecuta skills con `context: fork`** cuando esté disponible (Fase E*). Las skills pesadas en main context rompen el presupuesto.
+1. **Fase N+7 Context gate al cerrar la rama anterior**. Como última fase de la rama previa (post-merge, post-`/pos:compound`), evaluar explícitamente `continuar | /compact focus="..." | /clear | sesión nueva` contra la matriz de [HANDOFF.md §3](HANDOFF.md). Si se elige compact/clear/sesión nueva, emitir el resume prompt con archivos a recargar. Esta es la puerta de entrada obligatoria a Fase -1 de la siguiente rama.
+2. **Fase -1 siempre**. Ningún `git checkout -b` sin aprobación explícita documentada + marker file.
+3. **Docs dentro de la rama**. Nada de "lo documentamos después". Todo docs-sync en el mismo PR.
+4. **TDD**. Test primero, implementación después. Hook lo enforza (cuando D3 esté entregado); hasta entonces, manual.
+5. **Patrones antes de abstraer**. ≥2 ocurrencias documentadas en evidencia antes de helper compartido.
+6. **Community tool gate**. Cualquier MCP/plugin nuevo → `/pos:audit-plugin` (o su equivalente manual si no existe todavía — seguir [docs/SAFETY_POLICY.md](docs/SAFETY_POLICY.md)).
+7. **Token budget**. CLAUDE.md <200 líneas. Rules path-scoped <30KB total. Si contexto >120k, invocar `/pos:compress` (o equivalente manual).
+8. **No leer lo que no vas a usar**. Cita por rango de línea. No leas `MASTER_PLAN.md` entero cuando necesitas una sección.
+9. **Ejecuta skills con `context: fork`** cuando esté disponible (Fase E*). Las skills pesadas en main context rompen el presupuesto.
 
 ## Fuente de verdad por capa
 
@@ -39,10 +40,11 @@ Cuando el usuario escribe "continúa" o "siguiente":
 
 1. Leer `git log --oneline -5` + `git status -sb`.
 2. Leer ROADMAP.md → identificar próxima rama en estado ⏳.
-3. Leer MASTER_PLAN.md § esa rama.
-4. Leer solo los archivos citados en "Contexto a leer".
-5. Ejecutar Fase -1 (§2.1 MASTER_PLAN.md).
-6. **Parar. Esperar aprobación.** No crear marker sin OK explícito.
+3. **Context gate (Fase N+7 de la rama anterior)**: evaluar según [HANDOFF.md §3](HANDOFF.md) si procede `continuar` | `/compact focus="..."` | `/clear` | sesión nueva. Si compact/clear/sesión nueva, emitir al usuario el **resume prompt** con los archivos exactos a recargar (MASTER_PLAN § rama + Contexto a leer + decisiones sin grabar). **No saltar a Fase -1 de la nueva rama sin esta decisión explícita.**
+4. Leer MASTER_PLAN.md § esa rama.
+5. Leer solo los archivos citados en "Contexto a leer".
+6. Ejecutar Fase -1 (§2.1 MASTER_PLAN.md).
+7. **Parar. Esperar aprobación.** No crear marker sin OK explícito.
 
 ## Gate de salida por fase
 

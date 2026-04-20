@@ -5,7 +5,7 @@
 ## 1. Snapshot
 
 - Repo: `project-operating-system` (plugin `pos`).
-- Fase actual: **B1 en curso** (`feat/b1-questionnaire-schema`, PR en apertura). Siguiente: **B2 — `feat/b2-profiles-starter`**.
+- Fase actual: **B2 en curso** (`feat/b2-profiles-starter`, PR en apertura). Siguiente: **B3 — `feat/b3-generator-runner`**.
 - Fuente de verdad ejecutable: [MASTER_PLAN.md](MASTER_PLAN.md).
 - Estado vivo: [ROADMAP.md](ROADMAP.md).
 - Arquitectura canonical: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -23,7 +23,9 @@ Qué deberías ver:
 
 Si el ROADMAP no coincide con `git log` → ROADMAP desfasado, actualizarlo antes de arrancar.
 
-## 3. Decisión `/clear` vs `/compact` vs sesión nueva
+## 3. Decisión `/clear` vs `/compact` vs sesión nueva (Fase N+7 Context gate)
+
+**Última fase de la rama anterior**, ejecutada post-merge / post-`/pos:compound`. Puerta de entrada obligatoria a Fase -1 de la siguiente rama. AGENTS.md regla #1.
 
 | Caso | Acción |
 |---|---|
@@ -33,6 +35,17 @@ Si el ROADMAP no coincide con `git log` → ROADMAP desfasado, actualizarlo ante
 | Cambio de rama ortogonal | Sesión nueva (MEMORY.md + CLAUDE.md cargan solos) |
 
 Regla dura: contexto crítico NO en git + docs + memoria → **NO `/clear`**. Persiste primero.
+
+### Checklist pre-Fase-1
+
+- [ ] Evaluar contexto actual: ¿tamaño?, ¿decisiones sin grabar?, ¿rama previa cerrada en docs?
+- [ ] Elegir acción según la tabla: `continuar` | `/compact focus="..."` | `/clear` | sesión nueva.
+- [ ] Si `compact` o `clear` o sesión nueva: **emitir resume prompt** con:
+  - Archivos a releer (MASTER_PLAN § rama + "Contexto a leer" + schema/rules relevantes).
+  - Decisiones ya tomadas que deben sobrevivir (shape, alternativa elegida, ambigüedades resueltas).
+  - Tareas pendientes dentro de la rama nueva.
+- [ ] Solo entonces proceder con Fase -1 (§2.1 MASTER_PLAN.md).
+- [ ] Si la siguiente rama se inicia con `/compact` o `/clear`, el primer commit de kickoff referencia el resume prompt (trazabilidad).
 
 ## 4. Orden óptimo de lectura al arrancar rama
 
@@ -67,6 +80,10 @@ Ejecuta §2.1 Fase -1 completo. Espera aprobación explícita antes de `git chec
 - [ ] Marker creado: `.claude/branch-approvals/<slug-sanitized>.approved`.
 - [ ] `git checkout -b feat/<rama>` tras el marker.
 
+## 6b. Carry-over a fases futuras
+
+- **C1 (`feat/c1-renderers-core-docs`)**: propagar Fase N+7 Context gate al repo generado. `templates/HANDOFF.md.hbs` debe incluir la matriz de decisión + checklist post-merge; `templates/AGENTS.md.hbs` debe incluir Fase N+7 como última fase de rama en el flujo; `templates/.claude/rules/docs.md.hbs` debe incluir el checkbox de trazabilidad. Todo proyecto generado con `pos` hereda la misma disciplina de context-management.
+
 ## 7. Gotchas del entorno
 
 - El hook `pre-branch-gate.py` **aún no existe** (Fase D1). Hasta entonces, el marker es convención, no enforcement. Respetar manualmente.
@@ -84,39 +101,43 @@ Hasta que `pos` tenga sus propias skills:
 
 ## 9. Próxima rama
 
-**B2 — `feat/b2-profiles-starter`**
+**B3 — `feat/b3-generator-runner`**
 
-Scope (ver [MASTER_PLAN.md § Rama B2](MASTER_PLAN.md)):
+Scope (ver [MASTER_PLAN.md § Rama B3](MASTER_PLAN.md)):
 
-- `questionnaire/profiles/nextjs-app.yaml`, `agent-sdk.yaml`, `cli-tool.yaml`.
-- Cada profile responde automáticamente ~60% del cuestionario.
-- Fixture test en `generator/__fixtures__/profiles/` (carpeta no existe aún — se crea en rama).
-- Criterio salida: los 3 profiles validan contra `questionnaire/schema.yaml` (B1).
+- `generator/run.ts` (CLI entrypoint), `generator/lib/schema.ts` (zod), `generator/lib/validators.ts`, `generator/lib/token-budget.ts`.
+- Sólo runner + validación. Sin renderers aún (llegan en C*).
+- Criterio salida: `npx tsx generator/run.ts --profile ... --out tmp/ --validate-only` retorna 0/1 según validez. Coverage 85%.
 
 Lectura mínima:
 
-- [MASTER_PLAN.md § Rama B2](MASTER_PLAN.md)
-- [questionnaire/schema.yaml](questionnaire/schema.yaml) — schema que deben cumplir.
-- [docs/ARCHITECTURE.md § Cuestionario — Profiles predefinidos](docs/ARCHITECTURE.md)
+- [MASTER_PLAN.md § Rama B3](MASTER_PLAN.md)
+- [questionnaire/profiles/](questionnaire/profiles/) — 3 profiles canónicos (entregados en B2).
+- [tools/lib/profile-validator.ts](tools/lib/profile-validator.ts) — lógica reutilizable para validar profile vs schema.
+- [docs/ARCHITECTURE.md § Generador](docs/ARCHITECTURE.md)
 - [.claude/rules/generator.md](.claude/rules/generator.md)
 
-Checklist Fase -1 pendiente antes de abrir B2:
+Checklist Fase -1 pendiente antes de abrir B3:
 
+- [ ] Fase N+7 Context gate: decidir `continuar | /compact | /clear | sesión nueva` (ver §3).
 - [ ] Resumen técnico ≤300 palabras.
 - [ ] Resumen conceptual ≤150 palabras.
 - [ ] Ambigüedades (si las hay).
 - [ ] 2 alternativas evaluadas.
 - [ ] Test plan.
 - [ ] Docs plan.
-- [ ] Aprobación explícita del usuario + marker `.claude/branch-approvals/feat_b2-profiles-starter.approved`.
+- [ ] Aprobación explícita del usuario + marker `.claude/branch-approvals/feat_b3-generator-runner.approved`.
 
-## 10. Estado B1 (cerrando)
+## 10. Estado B2 (cerrando)
 
-Entregado en rama `feat/b1-questionnaire-schema`:
+Entregado en rama `feat/b2-profiles-starter`:
 
-- `tools/validate-questionnaire.ts` + `tools/lib/{condition-parser,meta-schema,cross-validate}.ts`.
-- `questionnaire/schema.yaml` (7 secciones A-G, 18 fields) + `questionnaire/questions.yaml` (22 preguntas con condicionales `when:`).
-- `.github/workflows/ci.yml` (matrix ubuntu+macos, node 20, actions pineadas por SHA).
-- `package.json`, `tsconfig.json`, `vitest.config.ts`, `.nvmrc` — toolchain TS + tsx + vitest + zod + yaml.
-- 49 tests verdes, coverage 95.66% líneas, typecheck limpio.
-- 6 commits: kickoff + parser + meta-schema + cross-validate + CLI/fixtures + questionnaire/docs.
+- `questionnaire/profiles/{nextjs-app,agent-sdk,cli-tool}.yaml` — 3 profiles canónicos parciales (11-12 answers cada uno).
+- `tools/lib/profile-validator.ts` + `.test.ts` — ProfileFile zod parser + `validateProfile()` con 5 issue kinds.
+- `tools/validate-profile.ts` + `.test.ts` — CLI exit 0/1/2 + `formatReport`.
+- `tools/__fixtures__/profiles/{valid,invalid}/*.yaml` — 3 válidos (duplicados) + 4 negativos (unknown-path, type-mismatch, enum-out-of-values, pattern-violation).
+- `.github/workflows/ci.yml` — nuevo step `Validate profiles`.
+- `package.json` — script `validate:profiles`.
+- **Meta** (commit `chore(meta): apply Fase N+7 Context gate systematization`): sistematización en `CLAUDE.md` + `AGENTS.md` + `HANDOFF.md` + `.claude/rules/docs.md`.
+- 106 tests verdes, coverage 95.97% líneas, typecheck limpio.
+- Brecha conocida: `answer-value-not-in-array-allowlist` no validado a nivel de instancia (ArrayField.values existe en schema; check diferido).

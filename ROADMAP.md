@@ -7,7 +7,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | Fase | Descripción | Estado |
 |---|---|---|
 | A | Skeleton & bootstrap | ✅ |
-| B | Cuestionario + profiles + runner | 🔄 en curso (B1) |
+| B | Cuestionario + profiles + runner | 🔄 en curso (B2) |
 | C | Templates + renderers | ⏳ pendiente |
 | D | Hooks (Python) | ⏳ pendiente |
 | E1 | Skills orquestación | ⏳ pendiente |
@@ -20,8 +20,8 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | Rama | Scope breve | Estado | PR |
 |---|---|---|---|
 | `feat/a-skeleton` | Bootstrap estructura + docs canónicos + policy | ✅ | — (commit inicial sin PR) |
-| `feat/b1-questionnaire-schema` | Schema + questions YAML + validator | 🔄 abierta | (por abrir) |
-| `feat/b2-profiles-starter` | nextjs-app / agent-sdk / cli-tool | ⏳ | — |
+| `feat/b1-questionnaire-schema` | Schema + questions YAML + validator | ✅ | #1 |
+| `feat/b2-profiles-starter` | nextjs-app / agent-sdk / cli-tool | 🔄 abierta | (por abrir) |
 | `feat/b3-generator-runner` | `generator/run.ts` + zod + token budget check | ⏳ | — |
 | `feat/c1-renderers-core-docs` | CLAUDE/MASTER_PLAN/ROADMAP/HANDOFF/AGENTS/README renderers | ⏳ | — |
 | `feat/c2-renderers-policy-rules` | policy.yaml + rules path-scoped | ⏳ | — |
@@ -63,9 +63,9 @@ Entregables:
 
 ## Progreso Fase B
 
-### `feat/b1-questionnaire-schema` — en curso
+### `feat/b1-questionnaire-schema` — ✅ PR #1
 
-Entregables (en rama):
+Entregables:
 
 - `tools/lib/condition-parser.ts` — DSL mínimo (==, !=, in, &&, ||, !, paren, literales, paths).
 - `tools/lib/meta-schema.ts` — zod schemas para `schema.yaml` + `questions.yaml`.
@@ -74,10 +74,23 @@ Entregables (en rama):
 - `tools/__fixtures__/` — valid / invalid-maps-to / bad-yaml.
 - `questionnaire/schema.yaml` — 7 secciones A-G, 18 fields.
 - `questionnaire/questions.yaml` — 22 questions con condicionales `when:`.
-- `.github/workflows/ci.yml` — matrix ubuntu+macos, node 20, actions pineadas por SHA, corre typecheck + validate + coverage.
+- `.github/workflows/ci.yml` — matrix ubuntu+macos, node 20, actions pineadas por SHA.
 - `package.json`, `tsconfig.json`, `vitest.config.ts`, `.nvmrc`.
 
-Estado: 49 tests verdes, coverage 95.66% líneas, typecheck limpio. Pendiente: abrir PR.
+### `feat/b2-profiles-starter` — en curso
+
+Entregables (en rama):
+
+- `questionnaire/profiles/{nextjs-app,agent-sdk,cli-tool}.yaml` — 3 profiles canónicos parciales.
+- `tools/lib/profile-validator.ts` — parser ProfileFile + `validateProfile()` emitiendo 5 issue kinds.
+- `tools/validate-profile.ts` — CLI con exit 0/1/2 + `formatReport`.
+- `tools/__fixtures__/profiles/valid/` — duplicados de los 3 canónicos.
+- `tools/__fixtures__/profiles/invalid/` — 4 negativos (unknown-path, type-mismatch, enum-out-of-values, pattern-violation).
+- `.github/workflows/ci.yml` — nuevo step `Validate profiles`.
+- `package.json` — script `validate:profiles`.
+- **Meta** (commit `chore(meta)`): sistematización Fase N+7 Context gate en CLAUDE/AGENTS/HANDOFF/rules.
+
+**Brecha conocida**: `answer-value-not-in-array-allowlist` no se valida a nivel de instancia en B2 (ArrayField.values existe en schema pero el check se difiere a una rama posterior).
 
 ## Convenciones de este archivo
 

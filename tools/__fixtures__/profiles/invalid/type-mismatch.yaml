@@ -1,0 +1,13 @@
+# Fixture negativo: valor numérico donde el schema espera booleano.
+# Issue esperado: answer-type-mismatch
+
+version: "0.1.0"
+
+profile:
+  name: "type-mismatch"
+  description: "Profile with a number where a boolean is expected."
+
+answers:
+  "stack.language": "typescript"
+  "testing.unit_framework": "vitest"
+  "workflow.branch_protection": 1
