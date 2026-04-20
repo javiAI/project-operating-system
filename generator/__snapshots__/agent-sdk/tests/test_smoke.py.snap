@@ -1,0 +1,5 @@
+"""Smoke test — verifies the test harness runs."""
+
+
+def test_smoke_runs_and_makes_trivial_assertion():
+    assert 1 + 1 == 2

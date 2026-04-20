@@ -155,7 +155,7 @@ export function formatRenderSummary(
 tsx generator/run.ts --profile <path> [--validate-only | --dry-run | --out <dir>]
 ```
 
-Los tres modos son mutuamente exclusivos (error → exit 2). Sin flags = `--validate-only` (compat con B3). `--out <dir>` requiere directorio vacío (exit 3 si no). `--dry-run` lista los 9 paths emitidos + tamaños sin tocar fs (6 docs + `policy.yaml` + 2 rules; ver § Renderers). Schema hard-coded a `questionnaire/schema.yaml`.
+Los tres modos son mutuamente exclusivos (error → exit 2). Sin flags = `--validate-only` (compat con B3). `--out <dir>` requiere directorio vacío (exit 3 si no). `--dry-run` lista los 13 paths emitidos + tamaños sin tocar fs (6 docs + `policy.yaml` + 2 rules + 4 test harness, el set exacto varía por stack; ver § Renderers). Schema hard-coded a `questionnaire/schema.yaml`.
 
 **Exit codes**:
 
@@ -204,12 +204,13 @@ export async function isDirEmpty(dir: string): Promise<boolean>;
 
 **Determinismo**: byte-identical entre runs. Tests asseveran con `JSON.stringify(renderAll(p, rs)) === JSON.stringify(renderAll(p, rs))`. Sin timestamps en templates (se añadirá `profile.metadata.generatedAt` inyectado desde fuera si una fase posterior lo requiere).
 
-**Lista actual** (C1 + C2, 9 archivos):
+**Lista actual** (C1 + C2 + C3, 13 archivos por profile):
 
 - **Core docs** (C1, tuple congelada `coreDocRenderers`): CLAUDE.md, MASTER_PLAN.md, ROADMAP.md, HANDOFF.md, AGENTS.md, README.md.
 - **Policy + rules** (C2, tuple congelada `policyAndRulesRenderers`): `policy.yaml`, `.claude/rules/docs.md`, `.claude/rules/patterns.md`.
+- **Tests harness** (C3, tuple congelada `testsHarnessRenderers`, 1 renderer): set variable por stack. `typescript+vitest` → `tests/README.md` + `tests/smoke.test.ts` + `vitest.config.ts` + `Makefile`. `python+pytest` → `tests/README.md` + `tests/test_smoke.py` + `pytest.ini` + `Makefile`.
 
-Composición expuesta como `allRenderers` en [generator/renderers/index.ts](../generator/renderers/index.ts) — `Object.freeze([...coreDocRenderers, ...policyAndRulesRenderers])`. `generator/run.ts` importa únicamente `allRenderers`; la composición no vive en `run.ts` para evitar que crezca por fase (decisión de Fase -1 de C2).
+Composición expuesta como `allRenderers` en [generator/renderers/index.ts](../generator/renderers/index.ts) — `Object.freeze([...coreDocRenderers, ...policyAndRulesRenderers, ...testsHarnessRenderers])`. `generator/run.ts` importa únicamente `allRenderers`; la composición no vive en `run.ts` para evitar que crezca por fase (decisión de Fase -1 de C2, consolidada en C3 como 3ª aplicación del patrón `renderer-group`).
 
 **`policy.yaml` — detalles del renderer**:
 
@@ -224,7 +225,16 @@ Composición expuesta como `allRenderers` en [generator/renderers/index.ts](../g
 - `docs.md.hbs` cierra el carry-over Fase N+7 iniciado en C1 con el bullet "Trazabilidad de contexto" referenciando `HANDOFF.md §3`.
 - `patterns.md.hbs` es doctrina stack-agnóstica (formato de un pattern file + hard rules + referencias a antipatterns/invariants).
 
-**Pendientes en C\***: test harness (C3), CI/CD workflows (C4), copia de skills + hooks (C5).
+**`tests/*` + harness configs — detalles del renderer** (C3):
+
+- Un solo renderer (`tests.ts`) emite 4 archivos según la combinación `stack.language` + `testing.unit_framework`. Combinaciones soportadas en C3: `typescript+vitest` y `python+pytest` únicamente. Resto (`jest`, `go-test`, `cargo-test`) lanza `Error` explícito desde el renderer con el nombre del framework + la palabra "deferred" + referencia al path `testing.unit_framework` — NO se mueve a `run.ts` (decisión Fase -1 de C3: fallo testeable con contrato claro).
+- `Makefile` es el entry-point universal (TS + Python). Targets: `test` (alias de `test-unit`), `test-unit`, `test-coverage`, `test-e2e` (placeholder sólo en TS, referencia al README), `clean`.
+- `vitest.config.ts` / `pytest.ini` son configuraciones mínimas pero válidas. Coverage threshold parametrizado desde `answers.testing.coverage_threshold`.
+- Smoke tests (`tests/smoke.test.ts` / `tests/test_smoke.py`) son funcionales reales (no placeholders): compilan/ejecutan y hacen una assertion trivial.
+- **Qué NO emite C3** (documentado en el `tests/README.md` emitido): `package.json` (TS), `pyproject.toml` (Python), `playwright.config.ts` (sólo mención en el README cuando `testing.e2e_framework != "none"`). Scope C3 es "test harness estructuralmente coherente", no "proyecto ejecutable end-to-end". La instalación real del stack + config e2e completa quedan diferidas.
+- `generator/__fixtures__/profiles/valid-partial/profile.yaml` declara `testing.coverage_threshold` + `testing.e2e_framework` explícitamente porque `buildProfile` no materializa defaults del schema todavía. Defaults-in-profile queda diferido a rama posterior.
+
+**Pendientes en C\***: CI/CD workflows (C4), copia de skills + hooks (C5).
 
 **Cómo añadir un renderer**:
 
@@ -240,7 +250,7 @@ Composición expuesta como `allRenderers` en [generator/renderers/index.ts](../g
    ```
 3. Crear `generator/renderers/<x>.test.ts` primero (TDD): tests semánticos sobre paths emitidos + strings críticas + verificación de stack conditionals si aplica.
 4. Registrar en el array correspondiente de [generator/renderers/index.ts](../generator/renderers/index.ts): `coreDocRenderers` (C1), `policyAndRulesRenderers` (C2), o un **nuevo array congelado** si el renderer pertenece a un grupo nuevo (p.ej. `testsHarnessRenderers` en C3). Componer el nuevo array dentro de `allRenderers`. `run.ts` no se toca.
-5. Los snapshots por `profile × template` se autogeneran en `generator/__snapshots__/<slug>/*.snap` al correr vitest — revisar diff antes de commit. C1 aportó 18 (3 profiles × 6 templates); C2 los amplió a 27 (3 profiles × 9 templates).
+5. Los snapshots por `profile × template` se autogeneran en `generator/__snapshots__/<slug>/*.snap` al correr vitest — revisar diff antes de commit. C1 aportó 18 (3 × 6); C2 los amplió a 27 (3 × 9); C3 los amplió a 39 (+12: 2 profiles TS × 4 templates + 1 profile Python × 4 templates). Los templates pueden variar por stack, así que el conteo ya no es estrictamente `profiles × templates` a partir de C3.
 6. Si el renderer requiere un nuevo helper Handlebars, añadirlo en [generator/lib/handlebars-helpers.ts](../generator/lib/handlebars-helpers.ts) con tests de compilación real.
 
 **User-specific placeholders**: `buildProfile` inyecta literal `TODO(identity.name|description|owner)` cuando el profile no los declara. Los templates usan `{{answers.identity.name}}` directamente — no necesitan `{{#if}}` guards para estos tres. Emite warning por path vía `completenessCheck`; no bloquea emisión. La sustitución real pasará por el runner interactivo de fase posterior.

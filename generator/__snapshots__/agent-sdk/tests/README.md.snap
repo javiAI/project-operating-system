@@ -1,0 +1,45 @@
+# Tests — TODO(identity.name)
+
+Guía rápida del harness de tests emitido por `pos` (Fase C3).
+
+## Stack detectado
+
+- Language: `python`
+- Unit framework: `pytest`
+- Coverage threshold: `90%`
+
+## Entry-point universal
+
+Todos los comandos se invocan desde el `Makefile` de la raíz:
+
+```bash
+make test          # alias de test-unit
+make test-unit     # unit tests
+make test-coverage # unit tests con coverage
+make clean         # limpia coverage + caches
+```
+
+## Unit tests
+
+Runner: **pytest**. Config: `pytest.ini` (raíz). Discovery: `tests/test_*.py`.
+
+Ejemplo inicial: `tests/test_smoke.py` — una assertion trivial que verifica que el runner arranca.
+
+## Coverage
+
+Threshold declarado en el profile: `90%`.
+
+El target `make test-coverage` aplica `--cov-fail-under=90` al invocar `pytest` (no vive en `pytest.ini` para que `make test-unit` no enforce threshold).
+
+
+## Qué NO emite C3 (diferidos)
+
+- `package.json` (TS) / `pyproject.toml` (Python): la instalación del stack es responsabilidad de una fase posterior del generador. Hasta entonces, asume el stack instalado en el entorno local.
+- Integration harness separado (solo unit + placeholder e2e).
+- Frameworks no canónicos: `jest`, `go-test`, `cargo-test` quedan diferidos hasta que aparezca un profile canónico que los use (CLAUDE.md regla #7: patrones antes de abstraer).
+
+## Añadir un test
+
+1. Crea `tests/test_<nombre>.py` siguiendo el patrón de `test_smoke.py`.
+2. Corre `make test` para ejecutar unit + cubrir el nuevo archivo.
+3. Si vas a tocar coverage, corre `make test-coverage` para verificar threshold.

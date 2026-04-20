@@ -1,0 +1,45 @@
+# Tests — TODO(identity.name)
+
+Guía rápida del harness de tests emitido por `pos` (Fase C3).
+
+## Stack detectado
+
+- Language: `typescript`
+- Unit framework: `vitest`
+- Coverage threshold: `85%`
+
+## Entry-point universal
+
+Todos los comandos se invocan desde el `Makefile` de la raíz:
+
+```bash
+make test          # alias de test-unit
+make test-unit     # unit tests
+make test-coverage # unit tests con coverage
+make clean         # limpia coverage + caches
+```
+
+## Unit tests
+
+Runner: **vitest**. Config: `vitest.config.ts` (raíz). Discovery: `tests/**/*.test.ts`.
+
+Ejemplo inicial: `tests/smoke.test.ts` — una assertion trivial que verifica que el runner arranca.
+
+## Coverage
+
+Threshold declarado en el profile: `85%`.
+
+`vitest.config.ts` aplica el threshold en `coverage.thresholds` (lines/functions/branches/statements).
+
+
+## Qué NO emite C3 (diferidos)
+
+- `package.json` (TS) / `pyproject.toml` (Python): la instalación del stack es responsabilidad de una fase posterior del generador. Hasta entonces, asume el stack instalado en el entorno local.
+- Integration harness separado (solo unit + placeholder e2e).
+- Frameworks no canónicos: `jest`, `go-test`, `cargo-test` quedan diferidos hasta que aparezca un profile canónico que los use (CLAUDE.md regla #7: patrones antes de abstraer).
+
+## Añadir un test
+
+1. Crea `tests/<nombre>.test.ts` siguiendo el patrón de `smoke.test.ts`.
+2. Corre `make test` para ejecutar unit + cubrir el nuevo archivo.
+3. Si vas a tocar coverage, corre `make test-coverage` para verificar threshold.

@@ -5,7 +5,7 @@
 ## 1. Snapshot
 
 - Repo: `project-operating-system` (plugin `pos`).
-- Fase actual: **C2 ✅ cerrada en rama** (`feat/c2-renderers-policy-rules`, PR pendiente de abrir). Anterior: **C1 ✅ PR #4** (`d361c9b`). Siguiente: **C3 — `feat/c3-renderers-tests-harness`**.
+- Fase actual: **C3 ✅ cerrada en rama** (`feat/c3-renderers-tests-harness`, PR pendiente de abrir). Anterior: **C2 ✅ PR #5** + compound PR #6 (`9d35a29`). Siguiente: **C4 — `feat/c4-renderers-ci-cd`**.
 - Fuente de verdad ejecutable: [MASTER_PLAN.md](MASTER_PLAN.md).
 - Estado vivo: [ROADMAP.md](ROADMAP.md).
 - Arquitectura canonical: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -86,6 +86,7 @@ Ejecuta §2.1 Fase -1 completo. Espera aprobación explícita antes de `git chec
 
 - **C1 (`feat/c1-renderers-core-docs`)** ✅ [parcial completada]: Fase N+7 propagada en `templates/HANDOFF.md.hbs` (matriz + checklist) y `templates/AGENTS.md.hbs` (Fase N+7 como última fase del flujo de rama).
 - **C2 (`feat/c2-renderers-policy-rules`)** ✅ **carry-over cerrado**: `templates/.claude/rules/docs.md.hbs` incluye el bullet "Trazabilidad de contexto" referenciando `HANDOFF.md §3`. Todo proyecto generado con `pos` hereda ya la disciplina completa de context-management.
+- **C3 (`feat/c3-renderers-tests-harness`)** ✅ sin carry-over abierto. Frameworks diferidos (`jest`, `go-test`, `cargo-test`) quedan como fallo explícito dentro de `renderTests(...)` — se retomarán sólo cuando un profile canónico los adopte (≥1 repetición → reevaluar con regla #7 CLAUDE.md). `package.json` / `pyproject.toml` / `playwright.config.ts` diferidos también, documentados en el README emitido ("Qué NO emite C3").
 
 ## 7. Gotchas del entorno
 
@@ -93,6 +94,21 @@ Ejecuta §2.1 Fase -1 completo. Espera aprobación explícita antes de `git chec
 - `policy.yaml` declarado pero no enforced todavía (Fase D4). Hasta entonces, docs-sync requiere disciplina manual.
 - `/pos:*` skills no existen aún (Fase E*). Invocaciones fallarán silenciosas. Usar comportamiento manual equivalente.
 - Todo hook declarado en `settings.local.json` con `_note: "Entregado en Fase D"` es un stub — el sistema tolera su ausencia.
+
+### Deuda técnica abierta — schema defaults no materializados en `buildProfile`
+
+Desde C3. `generator/lib/profile-model.ts::buildProfile` expande dotted-answers a nested e inyecta placeholders `TODO(identity.X)` para los 3 paths user-specific, pero **no lee `field.default` del schema**. Si un template referencia un path con `default:` declarado en `questionnaire/schema.yaml`, el profile debe declararlo explícitamente — en caso contrario el template renderiza `undefined` / vacío y el snapshot falla.
+
+**Síntoma visible hoy**: `generator/__fixtures__/profiles/valid-partial/profile.yaml` añade `testing.coverage_threshold: 80` + `testing.e2e_framework: "none"` explícitos (no via default) porque los templates C3 los usan. Los 3 profiles canónicos (`nextjs-app`, `cli-tool`, `agent-sdk`) también los declaran explícitos.
+
+**Impacto en próximas ramas**:
+
+- **C4 (CI/CD)** — si los workflows usan `testing.coverage_threshold` u otros paths con default, los 3 canonicals + `valid-partial` deben declararlo explícito (mismo patrón que C3). No basta con añadir el campo al schema.
+- **C5 (skills + hooks copy)** — mismo riesgo si alguna plantilla de policy.yaml o hook config referencia defaults.
+
+**Resolución futura (rama propia)**: extender `buildProfile` para leer `field.default` del schema y materializarlo cuando el profile no declare el path. Cuando se aborde, eliminar también los campos redundantes de los 3 canonicals + `valid-partial`. Scope diferido deliberadamente en C3 para no mezclar alcance.
+
+Ver detalle: `.claude/rules/generator.md` (Deferrals), `MASTER_PLAN § Rama C3` (Ajustes), `ROADMAP § Progreso Fase C` (entregables).
 
 ## 8. Skills / subagents del entorno Claude Code (no plugin)
 
@@ -104,29 +120,30 @@ Hasta que `pos` tenga sus propias skills:
 
 ## 9. Próxima rama
 
-**C3 — `feat/c3-renderers-tests-harness`**
+**C4 — `feat/c4-renderers-ci-cd`**
 
-Scope (ver [MASTER_PLAN.md § Rama C3](MASTER_PLAN.md)):
+Scope (ver [MASTER_PLAN.md § Rama C4](MASTER_PLAN.md)):
 
-- Renderer para test harness por stack (Node/Python/Go/Rust): configs (vitest/jest, pytest, go test, cargo), scripts en `package.json` / `Makefile`, ejemplo smoke test, `tests/README.md`.
-- Registrarse en un nuevo array (p.ej. `testsHarnessRenderers`) y componerse en `allRenderers` desde `generator/renderers/index.ts` (patrón establecido en C2).
+- Renderer para `.github/workflows/*.yml` (+ variantes GitLab/Bitbucket si aplica). Los workflows emitidos coinciden con los checks locales que C3 declara en `Makefile` (`make test-unit`, `make test-coverage`). Branch protection documentada en `docs/BRANCH_PROTECTION.md` emitido.
+- Registrarse en un nuevo array congelado (p.ej. `cicdRenderers`) y componerse en `allRenderers` desde `generator/renderers/index.ts`. Patrón `renderer-group` (ver `.claude/patterns/`).
 
 Lectura mínima al arrancar:
 
-- [MASTER_PLAN.md § Rama C3](MASTER_PLAN.md)
-- [docs/ARCHITECTURE.md § Renderers](docs/ARCHITECTURE.md)
-- [.claude/rules/generator.md](.claude/rules/generator.md) + [.claude/rules/tests.md](.claude/rules/tests.md) + [.claude/rules/templates.md](.claude/rules/templates.md)
-- `generator/renderers/index.ts` + `generator/lib/render-pipeline.ts` (patrón de composición entregado en C1/C2).
+- [MASTER_PLAN.md § Rama C4](MASTER_PLAN.md)
+- [docs/ARCHITECTURE.md § Renderers](docs/ARCHITECTURE.md) + [§ 11 CI/CD integrado](docs/ARCHITECTURE.md#11-cicd-integrado)
+- [.claude/rules/generator.md](.claude/rules/generator.md) + [.claude/rules/ci-cd.md](.claude/rules/ci-cd.md) (si existe) + [.claude/rules/templates.md](.claude/rules/templates.md)
+- `generator/renderers/index.ts` + `templates/Makefile.hbs` (targets que los workflows deben invocar) + `generator/renderers/tests.ts` (stack detection del que C4 puede aprender).
 
-## 10. Estado C2 (cerrada en rama)
+## 10. Estado C3 (cerrada en rama)
 
-Policy + rules path-scoped emitidas. 9 archivos por profile (6 docs + `policy.yaml` + 2 rules). Pipeline `allRenderers` compone `coreDocRenderers + policyAndRulesRenderers` desde `generator/renderers/index.ts`. Detalle de entregables en [ROADMAP.md § Progreso Fase C](ROADMAP.md); pipeline documentada en [docs/ARCHITECTURE.md § Renderers](docs/ARCHITECTURE.md).
+Test harness mínimo emitido por stack. 13 archivos por profile (6 docs + `policy.yaml` + 2 rules + 4 test harness). Pipeline `allRenderers` compone `coreDocRenderers + policyAndRulesRenderers + testsHarnessRenderers` desde `generator/renderers/index.ts`. Detalle de entregables en [ROADMAP.md § Progreso Fase C](ROADMAP.md); pipeline documentada en [docs/ARCHITECTURE.md § Renderers](docs/ARCHITECTURE.md).
 
-Apuntes para quien arranque C3:
+Apuntes para quien arranque C4:
 
-- Patrón de composición: añadir un nuevo grupo de renderers = crear array congelado en `generator/renderers/index.ts` (p.ej. `testsHarnessRenderers`) y componerlo dentro de `allRenderers`. `run.ts` no se toca. Esto evita que `run.ts` se convierta en sitio de composición creciente.
-- Colisiones de paths fallan el pipeline por invariante. `renderAll` reporta índices de los dos renderers que colisionan.
-- Snapshots por convención en `generator/__snapshots__/<slug>/<path>.snap`. Añadir 1 template = 3 snapshots nuevos (uno por profile canónico). C3 presumiblemente añadirá varios templates por stack.
-- Conditionals Handlebars del estilo `{{#if (eq answers.stack.language "typescript")}}` funcionan ya; `testing.unit.framework_node` / `framework_python` están resueltos en los 3 profiles canónicos.
-- Helpers Handlebars se registran en `generator/lib/handlebars-helpers.ts`; si C3 necesita helpers stack-específicos, añadir tests de compilación real allí.
-- Carry-over Fase N+7: **cerrado en C2**. No hay carry-over abierto al arrancar C3.
+- Patrón `renderer-group` consolidado (3ª aplicación: core + policy/rules + tests-harness). C4 = 4ª aplicación — crear `cicdRenderers` congelado y componerlo en `allRenderers`. `run.ts` no se toca.
+- Stack detection ya probado: `answers.stack.language` + `answers.testing.unit_framework` gobiernan el set emitido. Combinaciones soportadas: `typescript+vitest`, `python+pytest`. Resto diferidos con fallo explícito en el renderer.
+- Entry-point universal es el `Makefile` emitido. C4 debe hacer que los workflows invoquen `make test-unit` / `make test-coverage` (no llamar `npx vitest` / `pytest` directo desde el yaml).
+- `buildProfile` no materializa defaults del schema: si C4 emplea `answers.testing.coverage_threshold` u otros paths con `default:`, actualizar los 3 profiles canónicos + el fixture `valid-partial` (mismo patrón que C3).
+- Snapshots por convención en `generator/__snapshots__/<slug>/<path>.snap`. +12 archivos añadidos en C3; total actual 39.
+- Frameworks diferidos en C3 (`jest`, `go-test`, `cargo-test`) siguen diferidos hasta que un profile canónico los adopte. No reabrir en C4 salvo señal explícita.
+- Carry-over Fase N+7: **sin carry-over abierto** al arrancar C4.

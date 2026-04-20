@@ -108,7 +108,7 @@ describe("formatReport", () => {
 });
 
 describe("runRender (unit)", () => {
-  it("returns 9 FileWrite entries and user-specific warnings for valid-partial", async () => {
+  it("returns 13 FileWrite entries and user-specific warnings for valid-partial", async () => {
     const r = await runRender(VALID);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
@@ -119,9 +119,13 @@ describe("runRender (unit)", () => {
       "CLAUDE.md",
       "HANDOFF.md",
       "MASTER_PLAN.md",
+      "Makefile",
       "README.md",
       "ROADMAP.md",
       "policy.yaml",
+      "tests/README.md",
+      "tests/smoke.test.ts",
+      "vitest.config.ts",
     ]);
     for (const file of r.files) {
       expect(file.content.length).toBeGreaterThan(0);
@@ -137,6 +141,38 @@ describe("runRender (unit)", () => {
     const r = await runRender("generator/__fixtures__/profiles/does-not-exist.yaml");
     expect(r.ok).toBe(false);
   });
+
+  it("returns { ok: false, error } when a renderer throws (deferred framework), not a fatal crash", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "run-deferred-"));
+    const path = join(dir, "profile.yaml");
+    writeFileSync(
+      path,
+      [
+        "version: \"0.1.0\"",
+        "profile:",
+        "  name: \"deferred-jest\"",
+        "  description: \"deferred framework fixture\"",
+        "answers:",
+        "  \"domain.type\": \"cli\"",
+        "  \"stack.language\": \"typescript\"",
+        "  \"stack.database\": \"none\"",
+        "  \"testing.unit_framework\": \"jest\"",
+        "  \"testing.coverage_threshold\": 80",
+        "  \"testing.e2e_framework\": \"none\"",
+        "  \"workflow.ci_host\": \"github\"",
+        "  \"workflow.release_strategy\": \"manual\"",
+        "  \"workflow.branch_protection\": true",
+        "  \"claude_code.default_model\": \"claude-sonnet-4-6\"",
+        "",
+      ].join("\n"),
+    );
+    const r = await runRender(path);
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error).toMatch(/jest/);
+    expect(r.error).toMatch(/deferred/i);
+    expect(r.error).toMatch(/testing\.unit_framework/);
+  });
 });
 
 describe("formatRenderSummary", () => {
@@ -145,10 +181,13 @@ describe("formatRenderSummary", () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     const out = formatRenderSummary(r.files, r.warnings, "dry-run");
-    expect(out).toMatch(/dry-run.*9 file\(s\) would be emitted/);
+    expect(out).toMatch(/dry-run.*13 file\(s\) would be emitted/);
     expect(out).toContain("CLAUDE.md");
     expect(out).toContain("policy.yaml");
     expect(out).toContain(".claude/rules/docs.md");
+    expect(out).toContain("tests/smoke.test.ts");
+    expect(out).toContain("vitest.config.ts");
+    expect(out).toContain("Makefile");
     expect(out).toMatch(/warning .*identity\.name/);
   });
 
@@ -157,7 +196,7 @@ describe("formatRenderSummary", () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     const out = formatRenderSummary(r.files, r.warnings, "write", "/tmp/demo");
-    expect(out).toMatch(/wrote 9 file\(s\) to \/tmp\/demo/);
+    expect(out).toMatch(/wrote 13 file\(s\) to \/tmp\/demo/);
   });
 });
 
@@ -186,10 +225,10 @@ describe("generator/run.ts CLI (integration)", () => {
     expect(r.stdout).toMatch(/answer-value-not-in-enum/);
   }, 30000);
 
-  it("exits 0 and lists 9 files with --dry-run for valid-partial", () => {
+  it("exits 0 and lists 13 files with --dry-run for valid-partial", () => {
     const r = runCli(["--profile", VALID, "--dry-run"]);
     expect(r.code).toBe(0);
-    expect(r.stdout).toMatch(/dry-run.*9 file\(s\) would be emitted/);
+    expect(r.stdout).toMatch(/dry-run.*13 file\(s\) would be emitted/);
     expect(r.stdout).toContain("CLAUDE.md");
     expect(r.stdout).toContain("MASTER_PLAN.md");
     expect(r.stdout).toContain("ROADMAP.md");
@@ -199,9 +238,13 @@ describe("generator/run.ts CLI (integration)", () => {
     expect(r.stdout).toContain("policy.yaml");
     expect(r.stdout).toContain(".claude/rules/docs.md");
     expect(r.stdout).toContain(".claude/rules/patterns.md");
+    expect(r.stdout).toContain("Makefile");
+    expect(r.stdout).toContain("vitest.config.ts");
+    expect(r.stdout).toContain("tests/README.md");
+    expect(r.stdout).toContain("tests/smoke.test.ts");
   }, 30000);
 
-  it("exits 0 and writes 9 files into an empty --out directory", () => {
+  it("exits 0 and writes 13 files into an empty --out directory", () => {
     const outDir = mkdtempSync(join(tmpdir(), "run-out-"));
     const r = runCli(["--profile", VALID, "--out", outDir]);
     expect(r.code).toBe(0);
@@ -212,16 +255,25 @@ describe("generator/run.ts CLI (integration)", () => {
       "CLAUDE.md",
       "HANDOFF.md",
       "MASTER_PLAN.md",
+      "Makefile",
       "README.md",
       "ROADMAP.md",
       "policy.yaml",
+      "tests",
+      "vitest.config.ts",
     ]);
     expect(readFileSync(join(outDir, "CLAUDE.md"), "utf8").length).toBeGreaterThan(0);
     expect(readFileSync(join(outDir, ".claude/rules/docs.md"), "utf8"))
       .toContain("Trazabilidad de contexto");
     expect(readFileSync(join(outDir, "policy.yaml"), "utf8"))
       .toContain("type: \"generated-project\"");
-    expect(r.stdout).toMatch(/wrote 9 file\(s\)/);
+    expect(readFileSync(join(outDir, "Makefile"), "utf8"))
+      .toMatch(/^test:/m);
+    expect(readFileSync(join(outDir, "vitest.config.ts"), "utf8"))
+      .toContain("defineConfig");
+    expect(readFileSync(join(outDir, "tests/smoke.test.ts"), "utf8"))
+      .toMatch(/describe\s*\(/);
+    expect(r.stdout).toMatch(/wrote 13 file\(s\)/);
   }, 30000);
 
   it("exits 3 when --out target is not empty", () => {

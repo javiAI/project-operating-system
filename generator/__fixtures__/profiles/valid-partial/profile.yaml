@@ -2,7 +2,12 @@
 #
 # Profile válido parcial: cubre todos los required NON-user-specific,
 # omite los 3 user-specific (identity.name / description / owner).
-# Comportamiento esperado del runner B3: exit 0 + warning en stdout (dentro del reporte).
+# Comportamiento esperado del runner: exit 0 + warning en stdout (dentro del reporte).
+#
+# C3: se añaden explícitamente `testing.coverage_threshold` y `testing.e2e_framework`
+# (schema declara defaults para ambos, pero buildProfile no los materializa hoy —
+# los templates de tests harness los referencian, por lo que el fixture los hace
+# explícitos hasta que defaults-in-profile se resuelva en una fase posterior).
 
 version: "0.1.0"
 
@@ -14,3 +19,5 @@ answers:
   "domain.type": "web-app"
   "stack.language": "typescript"
   "testing.unit_framework": "vitest"
+  "testing.coverage_threshold": 80
+  "testing.e2e_framework": "none"

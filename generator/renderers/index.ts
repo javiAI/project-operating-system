@@ -7,6 +7,7 @@ import { render as renderAgents } from "./agents.ts";
 import { render as renderReadme } from "./readme.ts";
 import { render as renderPolicy } from "./policy.ts";
 import { render as renderRules } from "./rules.ts";
+import { render as renderTests } from "./tests.ts";
 
 export const coreDocRenderers: readonly Renderer[] = Object.freeze([
   renderClaudeMd,
@@ -22,7 +23,12 @@ export const policyAndRulesRenderers: readonly Renderer[] = Object.freeze([
   renderRules,
 ]);
 
+export const testsHarnessRenderers: readonly Renderer[] = Object.freeze([
+  renderTests,
+]);
+
 export const allRenderers: readonly Renderer[] = Object.freeze([
   ...coreDocRenderers,
   ...policyAndRulesRenderers,
+  ...testsHarnessRenderers,
 ]);
