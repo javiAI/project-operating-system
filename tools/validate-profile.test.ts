@@ -99,6 +99,12 @@ describe("validate-profile CLI (integration)", () => {
     expect(r.stdout).toMatch(/answer-constraint-violation/);
   }, 30000);
 
+  it("exits 1 for array-item-type-mismatch fixture", () => {
+    const r = runCli(["tools/__fixtures__/profiles/invalid/array-item-type-mismatch.yaml"]);
+    expect(r.code).toBe(1);
+    expect(r.stdout).toMatch(/answer-array-item-type-mismatch/);
+  }, 30000);
+
   it("exits 2 when the profile file does not exist", () => {
     const r = runCli(["does-not-exist.yaml"]);
     expect(r.code).toBe(2);

@@ -1,0 +1,12 @@
+# Fixture negativo: integrations.mcps es array<string>, pero mezclamos un número.
+# Issue esperado: answer-array-item-type-mismatch
+
+version: "0.1.0"
+
+profile:
+  name: "array-item-type-mismatch"
+  description: "Array field with a non-string item."
+
+answers:
+  "stack.language": "typescript"
+  "integrations.mcps": ["mempalace", 42]

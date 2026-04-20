@@ -70,7 +70,10 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 
 **Ajuste vs plan original**: los fixtures viven en `tools/__fixtures__/profiles/` (no en `generator/__fixtures__/profiles/`) porque el generador no existe todavía. Consolidación diferida a B3 si aplica.
 
-**Brecha conocida**: `answer-value-not-in-array-allowlist` no se valida a nivel de instancia (ArrayField.values existe en schema; check diferido).
+**Brechas conocidas** (diferidas a B3):
+
+- `answer-value-not-in-array-allowlist` no se valida a nivel de instancia (ArrayField.values existe en schema).
+- Campos `enum` con valor array/objeto emiten `answer-value-not-in-enum` en lugar de `answer-type-mismatch` (taxonomía imprecisa, reporting subóptimo).
 
 **Criterio de salida**: los 3 profiles validan contra el schema de B1 (`npm run validate:profiles` exit 0). Fixtures válidos + inválidos cubren los 5 issue kinds del validator. Tests >90% coverage.
 

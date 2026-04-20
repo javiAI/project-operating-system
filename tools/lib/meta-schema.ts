@@ -11,10 +11,22 @@ const FieldCommon = z.object({
   required: z.boolean().optional(),
 });
 
+const compilableRegex = z.string().refine(
+  (p) => {
+    try {
+      new RegExp(p);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  { message: "pattern must be a valid regex" },
+);
+
 const StringField = FieldCommon.extend({
   type: z.literal("string"),
   default: z.string().optional(),
-  pattern: z.string().optional(),
+  pattern: compilableRegex.optional(),
   minLength: z.number().int().nonnegative().optional(),
   maxLength: z.number().int().positive().optional(),
 });
@@ -148,7 +160,7 @@ const TextQuestion = QuestionCommon.extend({
   maps_to: z.string().regex(PATH_RE, "maps_to must be snake_case dotted path"),
   validation: z
     .object({
-      pattern: z.string().optional(),
+      pattern: compilableRegex.optional(),
       minLength: z.number().int().nonnegative().optional(),
       maxLength: z.number().int().positive().optional(),
     })
