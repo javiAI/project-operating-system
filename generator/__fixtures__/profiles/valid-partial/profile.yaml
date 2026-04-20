@@ -2,7 +2,7 @@
 #
 # Profile válido parcial: cubre todos los required NON-user-specific,
 # omite los 3 user-specific (identity.name / description / owner).
-# Comportamiento esperado del runner B3: exit 0 + warning en stderr.
+# Comportamiento esperado del runner B3: exit 0 + warning en stdout (dentro del reporte).
 
 version: "0.1.0"
 
