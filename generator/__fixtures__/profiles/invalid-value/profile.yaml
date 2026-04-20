@@ -1,0 +1,15 @@
+# generator/__fixtures__/profiles/invalid-value/profile.yaml
+#
+# Profile inválido por valor: stack.language fuera del enum.
+# Comportamiento esperado del runner B3: exit 1 (issue answer-value-not-in-enum).
+
+version: "0.1.0"
+
+profile:
+  name: "invalid-value"
+  description: "Fixture: stack.language out of enum values; expects exit 1."
+
+answers:
+  "domain.type": "web-app"
+  "stack.language": "cobol"
+  "testing.unit_framework": "vitest"

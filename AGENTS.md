@@ -12,7 +12,7 @@
 
 ## Reglas no negociables
 
-1. **Fase N+7 Context gate al cerrar la rama anterior**. Como última fase de la rama previa (post-merge, post-`/pos:compound`), evaluar explícitamente `continuar | /compact focus="..." | /clear | sesión nueva` contra la matriz de [HANDOFF.md §3](HANDOFF.md). Si se elige compact/clear/sesión nueva, emitir el resume prompt con archivos a recargar. Esta es la puerta de entrada obligatoria a Fase -1 de la siguiente rama.
+1. **Fase N+7 Context gate al cerrar la rama anterior**. Como última fase de la rama previa (post-merge, post-`/pos:compound`), Claude **presenta al usuario** las cuatro opciones con recomendación según la matriz de [HANDOFF.md §3](HANDOFF.md): `continuar` | `/compact focus="..."` | `/clear` | sesión nueva. **Claude nunca decide la opción por su cuenta** — espera elección explícita del usuario. Sólo después: si compact/clear/sesión nueva → emitir resume prompt con archivos a recargar + decisiones a preservar; si continuar → proceder a Fase -1 de la siguiente rama. Este es el único camino a Fase -1.
 2. **Fase -1 siempre**. Ningún `git checkout -b` sin aprobación explícita documentada + marker file.
 3. **Docs dentro de la rama**. Nada de "lo documentamos después". Todo docs-sync en el mismo PR.
 4. **TDD**. Test primero, implementación después. Hook lo enforza (cuando D3 esté entregado); hasta entonces, manual.
@@ -40,7 +40,7 @@ Cuando el usuario escribe "continúa" o "siguiente":
 
 1. Leer `git log --oneline -5` + `git status -sb`.
 2. Leer ROADMAP.md → identificar próxima rama en estado ⏳.
-3. **Context gate (Fase N+7 de la rama anterior)**: evaluar según [HANDOFF.md §3](HANDOFF.md) si procede `continuar` | `/compact focus="..."` | `/clear` | sesión nueva. Si compact/clear/sesión nueva, emitir al usuario el **resume prompt** con los archivos exactos a recargar (MASTER_PLAN § rama + Contexto a leer + decisiones sin grabar). **No saltar a Fase -1 de la nueva rama sin esta decisión explícita.**
+3. **Context gate (Fase N+7 de la rama anterior)**: **presentar al usuario** las opciones `continuar` | `/compact focus="..."` | `/clear` | sesión nueva con recomendación razonada según la matriz de [HANDOFF.md §3](HANDOFF.md). **Parar. Esperar elección explícita.** Si el usuario elige compact/clear/sesión nueva → emitir **resume prompt** con archivos exactos a recargar (MASTER_PLAN § rama + Contexto a leer + decisiones sin grabar + tareas pendientes). Si elige continuar → proceder al paso 4. **Nunca decidir la opción autónomamente ni saltar a Fase -1 sin esta decisión explícita del usuario.**
 4. Leer MASTER_PLAN.md § esa rama.
 5. Leer solo los archivos citados en "Contexto a leer".
 6. Ejecutar Fase -1 (§2.1 MASTER_PLAN.md).
