@@ -10,6 +10,7 @@
   "scripts": {
     "validate:questionnaire": "tsx tools/validate-questionnaire.ts",
     "validate:profiles": "tsx tools/validate-profile.ts questionnaire/profiles/nextjs-app.yaml && tsx tools/validate-profile.ts questionnaire/profiles/agent-sdk.yaml && tsx tools/validate-profile.ts questionnaire/profiles/cli-tool.yaml",
+    "validate:generator": "tsx generator/run.ts --profile questionnaire/profiles/nextjs-app.yaml && tsx generator/run.ts --profile questionnaire/profiles/agent-sdk.yaml && tsx generator/run.ts --profile questionnaire/profiles/cli-tool.yaml",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

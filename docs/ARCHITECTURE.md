@@ -117,33 +117,52 @@ El schema NO es JSON Schema. Es un DSL propio YAML declarativo, validado por [to
 
 ## 3. Generador (TypeScript + tsx)
 
-### Entrypoint
+### Entrypoint (entregado en B3)
 
-`generator/run.ts`:
+[generator/run.ts](../generator/run.ts) es el CLI del runner. Por diseño, B3 entrega **solo el runner de validación**; la parte de render + escritura llega en C* (y por eso `--out` y `--dry-run` se rechazan explícitamente).
+
+**Signatures públicas** (usables desde tests y, en el futuro, desde skills):
 
 ```ts
-import { parseArgs } from "node:util";
-import { loadProfile } from "./lib/profile-loader";
-import { validateProfile } from "./lib/schema";
-import { renderAll } from "./renderers";
-import { writeAll } from "./lib/fs-writer";
+// generator/run.ts
+export type RunResult = {
+  ok: boolean;
+  issues: ProfileIssue[];                 // de profile-validator
+  errors: CompletenessEntry[];            // required-missing (non-user-specific)
+  warnings: CompletenessEntry[];          // required-missing (user-specific)
+  parseErrors: string[];                  // YAML ilegible, schema roto, etc.
+  exitCode: 0 | 1 | 2;
+};
 
-const { values } = parseArgs({
-  options: {
-    profile: { type: "string", short: "p" },
-    out: { type: "string", short: "o" },
-    "dry-run": { type: "boolean" },
-    "validate-only": { type: "boolean" },
-  },
-});
-
-const profile = await loadProfile(values.profile!);
-validateProfile(profile);  // zod, throws en invalid
-if (values["validate-only"]) process.exit(0);
-
-const files = await renderAll(profile);
-await writeAll(files, values.out!, { dryRun: values["dry-run"] });
+export async function runValidation(profilePath: string): Promise<RunResult>;
+export function formatReport(result: RunResult, profilePath: string): string;
 ```
+
+**CLI**:
+
+```bash
+tsx generator/run.ts --profile <path> [--validate-only]
+```
+
+Schema hard-coded a `questionnaire/schema.yaml`. Flags `--out` y `--dry-run` se declaran en `parseArgs` pero el runner las rechaza con `flag --X not supported in B3; planned for C1` + exit 2.
+
+**Exit codes**:
+
+- `0` — profile OK (warnings user-specific permitidas).
+- `1` — `validateProfile` emitió issues **o** `completenessCheck` emitió errors (required no-user-specific faltante).
+- `2` — archivo ausente, YAML ilegible, args inválidos, o flag diferido.
+
+**Composición**:
+
+- [generator/lib/schema.ts](../generator/lib/schema.ts) — **re-export puro** de `parseSchemaFile` / `parseProfileFile` / `validateProfile` + tipos desde `tools/lib/`. 3ª aplicación de pattern-before-abstraction.
+- [generator/lib/profile-loader.ts](../generator/lib/profile-loader.ts) — `loadProfile(path): Promise<LoadResult>` reusando `readAndParseYaml` de `tools/lib/read-yaml.ts`.
+- [generator/lib/validators.ts](../generator/lib/validators.ts) — `completenessCheck(schema, profile): { errors, warnings }`. Exporta `USER_SPECIFIC_PATHS` para que los tests asseverar la lista sin duplicarla.
+
+**Deferrals de B3** (documentados en [.claude/rules/generator.md](../.claude/rules/generator.md#deferrals-b3)):
+
+- `generator/lib/token-budget.ts` — diferido hasta que `questionnaire/schema.yaml` declare `workflow.token_budget`.
+- `--schema` flag — diferido hasta que exista 2º schema.
+- Renderers + writers — llegan en C*.
 
 ### Renderers
 
