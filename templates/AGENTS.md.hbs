@@ -1,0 +1,66 @@
+{{!-- AGENTS.md — execution rules for the generated repo --}}
+# AGENTS — reglas de ejecución autónoma
+
+> Destinado a LLMs (Claude Code) que operan en este repo. Las reglas aquí son vinculantes.
+
+## Lectura obligatoria (en orden)
+
+1. [CLAUDE.md](CLAUDE.md)
+2. Este archivo.
+3. [HANDOFF.md](HANDOFF.md)
+4. Sección específica de la rama actual en [MASTER_PLAN.md](MASTER_PLAN.md)
+5. Path-scoped rules en [.claude/rules/](.claude/rules/) se cargan automáticamente según archivos tocados.
+
+## Reglas no negociables
+
+1. **Fase N+7 Context gate al cerrar la rama anterior**. Como última fase de la rama previa (post-merge), Claude **presenta al usuario** las 4 opciones con recomendación según la matriz de [HANDOFF.md §3](HANDOFF.md): `continuar` | `/compact focus="..."` | `/clear` | sesión nueva. **Claude nunca decide la opción por su cuenta** — espera elección explícita. Sólo después procede a Fase -1 de la siguiente rama.
+2. **Fase -1 siempre**. Ningún `git checkout -b` sin aprobación explícita documentada + marker file.
+3. **Docs dentro de la rama**. Nada de "lo documentamos después". Todo docs-sync en el mismo PR.
+4. **TDD**. Test primero, implementación después.
+5. **Patrones antes de abstraer**. ≥2 ocurrencias documentadas antes de helper compartido.
+6. **Token budget**. CLAUDE.md <200 líneas. Rules path-scoped acotadas. Si contexto >120k, invocar `/pos:compress` (o equivalente manual).
+7. **No leer lo que no vas a usar**. Cita por rango de línea. No leas `MASTER_PLAN.md` entero cuando necesitas una sección.
+
+## Flujo de rama
+
+```text
+Fase -1  │ Aprobación (marker file)
+Fase 0   │ Kickoff block (commit 1: scope + archivos + tests + docs plan)
+Fase 1   │ Tests primero
+Fase 2..N│ Implementación
+Fase N+1 │ Simplify / review pre-commit
+Fase N+2 │ Pre-PR gate (tests ✓, coverage ✓, docs-sync ✓)
+Fase N+3 │ PR + CI → merge
+Fase N+4 │ Context gate (Fase N+7 del flujo): decide continuar | /compact | /clear | sesión nueva — puerta de entrada a la siguiente rama
+```
+
+## Ejecución autónoma — "continúa"
+
+Cuando el usuario escribe "continúa" o "siguiente":
+
+1. Leer `git log --oneline -5` + `git status -sb`.
+2. Leer ROADMAP.md → identificar próxima rama en estado ⏳.
+3. **Context gate (Fase N+7 de la rama anterior)**: **presentar al usuario** las opciones `continuar` | `/compact focus="..."` | `/clear` | sesión nueva con recomendación razonada según la matriz de [HANDOFF.md §3](HANDOFF.md). **Parar. Esperar elección explícita.** Si elige compact/clear/sesión nueva → emitir **resume prompt**. Si elige continuar → paso 4.
+4. Leer MASTER_PLAN.md § esa rama.
+5. Leer solo los archivos citados en "Contexto a leer".
+6. Ejecutar Fase -1 (§2.1 MASTER_PLAN.md).
+7. **Parar. Esperar aprobación.** No crear marker sin OK explícito.
+
+## Gate de salida por fase
+
+Antes de considerar una rama ✅:
+
+- [ ] Criterio de salida del MASTER_PLAN.md cumplido.
+- [ ] Tests locales verdes.
+- [ ] Coverage ≥ threshold declarado ({{#if answers.testing.coverage_threshold}}{{answers.testing.coverage_threshold}}%{{else}}80%{{/if}}).
+- [ ] CI verde.
+- [ ] Docs-sync completado (ROADMAP + HANDOFF + condicionales según paths tocados).
+- [ ] Kickoff block presente en primer commit.
+- [ ] PR descripción generada o escrita; reviewer asignado.
+
+## Lo que este repo NO hace por ti
+
+- No commitea por ti. Siempre pide confirmación antes de `git commit` o `git push`.
+- No abre PRs automáticamente.
+- No instala dependencias sin preguntar.
+- No modifica `main` directamente (salvo bootstrap documentado).

@@ -1,9 +1,9 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { formatReport, runValidation } from "./run.ts";
+import { formatRenderSummary, formatReport, runRender, runValidation } from "./run.ts";
 
 const CLI = "generator/run.ts";
 
@@ -107,6 +107,55 @@ describe("formatReport", () => {
   });
 });
 
+describe("runRender (unit)", () => {
+  it("returns 6 FileWrite entries and user-specific warnings for valid-partial", async () => {
+    const r = await runRender(VALID);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.files.map((f) => f.path).sort()).toEqual([
+      "AGENTS.md",
+      "CLAUDE.md",
+      "HANDOFF.md",
+      "MASTER_PLAN.md",
+      "README.md",
+      "ROADMAP.md",
+    ]);
+    for (const file of r.files) {
+      expect(file.content.length).toBeGreaterThan(0);
+    }
+    expect(r.warnings.map((w) => w.path).sort()).toEqual([
+      "identity.description",
+      "identity.name",
+      "identity.owner",
+    ]);
+  });
+
+  it("returns an error when the profile file is missing", async () => {
+    const r = await runRender("generator/__fixtures__/profiles/does-not-exist.yaml");
+    expect(r.ok).toBe(false);
+  });
+});
+
+describe("formatRenderSummary", () => {
+  it("renders dry-run header + file list", async () => {
+    const r = await runRender(VALID);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const out = formatRenderSummary(r.files, r.warnings, "dry-run");
+    expect(out).toMatch(/dry-run.*6 file\(s\) would be emitted/);
+    expect(out).toContain("CLAUDE.md");
+    expect(out).toMatch(/warning .*identity\.name/);
+  });
+
+  it("renders write header with outDir", async () => {
+    const r = await runRender(VALID);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const out = formatRenderSummary(r.files, r.warnings, "write", "/tmp/demo");
+    expect(out).toMatch(/wrote 6 file\(s\) to \/tmp\/demo/);
+  });
+});
+
 describe("generator/run.ts CLI (integration)", () => {
   it("exits 0 for valid-partial and prints user-specific warnings", () => {
     const r = runCli(["--profile", VALID]);
@@ -132,16 +181,69 @@ describe("generator/run.ts CLI (integration)", () => {
     expect(r.stdout).toMatch(/answer-value-not-in-enum/);
   }, 30000);
 
-  it("exits 2 with clear message when --out is passed (deferred to C1)", () => {
-    const r = runCli(["--profile", VALID, "--out", "tmp/"]);
-    expect(r.code).toBe(2);
-    expect(r.stderr).toMatch(/flag --out not supported in B3; planned for C1/);
+  it("exits 0 and lists 6 files with --dry-run for valid-partial", () => {
+    const r = runCli(["--profile", VALID, "--dry-run"]);
+    expect(r.code).toBe(0);
+    expect(r.stdout).toMatch(/dry-run.*6 file\(s\) would be emitted/);
+    expect(r.stdout).toContain("CLAUDE.md");
+    expect(r.stdout).toContain("MASTER_PLAN.md");
+    expect(r.stdout).toContain("ROADMAP.md");
+    expect(r.stdout).toContain("HANDOFF.md");
+    expect(r.stdout).toContain("AGENTS.md");
+    expect(r.stdout).toContain("README.md");
   }, 30000);
 
-  it("exits 2 with clear message when --dry-run is passed (deferred to C1)", () => {
-    const r = runCli(["--profile", VALID, "--dry-run"]);
+  it("exits 0 and writes 6 files into an empty --out directory", () => {
+    const outDir = mkdtempSync(join(tmpdir(), "run-out-"));
+    const r = runCli(["--profile", VALID, "--out", outDir]);
+    expect(r.code).toBe(0);
+    const written = readdirSync(outDir).sort();
+    expect(written).toEqual([
+      "AGENTS.md",
+      "CLAUDE.md",
+      "HANDOFF.md",
+      "MASTER_PLAN.md",
+      "README.md",
+      "ROADMAP.md",
+    ]);
+    expect(readFileSync(join(outDir, "CLAUDE.md"), "utf8").length).toBeGreaterThan(0);
+    expect(r.stdout).toMatch(/wrote 6 file\(s\)/);
+  }, 30000);
+
+  it("exits 3 when --out target is not empty", () => {
+    const outDir = mkdtempSync(join(tmpdir(), "run-out-"));
+    writeFileSync(join(outDir, "pre-existing.txt"), "hi");
+    const r = runCli(["--profile", VALID, "--out", outDir]);
+    expect(r.code).toBe(3);
+    expect(r.stderr).toMatch(/not empty/);
+  }, 30000);
+
+  it("exits 2 when --out target is a file (not a directory)", () => {
+    const parent = mkdtempSync(join(tmpdir(), "run-out-"));
+    const filePath = join(parent, "iam-a-file.txt");
+    writeFileSync(filePath, "hi");
+    const r = runCli(["--profile", VALID, "--out", filePath]);
     expect(r.code).toBe(2);
-    expect(r.stderr).toMatch(/flag --dry-run not supported in B3; planned for C1/);
+    expect(r.stderr).toMatch(/not a directory/);
+  }, 30000);
+
+  it("exits 2 when --validate-only and --dry-run are combined", () => {
+    const r = runCli(["--profile", VALID, "--validate-only", "--dry-run"]);
+    expect(r.code).toBe(2);
+    expect(r.stderr).toMatch(/mutually exclusive/);
+  }, 30000);
+
+  it("exits 2 when --out and --dry-run are combined", () => {
+    const outDir = mkdtempSync(join(tmpdir(), "run-out-"));
+    const r = runCli(["--profile", VALID, "--out", outDir, "--dry-run"]);
+    expect(r.code).toBe(2);
+    expect(r.stderr).toMatch(/mutually exclusive/);
+  }, 30000);
+
+  it("exits 1 without rendering when profile has validation errors", () => {
+    const r = runCli(["--profile", MISSING_REQ, "--dry-run"]);
+    expect(r.code).toBe(1);
+    expect(r.stdout).not.toMatch(/would be emitted/);
   }, 30000);
 
   it("exits 2 when --profile is missing", () => {

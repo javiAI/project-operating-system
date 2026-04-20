@@ -44,5 +44,8 @@ jobs:
       - name: Validate generator (smoke — 3 canonical profiles)
         run: npm run validate:generator
 
+      - name: Render generator (dry-run — 3 canonical profiles)
+        run: npm run render:generator
+
       - name: Test (with coverage)
         run: npm run test:coverage
