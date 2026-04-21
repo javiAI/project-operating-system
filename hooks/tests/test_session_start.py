@@ -654,3 +654,45 @@ class TestDocstringContract:
         # them: payload → logs; git → degrades to reduced context.
         doc = ss.__doc__ or ""
         assert "reduced" in doc.lower() or "silently" in doc.lower()
+
+
+class TestGitSubprocessResilience:
+    """`_git()` must absorb every OSError subclass (PermissionError, exec
+    failures), not just FileNotFoundError. Otherwise a hardened runtime or
+    corrupted PATH entry crashes the hook and violates exit-0."""
+
+    def test_git_returns_none_on_permission_error(self, monkeypatch):
+        def boom(*_args, **_kwargs):
+            raise PermissionError("no exec on git")
+
+        monkeypatch.setattr(ss.subprocess, "run", boom)
+        assert ss._git(Path("/tmp"), "rev-parse", "HEAD") is None
+
+    def test_git_returns_none_on_generic_oserror(self, monkeypatch):
+        def boom(*_args, **_kwargs):
+            raise OSError(13, "exec format error")
+
+        monkeypatch.setattr(ss.subprocess, "run", boom)
+        assert ss._git(Path("/tmp"), "status") is None
+
+
+class TestPhaseLogResilience:
+    """`_latest_phase_from_log()` must degrade to None when the log file can't
+    be read (permission denied, replaced by dir, transient IO)."""
+
+    def test_oserror_on_open_returns_none(self, monkeypatch, tmp_path):
+        log = tmp_path / "phase-gates.jsonl"
+        log.write_text('{"slug":"feat/d2-x"}\n')
+
+        original_open = Path.open
+
+        def selective_boom(self, *args, **kwargs):
+            if self == log:
+                raise PermissionError("denied")
+            return original_open(self, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "open", selective_boom)
+        assert ss._latest_phase_from_log(log) is None
+
+    def test_missing_file_returns_none(self, tmp_path):
+        assert ss._latest_phase_from_log(tmp_path / "does-not-exist.jsonl") is None

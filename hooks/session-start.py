@@ -56,7 +56,7 @@ def _git(cwd: Path, *args: str) -> str | None:
             timeout=GIT_TIMEOUT_S,
             check=False,
         )
-    except (FileNotFoundError, subprocess.SubprocessError):
+    except (OSError, subprocess.SubprocessError):
         return None
     if r.returncode != 0:
         return None
@@ -88,22 +88,26 @@ def _diff_touches_docs_against(cwd: Path, base: str) -> bool:
 
 def _latest_phase_from_log(path: Path) -> str | None:
     """Single forward scan over phase-gates.jsonl keeping the last parseable
-    phase. O(1) memory regardless of log size."""
+    phase. O(1) memory regardless of log size. OSError on open/read
+    (permission, replaced-by-dir, transient IO) degrades to None."""
     if not path.exists():
         return None
     latest: str | None = None
-    with path.open(encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                entry = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            p = phase_from_slug(entry.get("slug"))
-            if p:
-                latest = p
+    try:
+        with path.open(encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                p = phase_from_slug(entry.get("slug"))
+                if p:
+                    latest = p
+    except OSError:
+        return None
     return latest
 
 
