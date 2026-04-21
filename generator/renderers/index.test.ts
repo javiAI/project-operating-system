@@ -4,6 +4,7 @@ import {
   cicdRenderers,
   coreDocRenderers,
   policyAndRulesRenderers,
+  skillsHooksRenderers,
   testsHarnessRenderers,
 } from "./index.ts";
 import { renderAll } from "../lib/render-pipeline.ts";
@@ -75,12 +76,25 @@ describe("renderers/index — cicdRenderers (C4)", () => {
   });
 });
 
+describe("renderers/index — skillsHooksRenderers (C5)", () => {
+  it("exposes exactly 1 renderer (C5 scope: settings + skeleton)", () => {
+    expect(skillsHooksRenderers).toHaveLength(1);
+  });
+
+  it("is frozen to prevent accidental mutation", () => {
+    expect(Object.isFrozen(skillsHooksRenderers)).toBe(true);
+  });
+});
+
 const ALL_RENDERERS_EXPECTED_PATHS: ReadonlyArray<readonly [string, readonly string[]]> = [
   [
     "nextjs-app",
     [
+      ".claude/hooks/README.md",
       ".claude/rules/docs.md",
       ".claude/rules/patterns.md",
+      ".claude/settings.json",
+      ".claude/skills/README.md",
       ".github/workflows/ci.yml",
       "AGENTS.md",
       "CLAUDE.md",
@@ -99,8 +113,11 @@ const ALL_RENDERERS_EXPECTED_PATHS: ReadonlyArray<readonly [string, readonly str
   [
     "cli-tool",
     [
+      ".claude/hooks/README.md",
       ".claude/rules/docs.md",
       ".claude/rules/patterns.md",
+      ".claude/settings.json",
+      ".claude/skills/README.md",
       ".github/workflows/ci.yml",
       "AGENTS.md",
       "CLAUDE.md",
@@ -119,8 +136,11 @@ const ALL_RENDERERS_EXPECTED_PATHS: ReadonlyArray<readonly [string, readonly str
   [
     "agent-sdk",
     [
+      ".claude/hooks/README.md",
       ".claude/rules/docs.md",
       ".claude/rules/patterns.md",
+      ".claude/settings.json",
+      ".claude/skills/README.md",
       ".github/workflows/ci.yml",
       "AGENTS.md",
       "CLAUDE.md",
@@ -138,7 +158,7 @@ const ALL_RENDERERS_EXPECTED_PATHS: ReadonlyArray<readonly [string, readonly str
   ],
 ];
 
-describe("renderers/index — allRenderers (C3 composition)", () => {
+describe("renderers/index — allRenderers (C5 composition)", () => {
   it("is frozen", () => {
     expect(Object.isFrozen(allRenderers)).toBe(true);
   });

@@ -108,13 +108,16 @@ describe("formatReport", () => {
 });
 
 describe("runRender (unit)", () => {
-  it("returns 15 FileWrite entries and user-specific warnings for valid-partial", async () => {
+  it("returns 18 FileWrite entries and user-specific warnings for valid-partial", async () => {
     const r = await runRender(VALID);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.files.map((f) => f.path).sort()).toEqual([
+      ".claude/hooks/README.md",
       ".claude/rules/docs.md",
       ".claude/rules/patterns.md",
+      ".claude/settings.json",
+      ".claude/skills/README.md",
       ".github/workflows/ci.yml",
       "AGENTS.md",
       "CLAUDE.md",
@@ -183,10 +186,13 @@ describe("formatRenderSummary", () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     const out = formatRenderSummary(r.files, r.warnings, "dry-run");
-    expect(out).toMatch(/dry-run.*15 file\(s\) would be emitted/);
+    expect(out).toMatch(/dry-run.*18 file\(s\) would be emitted/);
     expect(out).toContain("CLAUDE.md");
     expect(out).toContain("policy.yaml");
     expect(out).toContain(".claude/rules/docs.md");
+    expect(out).toContain(".claude/settings.json");
+    expect(out).toContain(".claude/hooks/README.md");
+    expect(out).toContain(".claude/skills/README.md");
     expect(out).toContain("tests/smoke.test.ts");
     expect(out).toContain("vitest.config.ts");
     expect(out).toContain("Makefile");
@@ -200,7 +206,7 @@ describe("formatRenderSummary", () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     const out = formatRenderSummary(r.files, r.warnings, "write", "/tmp/demo");
-    expect(out).toMatch(/wrote 15 file\(s\) to \/tmp\/demo/);
+    expect(out).toMatch(/wrote 18 file\(s\) to \/tmp\/demo/);
   });
 });
 
@@ -229,10 +235,10 @@ describe("generator/run.ts CLI (integration)", () => {
     expect(r.stdout).toMatch(/answer-value-not-in-enum/);
   }, 30000);
 
-  it("exits 0 and lists 15 files with --dry-run for valid-partial", () => {
+  it("exits 0 and lists 18 files with --dry-run for valid-partial", () => {
     const r = runCli(["--profile", VALID, "--dry-run"]);
     expect(r.code).toBe(0);
-    expect(r.stdout).toMatch(/dry-run.*15 file\(s\) would be emitted/);
+    expect(r.stdout).toMatch(/dry-run.*18 file\(s\) would be emitted/);
     expect(r.stdout).toContain("CLAUDE.md");
     expect(r.stdout).toContain("MASTER_PLAN.md");
     expect(r.stdout).toContain("ROADMAP.md");
@@ -242,6 +248,9 @@ describe("generator/run.ts CLI (integration)", () => {
     expect(r.stdout).toContain("policy.yaml");
     expect(r.stdout).toContain(".claude/rules/docs.md");
     expect(r.stdout).toContain(".claude/rules/patterns.md");
+    expect(r.stdout).toContain(".claude/settings.json");
+    expect(r.stdout).toContain(".claude/hooks/README.md");
+    expect(r.stdout).toContain(".claude/skills/README.md");
     expect(r.stdout).toContain("Makefile");
     expect(r.stdout).toContain("vitest.config.ts");
     expect(r.stdout).toContain("tests/README.md");
@@ -250,7 +259,7 @@ describe("generator/run.ts CLI (integration)", () => {
     expect(r.stdout).toContain("docs/BRANCH_PROTECTION.md");
   }, 30000);
 
-  it("exits 0 and writes 15 files into an empty --out directory", () => {
+  it("exits 0 and writes 18 files into an empty --out directory", () => {
     const outDir = mkdtempSync(join(tmpdir(), "run-out-"));
     const r = runCli(["--profile", VALID, "--out", outDir]);
     expect(r.code).toBe(0);
@@ -285,7 +294,15 @@ describe("generator/run.ts CLI (integration)", () => {
       .toMatch(/^name:\s*ci\s*$/m);
     expect(readFileSync(join(outDir, "docs/BRANCH_PROTECTION.md"), "utf8"))
       .toMatch(/Branch Protection/);
-    expect(r.stdout).toMatch(/wrote 15 file\(s\)/);
+    const settingsRaw = readFileSync(join(outDir, ".claude/settings.json"), "utf8");
+    const settings = JSON.parse(settingsRaw) as Record<string, unknown>;
+    expect(settings.hooks).toEqual({});
+    expect(typeof settings._note).toBe("string");
+    expect(readFileSync(join(outDir, ".claude/hooks/README.md"), "utf8"))
+      .toMatch(/Fase\s*D/);
+    expect(readFileSync(join(outDir, ".claude/skills/README.md"), "utf8"))
+      .toMatch(/Fase\s*E/);
+    expect(r.stdout).toMatch(/wrote 18 file\(s\)/);
   }, 30000);
 
   it("exits 3 when --out target is not empty", () => {
