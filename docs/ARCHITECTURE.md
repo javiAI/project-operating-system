@@ -58,7 +58,7 @@ El meta-repo nunca ejecuta código del proyecto destino. El proyecto destino nun
 
 - **File-based**: todo es Markdown plano. Sin DB, sin formato propietario. Compatible con cualquier editor Markdown.
 - **Tool-agnostic**: no impone cliente editor. Obsidian + Web Clipper es el **primer reference adapter** previsto — ver [MASTER_PLAN.md § Rama G2](../MASTER_PLAN.md). Logseq, Foam y plain-text son compatibles por construcción.
-- **Opt-in**: el questionnaire declara `integrations.knowledge_plane.enabled` (shape final en G1). Con flag off, `vault/` no se emite.
+- **Opt-in**: el questionnaire añadirá `integrations.knowledge_plane.enabled` cuando G1 se cierre — shape candidato (bool único o sub-objeto `{ enabled, adapter, vault_path }`) a decidir en G1. Con flag off, `vault/` no se emite.
 - **Sin runtime compartido**: el knowledge plane vive en el repo generado, no en el meta-repo. El generador sólo emite el esqueleto; el mantenimiento es local al proyecto destino.
 
 ## 2. Cuestionario → profile → generación
