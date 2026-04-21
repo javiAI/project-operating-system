@@ -403,6 +403,18 @@ Código Python/bash. Exit code 2 = bloqueo. El LLM no puede ignorarlos. Son el �
 - Double log propio + `phase-gates.jsonl` (evento `pre_write`). Pass-throughs no loguean (replica D1); allow sobre impl existente sí loguea (trazabilidad edit flow).
 - Scope recortado en Fase -1 (pattern injection + anti-pattern blocking diferidos post-E3a): ver [MASTER_PLAN.md § Rama D3](../MASTER_PLAN.md).
 
+**Tercera aplicación blocker — `hooks/pre-pr-gate.py`** (entregado en rama D4):
+
+- Shape idéntico a D1. Regla específica: enforza CLAUDE.md regla #2 (docs-sync dentro de la rama) sobre `gh pr create`.
+- Matcher via `shlex.split`: sólo activa si `tokens[:3] == ["gh", "pr", "create"]`; cualquier otro comando Bash → pass-through silencioso.
+- Docs-sync = baseline `ROADMAP.md` + `HANDOFF.md` (obligatorio en todo PR) + condicionales por prefijo de path tocado en `git diff main..HEAD`: `generator/` y `.claude/patterns/` → `docs/ARCHITECTURE.md`; `hooks/` (excluyendo `hooks/tests/`) → `docs/ARCHITECTURE.md`; `skills/` → `.claude/rules/skills-map.md`. Reglas hardcoded — mirror literal de `policy.yaml.lifecycle.pre_pr.docs_sync_baseline`/`docs_sync_conditional` (parse deferido a rama policy-loader, CLAUDE.md regla #7).
+- `decisionReason` lista los docs ausentes más los paths que los dispararon (capados a 3 por doc + sufijo `... (+N more)` cuando desbordan). Diff vacío recibe razón dedicada (`empty PR`) que no intenta check de docs — cubre el caso branch-sin-commits.
+- Advisory scaffold (`skills_required`, `ci_dry_run_required`, `invariants_check`) persistido como entradas `status: deferred` en el log del hook sólo cuando se emite decisión real (allow/deny con diff). Las skills y los invariants llegan en fases E*/F; el shape queda preparado sin bloquear.
+- Skip advisory (pass-through sin decisión + log `skipped`) en: `main`/`master`, `HEAD` detached, git no disponible, `merge-base HEAD main` sin resolver. Bloquear esos caminos dejaría al usuario sin vía para crear PRs antes de que haya historia contra `main`.
+- Safe-fail blocker canonical (D1): stdin no-JSON / top-level no-dict / `tool_input` no-dict → deny exit 2. `command` ausente, no-string o vacío → pass-through exit 0 (payload válido pero fuera de scope).
+- Double log: `.claude/logs/pre-pr-gate.jsonl` (`{ts, hook, command, decision, reason}`) + `.claude/logs/phase-gates.jsonl` (evento `pre_pr`, `{ts, event, decision}`). Pass-throughs no loguean (replica D1); los skips advisory sí loguean con `status: skipped` para dejar rastro.
+- Reuso `_lib/`: `append_jsonl` + `now_iso`. `sanitize_slug` no aplica (D4 no deriva slugs). No introduce helpers nuevos a `_lib/` (regla #7: sólo cuando ≥2 hooks lo reclamen).
+
 **Helpers compartidos — `hooks/_lib/`** (extraído en D2 tras segunda repetición, CLAUDE.md regla #7):
 
 - `_lib/slug.py::sanitize_slug` (`/` → `_`).

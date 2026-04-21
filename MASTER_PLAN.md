@@ -263,7 +263,25 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 
 ### Rama D4 — `feat/d4-hook-pre-pr-gate`
 
-**Scope**: `hooks/pre-pr-gate.py` — valida policy.yaml vs logs: docs-sync, skills required, CI dry-run, invariants.
+**Scope (entregado)**: `hooks/pre-pr-gate.py` — PreToolUse(Bash) blocker sobre `gh pr create` que enforza docs-sync como único check real; scaffold advisory no-blocking para skills_required / ci_dry_run_required / invariants_check. Shape canónico blocker D1 (tercera aplicación del patrón).
+
+**Ajustes vs plan original** (Fase -1 aprobada, recorte explícito del scope):
+
+- **Trigger recortado a `gh pr create` únicamente**. El plan original mencionaba "matcher `gh pr create` / `git push`"; `git push` queda fuera de D4 (scope separado — reabre cuando haya señal concreta de bloqueo pre-push útil vs coste de falsos positivos). `gh pr edit`, `gh pr view`, `gh pr list`, `gh issue create` → pass-through silencioso.
+- **Docs-sync como único enforcement real**. `skills_required`, `ci_dry_run_required`, `invariants_check` quedan como **advisory scaffold no-blocking** (se loguean con `status: "deferred"` en cada decisión real, sin afectar el exit code). Razón: ninguno tiene sustrato todavía — las skills reales aterrizan en Fase E*; CI dry-run requiere rama dedicada; invariants directory está vacío. Activar cualquiera de los 3 sin su sustrato sería abstracción sin datos (CLAUDE.md regla #7). El scaffold es **activable sin cambio de shape** cuando sus prerequisitos aterricen.
+- **Reglas de docs-sync hardcoded en el hook** (mirror textual de `policy.yaml.lifecycle.pre_pr.docs_sync_baseline` + `docs_sync_conditional`). **Sin pyyaml**, sin parser declarativo. La migración a policy-driven loading queda diferida a una **rama policy-loader propia** que unificará este hardcoded con el de D3 (paths enforced). Razón: introducir un parser declarativo en D4 inflaría scope y mezclaría dos deudas distintas.
+- **`hooks/tests/**` excluido del trigger `hooks/** → docs/ARCHITECTURE.md`**. Los archivos de test no son implementación; cambios ahí solos no justifican tocar ARCHITECTURE.md.
+- **Dedupe explícito de triggering docs**. `generator/**` y `.claude/patterns/**` apuntan ambos a `docs/ARCHITECTURE.md`; la entrada missing aparece una sola vez, con los paths triggering listados tras `— required by` y capados a 3 con sufijo `... (+N more)` cuando hay más.
+- **Skip advisory (pass-through + log explícito) en main / master / HEAD detached / cwd no-git / `git merge-base HEAD main` no resoluble**. Decisión vs alternativa "silent skip": el log advisory aporta trazabilidad sin deny ruidoso. Skip entries van al hook log; **`phase-gates.jsonl` intacto en skips** (no son decisiones reales del lifecycle).
+- **Empty diff → deny con reason dedicado separado del de docs-sync** (`"PR creation blocked: no changes between merge-base and HEAD (empty PR). Base: <sha>"`). Distinto del reason docs-sync para no sugerir al usuario que añadir docs resolvería un problema que es "no hay diff en absoluto".
+- **Safe-fail blocker canonical D1** (no D2 informative): stdin vacío / JSON inválido / top-level no-dict / `tool_input` no-dict → deny exit 2. Command ausente / no-string / vacío / shlex unparsable → pass-through exit 0.
+- **Evento canónico en `phase-gates.jsonl`**: `pre_pr` (se suma a `branch_creation` D1, `session_start` D2, `pre_write` D3). Entradas `deferred` advisory van sólo al hook log, no a `phase-gates.jsonl`.
+- **`hooks/pre-write-guard.py` NO tocado en D4**. La migración de los paths hardcoded de D3 a `policy.yaml` se acompaña en la misma rama policy-loader que migre los de D4 (scope limpio, un cambio a la vez).
+- **Reuso de `hooks/_lib/`**: `append_jsonl` + `now_iso`. Sin nuevos helpers (regla #7 aplicada incrementalmente).
+- **Simplify pass explícito pre-PR** (preferencia persistente del usuario): 3 cuts aplicados — docstring 10→6 líneas, `_conditional_triggers` docstring eliminada, `missing, _triggers` → `missing, _`. Todos test-safe.
+- **Trazabilidad de kickoff**: commit `e73416b` tuvo su message dañado por backticks interpretados por `$(cat <<'EOF' ...)`; follow-up `ee3099d` (empty `--allow-empty`) repone el contenido perdido sin reescribir historia.
+
+**Criterio de salida**: 96 tests verdes (`hooks/tests/test_pre_pr_gate.py`), 317 totales en `hooks/**` (D1+D2+D3+D4), coverage ≥80% lines / ≥75% branches (alcanzado 93% sobre `pre-pr-gate.py`, global ≥95%), `_lib/` consumido (regla #7 intacta), docs-sync en el propio PR (ROADMAP + HANDOFF + MASTER_PLAN + ARCHITECTURE + `.claude/rules/hooks.md`), hook instalado (el propio `pre-pr-gate` debe aprobar su PR al correr sobre esta rama — dogfooding). Cumplido.
 
 ### Rama D5 — `feat/d5-hook-post-action-compound`
 

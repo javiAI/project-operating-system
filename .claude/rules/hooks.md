@@ -158,3 +158,44 @@ Pass-through silencioso por **decisión explícita del repo (D2)**. Categoría s
 **Fuera de scope** (también pass-through): cualquier otro path que no caiga en enforced ni en los buckets excluidos — `scripts/**`, paths arbitrarios fuera del repo, etc. No logueados.
 
 Scope recortado (pattern injection + anti-pattern blocking diferidos post-E3a) documentado en [MASTER_PLAN.md § Rama D3](../../MASTER_PLAN.md). Ver también [ROADMAP.md § Progreso Fase D](../../ROADMAP.md).
+
+## Cuarto hook entregado — `hooks/pre-pr-gate.py` (Rama D4)
+
+Tercera aplicación del patrón **blocker** (PreToolUse(Bash)) — shape idéntico a D1, regla específica distinta. Enforza CLAUDE.md regla #2 (docs-sync dentro de la rama) sobre `gh pr create`.
+
+- Matcher con `shlex.split`: activa sólo si `tokens[:3] == ["gh", "pr", "create"]`. Cualquier otro comando Bash → pass-through silencioso.
+- Contrato:
+  - diff vacío (no commits vs `merge-base HEAD main`) → **deny exit 2** con razón dedicada (`empty PR`) — no intenta check de docs.
+  - diff con docs-sync baseline ausente (falta `ROADMAP.md` o `HANDOFF.md`) → **deny exit 2** con lista de docs faltantes + paths que los disparan.
+  - diff que toca `generator/`, `hooks/` (excl. `hooks/tests/`), `skills/` o `.claude/patterns/` sin su doc condicional → **deny exit 2** mismo shape de razón.
+  - todo docs-sync presente → **allow exit 0** (double log).
+  - rama `main`/`master`, `HEAD` detached, git no disponible o `merge-base` sin resolver → **pass-through exit 0** con log `status: skipped` (permite crear el primer PR contra `main` sin historia previa).
+- `decisionReason` constructivo: baseline listado con motivo literal (`required baseline (every PR)`); condicionales acompañados de los paths que los dispararon (cap 3 + `... (+N more)`). Sin parseo de docs.
+- Double log: `.claude/logs/pre-pr-gate.jsonl` (`{ts, hook, command, decision, reason}` en decisiones; `{ts, hook, command, status: skipped, reason}` en pass-throughs advisory) + `.claude/logs/phase-gates.jsonl` (evento `pre_pr`, sólo en decisiones reales). Pass-throughs non-matcher (comando Bash que no es `gh pr create`) NO loguean (replica D1).
+- Advisory scaffold (`skills_required`, `ci_dry_run_required`, `invariants_check`) persistido como entradas `status: deferred` en el log del hook sólo cuando hay decisión real. Shape ya preparado para cuando skills/invariants lleguen en E*/F; no bloquea.
+- Reglas hardcoded — mirror literal de `policy.yaml.lifecycle.pre_pr.docs_sync_baseline` / `docs_sync_conditional`. Parse real deferido a rama policy-loader (CLAUDE.md regla #7: dos repeticiones antes de abstraer).
+- Safe-fail blocker canonical (D1): stdin no-JSON / top-level no-dict / `tool_input` no-dict → **deny exit 2**. `command` ausente, no-string o vacío → pass-through exit 0 (payload válido pero fuera de scope).
+- Reuso `_lib/`: `append_jsonl` + `now_iso`. `sanitize_slug` no aplica. No introduce helpers nuevos a `_lib/`.
+- Tests pytest: 96 casos (subprocess end-to-end + in-process via `importlib.util.spec_from_file_location` por guión en el nombre), 93% coverage sobre `pre-pr-gate.py`. Fixture `repo` crea git real + commits para cubrir los caminos de `merge-base`/`diff`.
+
+### Docs-sync reglas (hardcoded en D4, migra a `policy.yaml` en rama policy-loader)
+
+**Baseline** (obligatorio en todo PR):
+
+| Doc          | Motivo                                                   |
+|--------------|----------------------------------------------------------|
+| `ROADMAP.md` | Estado vivo; toda rama altera al menos la fila de su fase |
+| `HANDOFF.md` | Quickref 30s; se reescribe al cerrar la rama             |
+
+**Condicional** (por prefijo de path tocado):
+
+| Prefijo de path      | Doc requerido                  | Excluye         |
+|----------------------|--------------------------------|-----------------|
+| `generator/`         | `docs/ARCHITECTURE.md`         | —               |
+| `hooks/`             | `docs/ARCHITECTURE.md`         | `hooks/tests/`  |
+| `skills/`            | `.claude/rules/skills-map.md`  | —               |
+| `.claude/patterns/`  | `docs/ARCHITECTURE.md`         | —               |
+
+La primera regla matcheada gana (ciclo de `CONDITIONAL_RULES` con `break`). Si un path no matchea ningún prefijo → no dispara docs-sync extra (baseline sigue aplicando).
+
+Ver también [MASTER_PLAN.md § Rama D4](../../MASTER_PLAN.md), [docs/ARCHITECTURE.md §7](../../docs/ARCHITECTURE.md#capa-1-hooks).

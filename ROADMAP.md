@@ -9,7 +9,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | A | Skeleton & bootstrap | ✅ |
 | B | Cuestionario + profiles + runner | ✅ |
 | C | Templates + renderers | ✅ (C1 ✅, C2 ✅, C3 ✅, C4 ✅, C5 ✅) |
-| D | Hooks (Python) | ⏳ parcial (D1 ✅, D2 ✅, D3 ✅) |
+| D | Hooks (Python) | ⏳ parcial (D1 ✅, D2 ✅, D3 ✅, D4 ✅) |
 | E1 | Skills orquestación | ⏳ pendiente |
 | E2 | Skills calidad | ⏳ pendiente |
 | E3 | Skills patterns + tests | ⏳ pendiente |
@@ -32,7 +32,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | `feat/d1-hook-pre-branch-gate` | Bloqueo `git checkout -b` / `switch -c` / `worktree add -b` sin marker | ✅ | #11 |
 | `feat/d2-hook-session-start` | Snapshot 30s + extracción `hooks/_lib/` (refactor D1) | ✅ | — (PR pendiente) |
 | `feat/d3-hook-pre-write-guard` | Test-pair enforcement (PreToolUse(Write)); pattern injection + anti-pattern block diferidos post-E3a | ✅ | — (PR pendiente) |
-| `feat/d4-hook-pre-pr-gate` | Policy vs logs + docs-sync + CI dry-run | ⏳ | — |
+| `feat/d4-hook-pre-pr-gate` | Docs-sync enforcer sobre `gh pr create` (shape D1 blocker); advisory scaffold skills/ci/invariants | ✅ | — (PR pendiente) |
 | `feat/d5-hook-post-action-compound` | Trigger `/pos:compound` por touched_paths | ⏳ | — |
 | `feat/d6-hook-pre-compact-stop` | Persist pre-compact + stop policy check | ⏳ | — |
 | `feat/e1a-skill-kickoff-handoff` | `/pos:kickoff`, `/pos:handoff-write` | ⏳ | — |
@@ -288,6 +288,31 @@ Entregables:
 - 6 fixtures JSON nuevos en `hooks/tests/fixtures/payloads/` con rutas relativas (normalizadas contra `Path.cwd()`).
 
 **Ajustes vs plan original**: ver [MASTER_PLAN.md § Rama D3](MASTER_PLAN.md).
+
+### `feat/d4-hook-pre-pr-gate` — ✅ (PR pendiente)
+
+Entregables:
+
+- `hooks/pre-pr-gate.py` (ejecutable, stdlib-only, Python 3.10+) — PreToolUse(Bash) blocker que enforza CLAUDE.md regla #2 (docs dentro de la rama) sobre el trigger `gh pr create`. Shape canónico blocker D1 (tercera aplicación del patrón tras pre-branch-gate + pre-write-guard).
+- Matcher: `shlex.split(command)` + `tokens[:3] == ["gh","pr","create"]`. Cubre flags `--draft`, `--title`, `--body`, `--base`. Todo lo demás (`gh pr list`/`view`/`edit`, `gh issue create`, `git push`, `git status`, non-Bash) → pass-through silencioso (cero log).
+- Skip advisory con log explícito (NO silencioso): branch `main` / `master` / `HEAD` detached; cwd no es git repo; `git merge-base HEAD main` no resoluble (main borrada localmente). Las entradas van sólo al hook-log; `phase-gates.jsonl` intacto en skips.
+- Empty diff (HEAD vs merge-base) → deny exit 2 con reason dedicado (`"PR creation blocked: no changes ... empty PR. Base: <sha>"`), textualmente separado del reason docs-sync para no inducir confusión al usuario.
+- Docs-sync check (reglas hardcoded, mirror de `policy.yaml.lifecycle.pre_pr.docs_sync_*`):
+  - **Baseline** (siempre): `ROADMAP.md` + `HANDOFF.md`.
+  - **Conditional**: `generator/**` → `docs/ARCHITECTURE.md`; `hooks/**` (excluyendo `hooks/tests/**`) → `docs/ARCHITECTURE.md`; `skills/**` → `.claude/rules/skills-map.md`; `.claude/patterns/**` → `docs/ARCHITECTURE.md`.
+  - Dedupe: `ARCHITECTURE.md` aparece una sola vez aunque múltiples prefijos lo exijan.
+  - Triggering paths capeados a 3 por doc en el reason, con sufijo `... (+N more)` cuando hay más.
+- Advisory scaffold no-blocking (activable sin cambio de shape): en cada decisión real (allow/deny) el hook emite 3 entradas `{status: "deferred", check: <name>}` al hook log — `skills_required`, `ci_dry_run_required`, `invariants_check`. NO se emiten en skip ni en pass-through. Se convertirán en enforcement real cuando sus ramas dedicadas aporten sustrato (Fase E* / CI dry-run propia / invariants directory poblado).
+- Safe-fail blocker canonical D1: stdin vacío / JSON inválido / top-level no-dict / `tool_input` no-dict → deny exit 2. Command ausente / no-string / vacío / shlex unparsable → pass-through exit 0.
+- Double log en decisiones reales (allow/deny/empty-diff):
+  - `.claude/logs/pre-pr-gate.jsonl` — `{ts, hook, command, decision, reason}` + 3 entradas `deferred` advisory.
+  - `.claude/logs/phase-gates.jsonl` — `{ts, event: "pre_pr", decision}`.
+- Reuso `hooks/_lib/`: `append_jsonl` + `now_iso`. Sin nuevos helpers compartidos.
+- `.claude/settings.json` no modificado: ya referenciaba `./hooks/pre-pr-gate.py` desde Fase A; D4 sólo materializa el binario.
+- Tests: 96 casos en `hooks/tests/test_pre_pr_gate.py`, 93% coverage sobre `pre-pr-gate.py`. Suite global `hooks/**`: 317 passed (D1 + D2 + D3 + D4). Sin regresión.
+- 3 fixtures JSON nuevos en `hooks/tests/fixtures/payloads/`: `gh_pr_create.json`, `gh_pr_create_draft.json`, `gh_pr_list.json`. Reuso de `git_status.json` + `non_bash.json` heredados de D1/D2.
+
+**Ajustes vs plan original**: ver [MASTER_PLAN.md § Rama D4](MASTER_PLAN.md).
 
 ## Convenciones de este archivo
 
