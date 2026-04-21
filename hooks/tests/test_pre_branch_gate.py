@@ -1,6 +1,8 @@
 """Tests for hooks/pre-branch-gate.py."""
 from __future__ import annotations
 
+import importlib.util
+import io
 import json
 import subprocess
 import sys
@@ -11,6 +13,11 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 HOOK = REPO_ROOT / "hooks" / "pre-branch-gate.py"
 FIXTURES = Path(__file__).parent / "fixtures" / "payloads"
+
+_spec = importlib.util.spec_from_file_location("pre_branch_gate", HOOK)
+assert _spec is not None and _spec.loader is not None
+pbg = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(pbg)
 
 TEST_SLUG = "feat/d1-test"
 TEST_MARKER_NAME = "feat_d1-test.approved"
@@ -240,3 +247,129 @@ class TestRobustness:
         ]
         assert len(entries) == 2
         assert entries[0]["decision"] == entries[1]["decision"] == "deny"
+
+
+class TestSanitizeSlugUnit:
+    def test_no_slash(self):
+        assert pbg.sanitize_slug("feat_x") == "feat_x"
+
+    def test_single_slash(self):
+        assert pbg.sanitize_slug("feat/x") == "feat_x"
+
+    def test_multiple_slashes(self):
+        assert pbg.sanitize_slug("feat/d1/x") == "feat_d1_x"
+
+
+class TestExtractBranchSlugUnit:
+    def test_checkout_b(self):
+        assert pbg.extract_branch_slug("git checkout -b feat/x") == "feat/x"
+
+    def test_switch_c(self):
+        assert pbg.extract_branch_slug("git switch -c feat/x") == "feat/x"
+
+    def test_worktree_add_b(self):
+        assert pbg.extract_branch_slug("git worktree add -b feat/x /tmp/wt") == "feat/x"
+
+    def test_checkout_existing_branch_none(self):
+        assert pbg.extract_branch_slug("git checkout main") is None
+
+    def test_status_none(self):
+        assert pbg.extract_branch_slug("git status") is None
+
+    def test_branch_without_flag_none(self):
+        assert pbg.extract_branch_slug("git branch feat/x") is None
+
+    def test_not_git_none(self):
+        assert pbg.extract_branch_slug("ls -la") is None
+
+    def test_unparseable_none(self):
+        assert pbg.extract_branch_slug("git checkout -b 'unterminated") is None
+
+    def test_empty_none(self):
+        assert pbg.extract_branch_slug("") is None
+
+    def test_git_only_none(self):
+        assert pbg.extract_branch_slug("git") is None
+
+    def test_only_global_opts_none(self):
+        assert pbg.extract_branch_slug("git -c user.name=x") is None
+
+    def test_global_opt_equals_form(self):
+        assert pbg.extract_branch_slug("git --git-dir=/foo checkout -b feat/x") == "feat/x"
+
+    def test_global_opt_space_form(self):
+        assert pbg.extract_branch_slug("git -C /foo checkout -b feat/x") == "feat/x"
+
+    def test_global_opt_paginate_no_arg(self):
+        assert pbg.extract_branch_slug("git --no-pager checkout -b feat/x") == "feat/x"
+
+    def test_checkout_b_no_arg_none(self):
+        assert pbg.extract_branch_slug("git checkout -b") is None
+
+    def test_switch_c_no_arg_none(self):
+        assert pbg.extract_branch_slug("git switch -c") is None
+
+    def test_worktree_add_no_b_none(self):
+        assert pbg.extract_branch_slug("git worktree add /tmp/wt") is None
+
+    def test_worktree_add_b_no_arg_none(self):
+        assert pbg.extract_branch_slug("git worktree add -b") is None
+
+    def test_worktree_list_none(self):
+        assert pbg.extract_branch_slug("git worktree list") is None
+
+    def test_unknown_subcmd_none(self):
+        assert pbg.extract_branch_slug("git fetch origin") is None
+
+
+class TestBuildDenyReasonUnit:
+    def test_contains_marker_touch_and_plan(self):
+        reason = pbg.build_deny_reason(
+            Path("/repo/.claude/branch-approvals/feat_x.approved"),
+            "git checkout -b feat/x",
+        )
+        assert "feat_x.approved" in reason
+        assert "touch" in reason
+        assert "MASTER_PLAN.md" in reason
+        assert "git checkout -b feat/x" in reason
+
+
+class TestMainInProcess:
+    def _run(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        repo: Path,
+        stdin_text: str,
+    ) -> int:
+        monkeypatch.chdir(repo)
+        monkeypatch.setattr("sys.stdin", io.StringIO(stdin_text))
+        return pbg.main()
+
+    def test_malformed_json_returns_2(self, monkeypatch, repo):
+        assert self._run(monkeypatch, repo, "not json") == 2
+
+    def test_non_dict_payload_returns_2(self, monkeypatch, repo):
+        assert self._run(monkeypatch, repo, "[1,2,3]") == 2
+
+    def test_non_bash_returns_0(self, monkeypatch, repo):
+        assert self._run(monkeypatch, repo, '{"tool_name": "Write"}') == 0
+
+    def test_bash_no_tool_input_returns_0(self, monkeypatch, repo):
+        assert self._run(monkeypatch, repo, '{"tool_name": "Bash"}') == 0
+
+    def test_bash_empty_command_returns_0(self, monkeypatch, repo):
+        payload = '{"tool_name": "Bash", "tool_input": {"command": "   "}}'
+        assert self._run(monkeypatch, repo, payload) == 0
+
+    def test_bash_non_branch_returns_0(self, monkeypatch, repo):
+        payload = '{"tool_name": "Bash", "tool_input": {"command": "ls"}}'
+        assert self._run(monkeypatch, repo, payload) == 0
+
+    def test_branch_with_marker_returns_0(self, monkeypatch, repo):
+        (repo / ".claude" / "branch-approvals" / "feat_x.approved").touch()
+        payload = '{"tool_name": "Bash", "tool_input": {"command": "git checkout -b feat/x"}}'
+        assert self._run(monkeypatch, repo, payload) == 0
+
+    def test_branch_without_marker_returns_2(self, monkeypatch, repo):
+        payload = '{"tool_name": "Bash", "tool_input": {"command": "git checkout -b feat/x"}}'
+        assert self._run(monkeypatch, repo, payload) == 2
