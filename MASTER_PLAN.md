@@ -333,13 +333,13 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 
 ## FASE G — Knowledge Plane (opcional)
 
-> Capa opcional mountable sobre el control-plane. No sustituye ni modifica la relación control-plane → runtime-plane. Proyectos generados por `pos` pueden adoptarla vía opt-in del questionnaire sin tocar el core. Ver [docs/ARCHITECTURE.md § 1.1](docs/ARCHITECTURE.md) (sección "Knowledge plane (opcional)") para el encaje arquitectónico y la terminología de tres capas (raw / wiki / schema).
+> Capa opcional mountable sobre el control-plane, adoptable por proyectos generados vía opt-in del questionnaire. Ver [docs/ARCHITECTURE.md § 1.1](docs/ARCHITECTURE.md) para encaje arquitectónico y terminología de tres capas (raw / wiki / schema).
 >
-> **Estado**: planificada, sin fecha de ejecución. Puede reordenarse o descartarse sin impacto sobre A..F. Introducida como roadmap por la rama `feat/fx-knowledge-plane-plan` (docs-only).
+> **Estado**: planificada, sin fecha de ejecución. Puede reordenarse o descartarse sin impacto sobre A..F.
 
 ### Rama G1 — `feat/g1-knowledge-plane-contract`
 
-**Scope**: fijar el contrato tool-agnostic de la capa. Markdown file-based, tres capas separadas (raw / wiki / schema). Sin adapter concreto, sin ingest, sin RAG.
+**Scope**: fijar el contrato tool-agnostic de la capa. Markdown file-based, tres capas separadas (raw / wiki / schema).
 
 **Archivos (previstos)**:
 
@@ -349,7 +349,9 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 
 **NO incluye**: adapter concreto, renderer, ingest CLI, lint.
 
-**Contexto a leer**: [docs/ARCHITECTURE.md § 1.1](docs/ARCHITECTURE.md) + gist de Karpathy referenciado en la rama `feat/fx-knowledge-plane-plan`.
+**Cuestión abierta** (a resolver en G1): el término `schema.md` colisiona léxicamente con `questionnaire/schema.yaml` (ya canonical). G1 decide renombre (p.ej. `vault/_meta.md`, `vault/config.md`) o justifica coexistencia.
+
+**Contexto a leer**: [docs/ARCHITECTURE.md § 1.1](docs/ARCHITECTURE.md) (incluye link al gist de Karpathy sobre wikis LLM-friendly).
 
 **Criterio de salida**: contrato público legible sin ambigüedad sobre qué es "raw" vs "wiki" vs "schema"; opt-in testeable; cero código de adapter o ingest.
 
