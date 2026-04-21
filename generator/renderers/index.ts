@@ -9,6 +9,7 @@ import { render as renderPolicy } from "./policy.ts";
 import { render as renderRules } from "./rules.ts";
 import { render as renderTests } from "./tests.ts";
 import { render as renderCiCd } from "./ci-cd.ts";
+import { render as renderSkillsHooksSkeleton } from "./skills-hooks-skeleton.ts";
 
 export const coreDocRenderers: readonly Renderer[] = Object.freeze([
   renderClaudeMd,
@@ -32,9 +33,14 @@ export const cicdRenderers: readonly Renderer[] = Object.freeze([
   renderCiCd,
 ]);
 
+export const skillsHooksRenderers: readonly Renderer[] = Object.freeze([
+  renderSkillsHooksSkeleton,
+]);
+
 export const allRenderers: readonly Renderer[] = Object.freeze([
   ...coreDocRenderers,
   ...policyAndRulesRenderers,
   ...testsHarnessRenderers,
   ...cicdRenderers,
+  ...skillsHooksRenderers,
 ]);
