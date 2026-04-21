@@ -28,7 +28,7 @@
 
 El meta-repo nunca ejecuta código del proyecto destino. El proyecto destino nunca depende del meta-repo en runtime (todo se copia).
 
-## 1.1. Knowledge plane (opcional)
+### 1.1. Knowledge plane (opcional)
 
 > **Opcional.** Capa extra mountable *dentro* del repo generado, adoptable vía opt-in del questionnaire. Introducida como roadmap en [MASTER_PLAN.md § FASE G](../MASTER_PLAN.md); no implementada todavía.
 
