@@ -278,7 +278,7 @@ Entregables:
 - Double log: `.claude/logs/pre-write-guard.jsonl` + `.claude/logs/phase-gates.jsonl` (evento `pre_write`). Pass-throughs NO loguean (replica D1). Allow sobre impl existente sí loguea (trazabilidad del edit flow).
 - Reuso `hooks/_lib/`: `append_jsonl` + `now_iso`. No introduce `read_jsonl` ni nuevos helpers.
 - `.claude/settings.json` no modificado: wire existente desde Fase A con `timeout: 3`; D3 sólo materializa el binario.
-- Tests: 81 casos en `hooks/tests/test_pre_write_guard.py`, 96% coverage. 219 totales en `hooks/**`; D1/D2 intactos.
+- Tests: 83 casos en `hooks/tests/test_pre_write_guard.py`, 95% coverage. 221 totales en `hooks/**`; D1/D2 intactos.
 - 6 fixtures JSON nuevos en `hooks/tests/fixtures/payloads/` con rutas relativas (normalizadas contra `Path.cwd()`).
 
 **Ajustes vs plan original**: ver [MASTER_PLAN.md § Rama D3](MASTER_PLAN.md).

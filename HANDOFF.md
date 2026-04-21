@@ -142,6 +142,6 @@ Lectura mínima al arrancar:
 
 ## 10. Estado D3 (cerrada en rama)
 
-`pre-write-guard` vivo: en cada `PreToolUse(Write)` clasifica `tool_input.file_path` (normalizado contra `Path.cwd()`), aplica los 2 buckets de exclusión (tests/docs/templates/meta + `hooks/_lib/**`) y enforza el contrato crystal-clear (enforced+new+no-pair → deny; enforced+new+pair → allow; enforced+existing → allow edit-flow; excluded/out-of-scope → pass-through silencioso). Enforced: `hooks/*.py` top-level + `generator/**/*.ts` (incluido `generator/run.ts`). Safe-fail blocker canonical D1. Double log: `pre-write-guard.jsonl` + `phase-gates.jsonl` (evento `pre_write`). 81 tests D3, 219 totales en `hooks/**`, 96% coverage; D1/D2 intactos.
+`pre-write-guard` vivo: en cada `PreToolUse(Write)` clasifica `tool_input.file_path` (normalizado contra `Path.cwd()`), aplica los 2 buckets de exclusión (tests/docs/templates/meta + `hooks/_lib/**`) y enforza el contrato crystal-clear (enforced+new+no-pair → deny; enforced+new+pair → allow; enforced+existing → allow edit-flow; excluded/out-of-scope → pass-through silencioso). Enforced: `hooks/*.py` top-level + `generator/**/*.ts` (incluido `generator/run.ts`). Safe-fail blocker canonical D1. Double log: `pre-write-guard.jsonl` + `phase-gates.jsonl` (evento `pre_write`). 83 tests D3, 221 totales en `hooks/**`, 95% coverage; D1/D2 intactos.
 
 **Detalle + "Lo que D3 NO hace" + apuntes D4**: ver [ROADMAP.md § feat/d3](ROADMAP.md), [MASTER_PLAN.md § Rama D3](MASTER_PLAN.md) y [.claude/rules/hooks.md § Tercer hook](.claude/rules/hooks.md).

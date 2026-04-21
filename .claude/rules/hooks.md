@@ -118,7 +118,7 @@ Segunda aplicación del patrón **blocker** (PreToolUse(Write)) — shape idént
 - Double log: `.claude/logs/pre-write-guard.jsonl` (`{ts, hook, file_path, decision, reason}`) + `.claude/logs/phase-gates.jsonl` (evento `pre_write`, `{ts, event, file_path, decision}`). Pass-throughs NO loguean (replica D1; evita ruido).
 - Safe-fail blocker canonical: stdin vacío / JSON inválido / top-level no-dict / `tool_input` no-dict → deny exit 2. `file_path` ausente o no-string → pass-through exit 0 (decisión Fase -1: no es malformación total).
 - Reuso `_lib/`: `append_jsonl` + `now_iso`. `sanitize_slug` no aplica (D3 no deriva slugs de file paths). No introduce `read_jsonl`.
-- Tests pytest: 81 casos, 96% coverage sobre `pre-write-guard.py`. Suite organizada por clase de contrato (enforced/exclusions/out-of-scope/logging/robustness) + unit tests del clasificador.
+- Tests pytest: 83 casos, 95% coverage sobre `pre-write-guard.py`. Suite organizada por clase de contrato (enforced/exclusions/out-of-scope/logging/robustness) + unit tests del clasificador.
 
 ### Clasificador — paths (hardcoded hasta D4 mueva la lista a `policy.yaml`)
 
