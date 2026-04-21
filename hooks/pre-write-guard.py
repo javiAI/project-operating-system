@@ -68,7 +68,9 @@ def build_deny_reason(write_path: str, expected_test: str) -> str:
         f"Expected test file: {expected_test}\n"
         f"To unblock: touch {expected_test} and author a failing test first (RED), "
         "then retry the implementation Write.\n"
-        "Rationale: see .claude/rules/tests.md — TDD hard-enforced on generator/** and hooks/**.\n"
+        "Convention enforced by this hook:\n"
+        "  - hooks/<name>.py          → hooks/tests/test_<name_underscore>.py\n"
+        "  - generator/**/*.ts (enf)  → co-located *.test.ts\n"
         f"Blocked write: {write_path}"
     )
 
