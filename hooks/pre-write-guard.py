@@ -70,7 +70,8 @@ def build_deny_reason(write_path: str, expected_test: str) -> str:
         "then retry the implementation Write.\n"
         "Convention enforced by this hook:\n"
         "  - hooks/<name>.py          → hooks/tests/test_<name_underscore>.py\n"
-        "  - generator/**/*.ts (enf)  → co-located *.test.ts\n"
+        "  - generator/**/*.ts        → co-located *.test.ts "
+        "(excluding *.test.ts, generator/__tests__/, generator/__fixtures__/)\n"
         f"Blocked write: {write_path}"
     )
 
