@@ -333,7 +333,7 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 
 ## FASE G — Knowledge Plane (opcional)
 
-> Capa opcional mountable sobre el control-plane, adoptable por proyectos generados vía opt-in del questionnaire. Ver [docs/ARCHITECTURE.md § 1.1](docs/ARCHITECTURE.md) para encaje arquitectónico y terminología de tres capas (raw / wiki / schema).
+> Capa opcional mountable dentro del repo generado (runtime plane), no en el meta-repo ni "sobre" el control-plane; su adopción se activa vía opt-in del questionnaire. Ver [docs/ARCHITECTURE.md § 1.1](docs/ARCHITECTURE.md) para encaje arquitectónico y terminología de tres capas (raw / wiki / schema).
 >
 > **Estado**: planificada, sin fecha de ejecución. Puede reordenarse o descartarse sin impacto sobre A..F.
 
