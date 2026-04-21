@@ -111,14 +111,10 @@ def main() -> int:
         return 0
 
     repo_root = Path.cwd()
-    p = Path(file_path)
-    if p.is_absolute():
-        try:
-            rel = p.resolve().relative_to(repo_root.resolve()).as_posix()
-        except ValueError:
-            return 0
-    else:
-        rel = p.as_posix()
+    try:
+        rel = (repo_root / file_path).resolve().relative_to(repo_root.resolve()).as_posix()
+    except ValueError:
+        return 0
 
     if not is_enforced(rel):
         return 0

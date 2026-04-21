@@ -273,6 +273,13 @@ class TestOutOfScope:
         result = run_hook(payload, cwd=repo)
         assert result.returncode == 2
 
+    def test_relative_dotdot_still_enforced(self, repo: Path):
+        """Regression: `docs/../hooks/new_guard.py` must resolve to the real
+        enforced path and deny — not bypass via naive string split."""
+        payload = make_write("docs/../hooks/new_guard.py")
+        result = run_hook(payload, cwd=repo)
+        assert result.returncode == 2
+
 
 # ---------------------------------------------------------------------------
 # TestLogging — double-log only on decisions; zero log on pass-through
@@ -565,3 +572,7 @@ class TestMainInProcess:
         abs_path = str(tmp_path.parent / "elsewhere" / "foo.py")
         payload = json.dumps(make_write(abs_path))
         assert self._run(monkeypatch, repo, payload) == 0
+
+    def test_write_relative_dotdot_still_enforced(self, monkeypatch, repo):
+        payload = json.dumps(make_write("docs/../hooks/new_guard.py"))
+        assert self._run(monkeypatch, repo, payload) == 2
