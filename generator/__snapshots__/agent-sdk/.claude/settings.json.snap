@@ -1,4 +1,4 @@
 {
-  "_note": "Esqueleto generado por pos (C5). La entrada 'hooks' es un objeto vacio; las definiciones reales las inserta 'pos' en Fase D cuando se copien los hooks ejecutables. No sembramos permissions baseline: ese contrato queda diferido hasta que el plugin lo requiera explicitamente.",
+  "_note": "Esqueleto generado por pos (C5). La entrada 'hooks' es un objeto vacío; las definiciones reales las inserta 'pos' en Fase D cuando se copien los hooks ejecutables. No sembramos permissions baseline: ese contrato queda diferido hasta que el plugin lo requiera explícitamente.",
   "hooks": {}
 }
