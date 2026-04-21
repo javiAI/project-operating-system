@@ -28,6 +28,39 @@
 
 El meta-repo nunca ejecuta código del proyecto destino. El proyecto destino nunca depende del meta-repo en runtime (todo se copia).
 
+### 1.1. Knowledge plane (opcional)
+
+> **Opcional.** Capa extra mountable *dentro* del repo generado, adoptable vía opt-in del questionnaire. Introducida como roadmap en [MASTER_PLAN.md § FASE G](../MASTER_PLAN.md); no implementada todavía.
+
+```
+┌────────────────────────────────────────┐
+│  META-REPO (control plane)             │
+└───────────────┬────────────────────────┘
+                │ genera
+                ▼
+┌────────────────────────────────────────┐
+│  REPO GENERADO (runtime plane)         │
+│                                        │
+│  [opcional] vault/ (knowledge plane):  │
+│    raw/       fuentes inmutables       │
+│    wiki/      síntesis (LLM + humano)  │
+│    schema.md  configuración            │
+└────────────────────────────────────────┘
+```
+
+**Tres capas separadas** (terminología adaptada del [gist de Karpathy sobre wikis LLM-friendly](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)):
+
+- `vault/raw/` — fuentes inmutables (artículos, papers, notas importadas, clippings). No se reescriben; se añaden.
+- `vault/wiki/` — síntesis mantenida por LLM o humano. Cross-referenced, git-diffable.
+- `vault/schema.md` — documento de configuración de la instancia: convenciones, reglas de síntesis, mapa de categorías.
+
+**Principios invariantes**:
+
+- **File-based**: todo es Markdown plano. Sin DB, sin formato propietario. Compatible con cualquier editor Markdown.
+- **Tool-agnostic**: no impone cliente editor. Obsidian + Web Clipper es el **primer reference adapter** previsto — ver [MASTER_PLAN.md § Rama G2](../MASTER_PLAN.md). Logseq, Foam y plain-text son compatibles por construcción.
+- **Opt-in**: el questionnaire añadirá `integrations.knowledge_plane.enabled` cuando G1 se cierre — shape candidato (bool único o sub-objeto `{ enabled, adapter, vault_path }`) a decidir en G1. Con flag off, `vault/` no se emite.
+- **Sin runtime compartido**: el knowledge plane vive en el repo generado, no en el meta-repo. El generador sólo emite el esqueleto; el mantenimiento es local al proyecto destino.
+
 ## 2. Cuestionario → profile → generación
 
 ### Flujo

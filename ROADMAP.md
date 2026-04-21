@@ -14,6 +14,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | E2 | Skills calidad | ⏳ pendiente |
 | E3 | Skills patterns + tests | ⏳ pendiente |
 | F | Audit + selftest + marketplace | ⏳ pendiente |
+| G | Knowledge Plane (opcional) | ⏳ solo planificación (scope cerrado, sin implementación) |
 
 ## Ramas
 
@@ -44,6 +45,11 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | `feat/f2-agents-subagents` | 3 subagents | ⏳ | — |
 | `feat/f3-selftest-end-to-end` | `bin/pos-selftest.sh` + escenarios | ⏳ | — |
 | `feat/f4-marketplace-public-repo` | `javiAI/pos-marketplace` + release flow | ⏳ | — |
+| `feat/fx-knowledge-plane-plan` | Docs-only: abre FASE G en MASTER_PLAN (capa opcional knowledge plane) | ⏳ | — |
+| `feat/g1-knowledge-plane-contract` | Contrato tool-agnostic (raw/wiki/schema) + opt-in questionnaire | ⏳ | — |
+| `feat/g2-adapter-obsidian-reference` | Primer reference adapter: esqueleto `vault/` + Obsidian Web Clipper | ⏳ | — |
+| `feat/g3-ingest-cli` | Stub CLI `pos knowledge ingest` (diferida) | ⏳ | — |
+| `feat/g4-wiki-lint` | Skill `/pos:knowledge-lint` (diferida) | ⏳ | — |
 
 ## Progreso Fase A
 

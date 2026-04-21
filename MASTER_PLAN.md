@@ -331,6 +331,65 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 
 ---
 
+## FASE G — Knowledge Plane (opcional)
+
+> Capa opcional mountable dentro del repo generado (runtime plane), no en el meta-repo ni "sobre" el control-plane; su adopción se activa vía opt-in del questionnaire. Ver [docs/ARCHITECTURE.md § 1.1](docs/ARCHITECTURE.md) para encaje arquitectónico y terminología de tres capas (raw / wiki / schema).
+>
+> **Estado**: planificada, sin fecha de ejecución. Puede reordenarse o descartarse sin impacto sobre A..F.
+
+### Rama G1 — `feat/g1-knowledge-plane-contract`
+
+**Scope**: fijar el contrato tool-agnostic de la capa. Markdown file-based, tres capas separadas (raw / wiki / schema).
+
+**Archivos (previstos)**:
+
+- `docs/KNOWLEDGE_PLANE.md` — especificación conceptual (shape de `schema.md`, convenciones `raw/` y `wiki/`, invariantes).
+- `.claude/rules/knowledge-plane.md` — rule path-scoped cuando se editan archivos bajo `vault/**`.
+- `questionnaire/schema.yaml` — añade opt-in `integrations.knowledge_plane.enabled`. **Candidate shape to be finalized in G1**: no se decide en esta rama si el opt-in es bool único o sub-objeto `{ enabled, adapter, vault_path }`.
+
+**NO incluye**: adapter concreto, renderer, ingest CLI, lint.
+
+**Cuestión abierta** (a resolver en G1): el término `schema.md` colisiona léxicamente con `questionnaire/schema.yaml` (ya canonical). G1 decide renombre (p.ej. `vault/_meta.md`, `vault/config.md`) o justifica coexistencia.
+
+**Contexto a leer**: [docs/ARCHITECTURE.md § 1.1](docs/ARCHITECTURE.md) (incluye link al gist de Karpathy sobre wikis LLM-friendly).
+
+**Criterio de salida**: contrato público legible sin ambigüedad sobre qué es "raw" vs "wiki" vs "schema"; opt-in testeable; cero código de adapter o ingest.
+
+### Rama G2 — `feat/g2-adapter-obsidian-reference`
+
+**Scope**: **primer reference adapter** sobre Obsidian + Obsidian Web Clipper. Renderer nuevo que, cuando `integrations.knowledge_plane.enabled` está on, emite esqueleto mínimo del vault:
+
+- `vault/schema.md` — template inicial (estructura, convenciones, cómo añadir fuentes).
+- `vault/raw/.gitkeep`
+- `vault/wiki/.gitkeep`
+
+Documenta Obsidian Web Clipper como **ingestor manual recomendado** (extensión oficial que guarda páginas web como Markdown en el vault). **Adapter de referencia, no definitivo**: el knowledge plane permanece file-based/tool-agnostic — cualquier editor Markdown (Logseq, Foam, plain-text) es compatible por construcción.
+
+**Archivos (previstos)**:
+
+- `templates/vault/schema.md.hbs`
+- `generator/renderers/knowledge-plane-obsidian.ts` + `*.test.ts` (co-located, patrón de C1–C5).
+- `generator/renderers/index.ts` — registrar en nuevo grupo congelado `knowledgePlaneRenderers` (patrón `renderer-group` de [.claude/rules/generator.md](.claude/rules/generator.md)).
+- `docs/ARCHITECTURE.md § 1.1` — ampliar con referencia al adapter entregado.
+
+**NO incluye**: ingest automático, LLM calls, sync runtime, múltiples adapters.
+
+**Criterio de salida**: con `integrations.knowledge_plane.enabled: true` en el profile, `npx tsx generator/run.ts --out <tmp>` emite `vault/` esqueleto; con flag off, no se emite nada. Tests semánticos sobre paths + contenido de `vault/schema.md`. Coverage ≥85% sobre el renderer nuevo.
+
+### Rama G3 — `feat/g3-ingest-cli` (diferida)
+
+**Scope**: stub CLI `pos knowledge ingest <path>`. Manual, sin LLM call, sin RAG. Copia/mueve un archivo a `vault/raw/` en posición canónica y emite un TODO en `vault/wiki/` para síntesis manual.
+
+**Razón de diferimiento**: requiere G1 y G2 cerradas; sin contrato no hay comando sobre qué actuar.
+
+### Rama G4 — `feat/g4-wiki-lint` (diferida)
+
+**Scope**: skill `/pos:knowledge-lint` + hook opcional. Detecta links rotos en `vault/wiki/**`, orphan pages (raw sin sintetizar), wiki sin raw correspondiente, `schema.md` incoherente con el contenido emitido.
+
+**Razón de diferimiento**: requiere ≥2 proyectos reales usando la capa para calibrar señales sin falsos positivos (CLAUDE.md regla #7).
+
+---
+
 ## §3. Progreso por fase
 
 Mantenido en [ROADMAP.md](ROADMAP.md). No duplicar estado aquí.
