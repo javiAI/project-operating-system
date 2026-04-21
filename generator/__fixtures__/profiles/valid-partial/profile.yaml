@@ -8,6 +8,10 @@
 # (schema declara defaults para ambos, pero buildProfile no los materializa hoy —
 # los templates de tests harness los referencian, por lo que el fixture los hace
 # explícitos hasta que defaults-in-profile se resuelva en una fase posterior).
+#
+# C4: mismo patrón — se añaden `workflow.ci_host` y `workflow.branch_protection`
+# explícitamente porque los templates de CI/CD los referencian y buildProfile
+# sigue sin materializar los defaults declarados en schema.yaml.
 
 version: "0.1.0"
 
@@ -21,3 +25,5 @@ answers:
   "testing.unit_framework": "vitest"
   "testing.coverage_threshold": 80
   "testing.e2e_framework": "none"
+  "workflow.ci_host": "github"
+  "workflow.branch_protection": true

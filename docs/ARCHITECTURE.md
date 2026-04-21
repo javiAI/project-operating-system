@@ -155,7 +155,7 @@ export function formatRenderSummary(
 tsx generator/run.ts --profile <path> [--validate-only | --dry-run | --out <dir>]
 ```
 
-Los tres modos son mutuamente exclusivos (error → exit 2). Sin flags = `--validate-only` (compat con B3). `--out <dir>` requiere directorio vacío (exit 3 si no). `--dry-run` lista los 13 paths emitidos + tamaños sin tocar fs (6 docs + `policy.yaml` + 2 rules + 4 test harness, el set exacto varía por stack; ver § Renderers). Schema hard-coded a `questionnaire/schema.yaml`.
+Los tres modos son mutuamente exclusivos (error → exit 2). Sin flags = `--validate-only` (compat con B3). `--out <dir>` requiere directorio vacío (exit 3 si no). `--dry-run` lista los 15 paths emitidos + tamaños sin tocar fs (6 docs + `policy.yaml` + 2 rules + 4 test harness + `ci.yml` + opcional `docs/BRANCH_PROTECTION.md`; el set exacto varía por stack y por `workflow.branch_protection`; ver § Renderers). Schema hard-coded a `questionnaire/schema.yaml`.
 
 **Exit codes**:
 
@@ -180,7 +180,7 @@ Los tres modos son mutuamente exclusivos (error → exit 2). Sin flags = `--vali
 - `--schema` flag — diferido hasta que exista 2º schema.
 - `--force` flag — fuera de scope C1; `--out` sobre dir no vacío aborta con exit 3.
 
-### Renderers (entregado en C1)
+### Renderers (entregado en C1, ampliado en C2, C3 y C4)
 
 Un renderer por output. Función pura `Renderer = (profile: Profile) => FileWrite[]`. Sin efectos secundarios, sin `Date.now()`, sin `Math.random()`, sin env vars del host.
 
@@ -204,13 +204,14 @@ export async function isDirEmpty(dir: string): Promise<boolean>;
 
 **Determinismo**: byte-identical entre runs. Tests asseveran con `JSON.stringify(renderAll(p, rs)) === JSON.stringify(renderAll(p, rs))`. Sin timestamps en templates (se añadirá `profile.metadata.generatedAt` inyectado desde fuera si una fase posterior lo requiere).
 
-**Lista actual** (C1 + C2 + C3, 13 archivos por profile):
+**Lista actual** (C1 + C2 + C3 + C4, 15 archivos por profile cuando `workflow.branch_protection == true`; 14 cuando `false`):
 
 - **Core docs** (C1, tuple congelada `coreDocRenderers`): CLAUDE.md, MASTER_PLAN.md, ROADMAP.md, HANDOFF.md, AGENTS.md, README.md.
 - **Policy + rules** (C2, tuple congelada `policyAndRulesRenderers`): `policy.yaml`, `.claude/rules/docs.md`, `.claude/rules/patterns.md`.
 - **Tests harness** (C3, tuple congelada `testsHarnessRenderers`, 1 renderer): set variable por stack. `typescript+vitest` → `tests/README.md` + `tests/smoke.test.ts` + `vitest.config.ts` + `Makefile`. `python+pytest` → `tests/README.md` + `tests/test_smoke.py` + `pytest.ini` + `Makefile`.
+- **CI/CD** (C4, tuple congelada `cicdRenderers`, 1 renderer): `.github/workflows/ci.yml` siempre (cuando `workflow.ci_host == "github"`); `docs/BRANCH_PROTECTION.md` sólo si `workflow.branch_protection == true`. `workflow.ci_host ∈ {gitlab, bitbucket}` → `Error` explícito desde el renderer ("deferred" + path del schema).
 
-Composición expuesta como `allRenderers` en [generator/renderers/index.ts](../generator/renderers/index.ts) — `Object.freeze([...coreDocRenderers, ...policyAndRulesRenderers, ...testsHarnessRenderers])`. `generator/run.ts` importa únicamente `allRenderers`; la composición no vive en `run.ts` para evitar que crezca por fase (decisión de Fase -1 de C2, consolidada en C3 como 3ª aplicación del patrón `renderer-group`).
+Composición expuesta como `allRenderers` en [generator/renderers/index.ts](../generator/renderers/index.ts) — `Object.freeze([...coreDocRenderers, ...policyAndRulesRenderers, ...testsHarnessRenderers, ...cicdRenderers])`. `generator/run.ts` importa únicamente `allRenderers`; la composición no vive en `run.ts` para evitar que crezca por fase (decisión de Fase -1 de C2, consolidada como 4ª aplicación del patrón `renderer-group` en C4).
 
 **`policy.yaml` — detalles del renderer**:
 
@@ -234,7 +235,17 @@ Composición expuesta como `allRenderers` en [generator/renderers/index.ts](../g
 - **Qué NO emite C3** (documentado en el `tests/README.md` emitido): `package.json` (TS), `pyproject.toml` (Python), `playwright.config.ts` (sólo mención en el README cuando `testing.e2e_framework != "none"`). Scope C3 es "test harness estructuralmente coherente", no "proyecto ejecutable end-to-end". La instalación real del stack + config e2e completa quedan diferidas.
 - `generator/__fixtures__/profiles/valid-partial/profile.yaml` declara `testing.coverage_threshold` + `testing.e2e_framework` explícitamente porque `buildProfile` no materializa defaults del schema todavía. Defaults-in-profile queda diferido a rama posterior.
 
-**Pendientes en C\***: CI/CD workflows (C4), copia de skills + hooks (C5).
+**`.github/workflows/ci.yml` + `docs/BRANCH_PROTECTION.md` — detalles del renderer** (C4):
+
+- Un solo renderer (`ci-cd.ts`) emite hasta 2 archivos según `workflow.ci_host` + `workflow.branch_protection`. Soportado en C4: `ci_host == "github"` únicamente. `gitlab` / `bitbucket` → `Error` explícito desde el renderer con host + "deferred" + path `workflow.ci_host` (mismo patrón que frameworks diferidos de C3; 0 repeticiones canónicas, CLAUDE.md regla #7).
+- `ci.yml` es estable: `name: ci`, trigger `pull_request`/`push` a `main`, job único `unit` con `runs-on: ubuntu-latest`. Stack conditionals: `typescript` → step `setup-node` pinned + Node 20.17.0 + step `Install test deps` (`npm install --no-save vitest@3.0.5 @vitest/coverage-v8@3.0.5`, versiones pinneadas alineadas con `package.json` del meta-repo); `python` → step `setup-python` pinned + 3.11 + step `Install test deps` (`pip install pytest==8.3.4 pytest-cov==6.0.0`, también pinneadas). Cada `uses:` pinneado por SHA40 (regla `.claude/rules/ci-cd.md`). El workflow **invoca `make test-unit` y `make test-coverage`** exclusivamente — nunca `npx vitest` / `pytest` directos (entry-point universal delegado al `Makefile` emitido por C3). Los `${{ github.* }}` literales se escapan con `\{{` en el template para evitar interpretación de Handlebars.
+- **Contrato del workflow** (cerrado en revisión de C4): el runner remoto NO depende de `package.json` / `pyproject.toml` emitidos (diferidos en C3). El step `Install test deps` instala las dependencias mínimas que el `Makefile` necesita en ambos stacks con versiones pinneadas (TS: `vitest` + `@vitest/coverage-v8`; Python: `pytest` + `pytest-cov`). Tests semánticos validan presencia + pins + orden pre-`make test-unit` en ambas ramas, más no-leak cruzado (TS sin `pip`/`pytest`; Python sin `npm`/`vitest`). Cuando C5/C6 emitan `package.json` / `pyproject.toml`, el step pasará a un `npm ci` / `pip install -e .[dev]` equivalente y los pins saldrán del manifest, no del workflow.
+- `BRANCH_PROTECTION.md` es dinámico: lista los jobs reales del `ci.yml` emitido + los targets Makefile invocados. Tests de consistencia cruzada validan que ambos archivos se mantienen coherentes. Markdown para aplicación manual en GitHub Settings — el generador **no** llama la API de GitHub (separación control-plane vs runtime-plane, § 1).
+- Runtime versions hardcoded en C4 (Node 20.17.0 coincide con `.nvmrc` del meta-repo; Python 3.11). Deuda documentada como futura rama en `.claude/rules/generator.md § Deferrals` (schema: añadir `stack.runtime_version`).
+- `workflow.release_strategy` y `release.yml` diferidos: las 3 ramas de release strategy divergen en pasos distintos, requieren rama propia.
+- `generator/__fixtures__/profiles/valid-partial/profile.yaml` declara `workflow.ci_host: "github"` + `workflow.branch_protection: true` explícitos (mismo workaround que C3 por defaults no materializados en `buildProfile`).
+
+**Pendientes en C\***: copia de skills + hooks (C5).
 
 **Cómo añadir un renderer**:
 
@@ -249,8 +260,8 @@ Composición expuesta como `allRenderers` en [generator/renderers/index.ts](../g
    ];
    ```
 3. Crear `generator/renderers/<x>.test.ts` primero (TDD): tests semánticos sobre paths emitidos + strings críticas + verificación de stack conditionals si aplica.
-4. Registrar en el array correspondiente de [generator/renderers/index.ts](../generator/renderers/index.ts): `coreDocRenderers` (C1), `policyAndRulesRenderers` (C2), o un **nuevo array congelado** si el renderer pertenece a un grupo nuevo (p.ej. `testsHarnessRenderers` en C3). Componer el nuevo array dentro de `allRenderers`. `run.ts` no se toca.
-5. Los snapshots por `profile × template` se autogeneran en `generator/__snapshots__/<slug>/*.snap` al correr vitest — revisar diff antes de commit. C1 aportó 18 (3 × 6); C2 los amplió a 27 (3 × 9); C3 los amplió a 39 (+12: 2 profiles TS × 4 templates + 1 profile Python × 4 templates). Los templates pueden variar por stack, así que el conteo ya no es estrictamente `profiles × templates` a partir de C3.
+4. Registrar en el array correspondiente de [generator/renderers/index.ts](../generator/renderers/index.ts): `coreDocRenderers` (C1), `policyAndRulesRenderers` (C2), `testsHarnessRenderers` (C3), `cicdRenderers` (C4), o un **nuevo array congelado** si el renderer pertenece a un grupo nuevo. Componer el nuevo array dentro de `allRenderers`. `run.ts` no se toca.
+5. Los snapshots por `profile × template` se autogeneran en `generator/__snapshots__/<slug>/*.snap` al correr vitest — revisar diff antes de commit. C1 aportó 18 (3 × 6); C2 los amplió a 27 (3 × 9); C3 los amplió a 39 (+12: 2 profiles TS × 4 templates + 1 profile Python × 4 templates); C4 los amplió a 45 (+6: 3 profiles × 2 archivos — `.github/workflows/ci.yml.snap` + `docs/BRANCH_PROTECTION.md.snap`). Los templates pueden variar por stack y por flags del profile, así que el conteo ya no es estrictamente `profiles × templates` desde C3.
 6. Si el renderer requiere un nuevo helper Handlebars, añadirlo en [generator/lib/handlebars-helpers.ts](../generator/lib/handlebars-helpers.ts) con tests de compilación real.
 
 **User-specific placeholders**: `buildProfile` inyecta literal `TODO(identity.name|description|owner)` cuando el profile no los declara. Los templates usan `{{answers.identity.name}}` directamente — no necesitan `{{#if}}` guards para estos tres. Emite warning por path vía `completenessCheck`; no bloquea emisión. La sustitución real pasará por el runner interactivo de fase posterior.
@@ -416,8 +427,23 @@ Ver `.claude/rules/ci-cd.md`. Principios:
 - Nada en CI que no corra local primero.
 - Workflows pinneados por SHA.
 - Secrets vía `secrets.*`, nunca hardcoded.
-- Coverage gate en CI usando threshold de `policy.yaml`.
+- Coverage gate en CI usando threshold de `policy.yaml` (delegado al `Makefile` vía `make test-coverage`).
 - Branch protection documentada en `docs/BRANCH_PROTECTION.md` (aplicación manual en GitHub Settings).
+
+### Qué emite C4
+
+El renderer `ci-cd.ts` (tuple `cicdRenderers`) emite hasta 2 archivos por profile, gobernados por `workflow.ci_host` + `workflow.branch_protection`:
+
+- **`.github/workflows/ci.yml`** — siempre que `ci_host == "github"`. Workflow mínimo estable (`name: ci`, job `unit` sobre `ubuntu-latest`). Stack conditionals para setup runtime (Node 20.17.0 / Python 3.11). `uses:` pinneados por SHA40. El workflow invoca `make test-unit` + `make test-coverage` exclusivamente — el Makefile emitido por C3 es el entry-point universal.
+- **`docs/BRANCH_PROTECTION.md`** — sólo si `branch_protection == true`. Markdown dinámico que lista los jobs reales del `ci.yml` emitido. Aplicación manual en GitHub Settings (el generador no llama la API de GitHub: separación control-plane vs runtime-plane, § 1).
+
+### Qué queda diferido (C4)
+
+- **`ci_host ∈ {gitlab, bitbucket}`**: `Error` explícito desde el renderer con host + "deferred" + path `workflow.ci_host`. 0 repeticiones en profiles canónicos (CLAUDE.md regla #7); reabrir cuando un profile canónico los adopte.
+- **`release.yml`**: las 3 ramas de `workflow.release_strategy` divergen en pasos distintos (publish vs tag-only vs push-on-main), mezclar en C4 duplica complejidad. Rama propia futura.
+- **`audit.yml` / nightly workflows**: dependen de infra (secrets, cron triggers) que excede el scope del harness mínimo.
+- **Matriz multi-OS / multi-runtime**: C4 emite `ubuntu-latest` + runtime único (20.17.0 / 3.11). Matrix real se difiere hasta que `stack.runtime_version` exista en el schema.
+- **Runtime versions en schema**: hardcoded en C4. Rama futura = añadir `stack.runtime_version` a `questionnaire/schema.yaml` + cablear en el template.
 
 ## 12. Safety para community tools
 

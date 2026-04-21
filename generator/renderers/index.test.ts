@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   allRenderers,
+  cicdRenderers,
   coreDocRenderers,
   policyAndRulesRenderers,
   testsHarnessRenderers,
@@ -64,12 +65,23 @@ describe("renderers/index — testsHarnessRenderers (C3)", () => {
   });
 });
 
+describe("renderers/index — cicdRenderers (C4)", () => {
+  it("exposes exactly 1 renderer (C4 scope)", () => {
+    expect(cicdRenderers).toHaveLength(1);
+  });
+
+  it("is frozen to prevent accidental mutation", () => {
+    expect(Object.isFrozen(cicdRenderers)).toBe(true);
+  });
+});
+
 const ALL_RENDERERS_EXPECTED_PATHS: ReadonlyArray<readonly [string, readonly string[]]> = [
   [
     "nextjs-app",
     [
       ".claude/rules/docs.md",
       ".claude/rules/patterns.md",
+      ".github/workflows/ci.yml",
       "AGENTS.md",
       "CLAUDE.md",
       "HANDOFF.md",
@@ -77,6 +89,7 @@ const ALL_RENDERERS_EXPECTED_PATHS: ReadonlyArray<readonly [string, readonly str
       "Makefile",
       "README.md",
       "ROADMAP.md",
+      "docs/BRANCH_PROTECTION.md",
       "policy.yaml",
       "tests/README.md",
       "tests/smoke.test.ts",
@@ -88,6 +101,7 @@ const ALL_RENDERERS_EXPECTED_PATHS: ReadonlyArray<readonly [string, readonly str
     [
       ".claude/rules/docs.md",
       ".claude/rules/patterns.md",
+      ".github/workflows/ci.yml",
       "AGENTS.md",
       "CLAUDE.md",
       "HANDOFF.md",
@@ -95,6 +109,7 @@ const ALL_RENDERERS_EXPECTED_PATHS: ReadonlyArray<readonly [string, readonly str
       "Makefile",
       "README.md",
       "ROADMAP.md",
+      "docs/BRANCH_PROTECTION.md",
       "policy.yaml",
       "tests/README.md",
       "tests/smoke.test.ts",
@@ -106,6 +121,7 @@ const ALL_RENDERERS_EXPECTED_PATHS: ReadonlyArray<readonly [string, readonly str
     [
       ".claude/rules/docs.md",
       ".claude/rules/patterns.md",
+      ".github/workflows/ci.yml",
       "AGENTS.md",
       "CLAUDE.md",
       "HANDOFF.md",
@@ -113,6 +129,7 @@ const ALL_RENDERERS_EXPECTED_PATHS: ReadonlyArray<readonly [string, readonly str
       "Makefile",
       "README.md",
       "ROADMAP.md",
+      "docs/BRANCH_PROTECTION.md",
       "policy.yaml",
       "pytest.ini",
       "tests/README.md",

@@ -8,7 +8,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 |---|---|---|
 | A | Skeleton & bootstrap | ✅ |
 | B | Cuestionario + profiles + runner | ✅ |
-| C | Templates + renderers | 🔄 en curso (C1 ✅, C2 ✅, C3 ✅, C4 siguiente) |
+| C | Templates + renderers | 🔄 en curso (C1 ✅, C2 ✅, C3 ✅, C4 ✅, C5 siguiente) |
 | D | Hooks (Python) | ⏳ pendiente |
 | E1 | Skills orquestación | ⏳ pendiente |
 | E2 | Skills calidad | ⏳ pendiente |
@@ -26,7 +26,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | `feat/c1-renderers-core-docs` | CLAUDE/MASTER_PLAN/ROADMAP/HANDOFF/AGENTS/README renderers + pipeline + `--out`/`--dry-run` wire-up | ✅ | #4 |
 | `feat/c2-renderers-policy-rules` | policy.yaml + rules path-scoped | ✅ | — |
 | `feat/c3-renderers-tests-harness` | Test harness mínimo por stack | ✅ | — |
-| `feat/c4-renderers-ci-cd` | GitHub/GitLab/Bitbucket workflows | ⏳ | — |
+| `feat/c4-renderers-ci-cd` | GitHub Actions CI workflow + BRANCH_PROTECTION doc (GitLab/Bitbucket diferidos) | ✅ | — |
 | `feat/c5-renderers-skills-hooks-copy` | Copia skills+hooks del plugin al proyecto destino | ⏳ | — |
 | `feat/d1-hook-pre-branch-gate` | Bloqueo `git checkout -b` sin marker | ⏳ | — |
 | `feat/d2-hook-session-start` | Snapshot 30s | ⏳ | — |
@@ -170,6 +170,31 @@ Entregables:
 - `Makefile` como entry-point universal (TS + Python); no se emite `package.json.scripts`. `vitest.config.ts` / `pytest.ini` mínimos pero válidos (incluyen coverage thresholds parametrizados desde el profile).
 - `playwright.config.ts` **no** se emite (sólo mención en el README de `nextjs-app` cuando `testing.e2e_framework != "none"`). Razón: configuración e2e requiere paths de navegador/base-url/project setup que exceden un harness mínimo; se difiere a una fase posterior.
 - `.claude/rules/tests.md` **no tocado** en C3 — el rule existente cubre ya la expectativa; expandirlo sin señal nueva sería ruido (guidance explícita Fase -1).
+
+### `feat/c4-renderers-ci-cd` — ✅
+
+Entregables:
+
+- `generator/renderers/ci-cd.ts` — renderer. Emite `.github/workflows/ci.yml` siempre (cuando `workflow.ci_host == "github"`); emite `docs/BRANCH_PROTECTION.md` sólo si `workflow.branch_protection == true`. `workflow.ci_host ∈ {gitlab, bitbucket}` → `Error` explícito con host + "deferred" + path del schema (mismo patrón que C3 con `jest`/`go-test`/`cargo-test`).
+- 2 templates Handlebars: `templates/.github/workflows/ci.yml.hbs` (workflow estable `name: ci`, job único `unit`, stack-aware: TS→`setup-node` pinned + Node 20.17.0; Python→`setup-python` pinned + 3.11 + `pip install pytest pytest-cov`; invoca `make test-unit` y `make test-coverage` exclusivamente — nunca `npx vitest`/`pytest` directos; `${{ github.* }}` escapado con `\{{` para evitar interpretación de Handlebars); `templates/docs/BRANCH_PROTECTION.md.hbs` (doc dinámica listando job `unit` + targets Makefile invocados, consistente con el workflow).
+- `generator/renderers/index.ts` — nuevo export `cicdRenderers` (frozen, 1 renderer). `allRenderers` recompuesto a `[...coreDocRenderers, ...policyAndRulesRenderers, ...testsHarnessRenderers, ...cicdRenderers]`. `run.ts` intacto (4ª aplicación del patrón `renderer-group`).
+- `generator/__fixtures__/profiles/valid-partial/profile.yaml` — añadidos `workflow.ci_host: "github"` + `workflow.branch_protection: true` explícitos (mismo workaround que C3 por `buildProfile` sin materialización de defaults).
+- Tests: `generator/renderers/ci-cd.test.ts` (paths por profile canónico, `yaml.parse(ci.yml)` OK, `name: ci` + `on.pull_request`/`push` estables, todas las `uses:` con SHA40 pin, job names estables `{unit}`, `make test-unit` Y `make test-coverage` aserciones independientes, prohibido `npx vitest`/`pytest` directos, stack conditionals sin leaks, consistencia cruzada `ci.yml` ↔ `BRANCH_PROTECTION.md`, `branch_protection=false` → sólo `ci.yml`, gitlab/bitbucket → Error con host + path + "deferred", trailing `\n`, determinismo byte-identical). `generator/renderers/index.test.ts` extendido con `cicdRenderers` (length 1 + frozen) y `ALL_RENDERERS_EXPECTED_PATHS` actualizado a 15 paths por profile.
+- Snapshots: +6 (3 profiles × 2 archivos: `.github/workflows/ci.yml.snap` + `docs/BRANCH_PROTECTION.md.snap`). Total: 39 (C1+C2+C3) + 6 (C4) = 45.
+- `generator/run.test.ts` actualizado: `runRender` returns 15 entries (was 13), dry-run header `/15 file\(s\) would be emitted/`, CLI integration `--out` writes top-level 13 entries (añade `.github` y `docs`) + readFileSync checks para `.github/workflows/ci.yml` (`/^name:\s*ci\s*$/m`), `docs/BRANCH_PROTECTION.md` (`/Branch Protection/`).
+
+**Ajustes vs plan original** (Fase -1 aprobada):
+
+- **Solo `ci.yml`** (A1). No `audit.yml` ni `release.yml` — quedan fuera de scope (release.yml depende de `workflow.release_strategy` con 3 ramas que divergen en pasos; rama propia posterior).
+- **Runtime versions hardcoded** (A2): Node 20.17.0 (coincide con `.nvmrc` del meta-repo) + Python 3.11. Deuda documentada como rama futura en `.claude/rules/generator.md § Deferrals` (*schema: añadir `stack.runtime_version`*). Comentario breve en template, sin ensayos.
+- **Coverage gate delegado al Makefile C3** (A3). El workflow solo invoca; no duplica lógica de thresholds.
+- **`BRANCH_PROTECTION.md` dinámico** (A4): lista los jobs del `ci.yml` emitido, test de consistencia cruzada garantiza que ambos archivos se mantienen coherentes.
+- **`gitlab` / `bitbucket` diferidos con `Error` explícito** (A5): mismo patrón que frameworks diferidos de C3. 0 repeticiones documentadas en profiles canónicos (CLAUDE.md #7). Reabrir cuando un profile canónico los adopte.
+- **`branch_protection=false` → sólo `ci.yml`** (A6). No se emite `docs/BRANCH_PROTECTION.md` si el usuario desactiva la protección.
+- **Python toolchain minimal** (no `uv`): `actions/setup-python` + `pip install pytest==8.3.4 pytest-cov==6.0.0`. Coherente con C3 que no emite `pyproject.toml`. Preferencia fuerte de toolchain (uv, poetry, pdm) se pospone hasta una rama que haga justificable la decisión desde el output actual del proyecto generado.
+- **Contrato del workflow cerrado en revisión** (ajuste post-Fase-1 tras 2 pases de Copilot): ambas ramas declaran `Install test deps` con versiones pinneadas — TS: `npm install --no-save vitest@3.0.5 @vitest/coverage-v8@3.0.5` (alineado con `package.json` del meta-repo); Python: `pip install pytest==8.3.4 pytest-cov==6.0.0`. Tests semánticos en ambos stacks: presencia del step + versiones pinneadas + orden pre-`make test-unit`, más no-leak cruzado (TS sin `pip`/`pytest`; Python sin `npm`/`vitest`). Cuando C5/C6 emita `package.json`/`pyproject.toml`, migrar a `npm ci` / `pip install -e .[dev]` y sacar los pins al manifest.
+- **Header comment de `BRANCH_PROTECTION.md.hbs`**: rebajado de "Dynamic: mirrors…" a guía alineada con el workflow + aviso explícito de que la lista de required checks se actualiza a mano (evita sugerir sincronización automática).
+- **Branch protection no se aplica programáticamente**: documento markdown + aplicación manual en GitHub Settings. Mantiene la separación control-plane vs runtime-plane (ARCHITECTURE.md §1).
 
 ## Convenciones de este archivo
 
