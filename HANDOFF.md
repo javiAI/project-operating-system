@@ -5,7 +5,7 @@
 ## 1. Snapshot
 
 - Repo: `project-operating-system` (plugin `pos`).
-- Fase actual: **C3 ✅ cerrada en rama** (`feat/c3-renderers-tests-harness`, PR pendiente de abrir). Anterior: **C2 ✅ PR #5** + compound PR #6 (`9d35a29`). Siguiente: **C4 — `feat/c4-renderers-ci-cd`**.
+- Fase actual: **C4 ✅ cerrada en rama** (`feat/c4-renderers-ci-cd`, PR pendiente de abrir). Anterior: **C3 ✅ PR #7** (`77d7e43`). Siguiente: **C5 — `feat/c5-renderers-skills-hooks-copy`**.
 - Fuente de verdad ejecutable: [MASTER_PLAN.md](MASTER_PLAN.md).
 - Estado vivo: [ROADMAP.md](ROADMAP.md).
 - Arquitectura canonical: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -87,6 +87,7 @@ Ejecuta §2.1 Fase -1 completo. Espera aprobación explícita antes de `git chec
 - **C1 (`feat/c1-renderers-core-docs`)** ✅ [parcial completada]: Fase N+7 propagada en `templates/HANDOFF.md.hbs` (matriz + checklist) y `templates/AGENTS.md.hbs` (Fase N+7 como última fase del flujo de rama).
 - **C2 (`feat/c2-renderers-policy-rules`)** ✅ **carry-over cerrado**: `templates/.claude/rules/docs.md.hbs` incluye el bullet "Trazabilidad de contexto" referenciando `HANDOFF.md §3`. Todo proyecto generado con `pos` hereda ya la disciplina completa de context-management.
 - **C3 (`feat/c3-renderers-tests-harness`)** ✅ sin carry-over abierto. Frameworks diferidos (`jest`, `go-test`, `cargo-test`) quedan como fallo explícito dentro de `renderTests(...)` — se retomarán sólo cuando un profile canónico los adopte (≥1 repetición → reevaluar con regla #7 CLAUDE.md). `package.json` / `pyproject.toml` / `playwright.config.ts` diferidos también, documentados en el README emitido ("Qué NO emite C3").
+- **C4 (`feat/c4-renderers-ci-cd`)** ✅ sin carry-over abierto. `gitlab` / `bitbucket` diferidos con `Error` explícito dentro de `ci-cd.ts` — mismo patrón que C3 (reabrir sólo si un profile canónico los adopta). `release.yml` / `audit.yml` diferidos a rama propia (ramas de `workflow.release_strategy` divergen). `stack.runtime_version` no existe en schema → Node 20.17.0 + Python 3.11 hardcoded en template C4; deuda documentada en `.claude/rules/generator.md § Deferrals`. Python toolchain mínimo (`pip install pytest pytest-cov`); adoptar `uv`/`poetry`/`pdm` se pospone hasta que C5/C6 emita `pyproject.toml`.
 
 ## 7. Gotchas del entorno
 
@@ -120,30 +121,32 @@ Hasta que `pos` tenga sus propias skills:
 
 ## 9. Próxima rama
 
-**C4 — `feat/c4-renderers-ci-cd`**
+**C5 — `feat/c5-renderers-skills-hooks-copy`**
 
-Scope (ver [MASTER_PLAN.md § Rama C4](MASTER_PLAN.md)):
+Scope (ver [MASTER_PLAN.md § Rama C5](MASTER_PLAN.md)):
 
-- Renderer para `.github/workflows/*.yml` (+ variantes GitLab/Bitbucket si aplica). Los workflows emitidos coinciden con los checks locales que C3 declara en `Makefile` (`make test-unit`, `make test-coverage`). Branch protection documentada en `docs/BRANCH_PROTECTION.md` emitido.
-- Registrarse en un nuevo array congelado (p.ej. `cicdRenderers`) y componerse en `allRenderers` desde `generator/renderers/index.ts`. Patrón `renderer-group` (ver `.claude/patterns/`).
+- Renderers para copiar skills (`.claude/skills/pos/**`) + hooks (`hooks/**`) del meta-repo al proyecto generado, con customización de paths según el profile destino. Primer punto del pipeline donde `FileWrite` puede requerir el campo `mode` (hooks ejecutables = bit +x). Decidir en Fase -1 si extender el shape a `{ path, content, mode? }` o mantener binary bits fuera del manifiesto.
+- Registrar nuevo array congelado (p.ej. `skillsHooksRenderers`) y componerse en `allRenderers`. 5ª aplicación del patrón `renderer-group`.
 
 Lectura mínima al arrancar:
 
-- [MASTER_PLAN.md § Rama C4](MASTER_PLAN.md)
-- [docs/ARCHITECTURE.md § Renderers](docs/ARCHITECTURE.md) + [§ 11 CI/CD integrado](docs/ARCHITECTURE.md#11-cicd-integrado)
-- [.claude/rules/generator.md](.claude/rules/generator.md) + [.claude/rules/ci-cd.md](.claude/rules/ci-cd.md) (si existe) + [.claude/rules/templates.md](.claude/rules/templates.md)
-- `generator/renderers/index.ts` + `templates/Makefile.hbs` (targets que los workflows deben invocar) + `generator/renderers/tests.ts` (stack detection del que C4 puede aprender).
+- [MASTER_PLAN.md § Rama C5](MASTER_PLAN.md)
+- [docs/ARCHITECTURE.md § Renderers](docs/ARCHITECTURE.md) + [§ 4 Hooks](docs/ARCHITECTURE.md) + [§ 5 Skills](docs/ARCHITECTURE.md)
+- [.claude/rules/generator.md](.claude/rules/generator.md) (Renderers + Deferrals) + [.claude/rules/templates.md](.claude/rules/templates.md) + [.claude/rules/skills-map.md](.claude/rules/skills-map.md)
+- `generator/renderers/index.ts` + `generator/lib/render-pipeline.ts` (shape de `FileWrite`) + estructura de `.claude/skills/` + `hooks/` (aún vacíos; skills se pueblan en E, hooks en D — valorar si C5 copia sólo esqueleto o difiere la copia completa hasta D/E).
 
-## 10. Estado C3 (cerrada en rama)
+## 10. Estado C4 (cerrada en rama)
 
-Test harness mínimo emitido por stack. 13 archivos por profile (6 docs + `policy.yaml` + 2 rules + 4 test harness). Pipeline `allRenderers` compone `coreDocRenderers + policyAndRulesRenderers + testsHarnessRenderers` desde `generator/renderers/index.ts`. Detalle de entregables en [ROADMAP.md § Progreso Fase C](ROADMAP.md); pipeline documentada en [docs/ARCHITECTURE.md § Renderers](docs/ARCHITECTURE.md).
+CI/CD workflow (`ci.yml`) + doc markdown `BRANCH_PROTECTION.md` emitidos por stack. 15 archivos por profile cuando `workflow.branch_protection == true` (14 si `false`): 6 docs + `policy.yaml` + 2 rules + 4 test harness + `ci.yml` + `docs/BRANCH_PROTECTION.md` opcional. Pipeline `allRenderers` compone `coreDocRenderers + policyAndRulesRenderers + testsHarnessRenderers + cicdRenderers` desde `generator/renderers/index.ts`. Detalle en [ROADMAP.md § Progreso Fase C](ROADMAP.md); pipeline documentada en [docs/ARCHITECTURE.md § Renderers](docs/ARCHITECTURE.md) + [§ 11 CI/CD integrado](docs/ARCHITECTURE.md#11-cicd-integrado).
 
-Apuntes para quien arranque C4:
+Apuntes para quien arranque C5:
 
-- Patrón `renderer-group` consolidado (3ª aplicación: core + policy/rules + tests-harness). C4 = 4ª aplicación — crear `cicdRenderers` congelado y componerlo en `allRenderers`. `run.ts` no se toca.
-- Stack detection ya probado: `answers.stack.language` + `answers.testing.unit_framework` gobiernan el set emitido. Combinaciones soportadas: `typescript+vitest`, `python+pytest`. Resto diferidos con fallo explícito en el renderer.
-- Entry-point universal es el `Makefile` emitido. C4 debe hacer que los workflows invoquen `make test-unit` / `make test-coverage` (no llamar `npx vitest` / `pytest` directo desde el yaml).
-- `buildProfile` no materializa defaults del schema: si C4 emplea `answers.testing.coverage_threshold` u otros paths con `default:`, actualizar los 3 profiles canónicos + el fixture `valid-partial` (mismo patrón que C3).
-- Snapshots por convención en `generator/__snapshots__/<slug>/<path>.snap`. +12 archivos añadidos en C3; total actual 39.
-- Frameworks diferidos en C3 (`jest`, `go-test`, `cargo-test`) siguen diferidos hasta que un profile canónico los adopte. No reabrir en C4 salvo señal explícita.
-- Carry-over Fase N+7: **sin carry-over abierto** al arrancar C4.
+- Patrón `renderer-group` consolidado (4ª aplicación: core + policy/rules + tests-harness + ci-cd). C5 = 5ª aplicación — crear `skillsHooksRenderers` congelado y componerlo en `allRenderers`. `run.ts` no se toca.
+- **Decisión abierta de C5**: `FileWrite` shape hoy es `{ path, content }`. Hooks ejecutables requieren bit `+x` → probable extensión a `{ path, content, mode? }`. Documentar la decisión en Fase -1 de C5 (decisión histórica prevista ya en C1/C2/C3/C4: "se añade en C5 si hooks ejecutables lo requieren").
+- CI hosts no-github (`gitlab`, `bitbucket`) siguen diferidos. C5 no los reabre salvo señal explícita.
+- `release.yml` / `audit.yml` / matrix multi-OS y multi-runtime siguen diferidos. Ramas propias futuras.
+- Runtime version hardcoding (Node 20.17.0 / Python 3.11) en template C4 — si C5 toca paths de hooks que dependen de runtime, respetar la misma convención hasta que `stack.runtime_version` exista en schema.
+- `buildProfile` sigue sin materializar defaults: `valid-partial` declara 4 paths explícitos hoy (`testing.coverage_threshold`, `testing.e2e_framework`, `workflow.ci_host`, `workflow.branch_protection`). Si C5 usa más paths con `default:`, actualizar los 3 canonicals + `valid-partial` (mismo patrón).
+- Snapshots por convención en `generator/__snapshots__/<slug>/<path>.snap`. +6 archivos añadidos en C4; total actual 45 (18 C1 + 9 C2 + 12 C3 + 6 C4).
+- Entry-point universal sigue siendo el `Makefile` emitido por C3. Los workflows invocan `make test-unit` + `make test-coverage`. Si C5 añade hooks ejecutables, valorar si se añaden targets al Makefile o se invocan directamente.
+- Carry-over Fase N+7: **sin carry-over abierto** al arrancar C5.

@@ -150,9 +150,24 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 - **Tests adicionales del plan original** (requeridos en Fase -1): trailing `\n` en todos los FileWrite emitidos; TS sin rastro de `pytest`; Python sin rastro de `vitest`; 1 test por framework diferido (no aggregated).
 - **`.claude/rules/tests.md` NO tocado** — expandirlo sin señal nueva sería ruido (guidance explícita Fase -1). La rule existente cubre la expectativa de patrón renderer-group + snapshot testing.
 
-### Rama C4 — `feat/c4-renderers-ci-cd`
+### Rama C4 — `feat/c4-renderers-ci-cd` ✅
 
-**Scope**: renderer para `.github/workflows/*.yml` (+ GitLab/Bitbucket variants). Workflows coinciden con checks locales. Branch protection doc.
+**Scope**: renderer para `.github/workflows/ci.yml` + `docs/BRANCH_PROTECTION.md` (dinámico). 4ª aplicación del patrón `renderer-group`.
+
+**Ajustes vs plan original** (Fase -1 aprobada):
+
+- **Solo `ci.yml`** (A1). `audit.yml` y `release.yml` quedan fuera de scope (release.yml depende de `workflow.release_strategy` con lógicas divergentes → rama posterior).
+- **Runtime versions hardcoded** (A2): Node `20.17.0` + Python `3.11`. Deuda documentada como rama futura (*schema: añadir `stack.runtime_version`*) en `.claude/rules/generator.md § Deferrals`. Comentario breve en el template, no ensayo.
+- **Coverage gate delegado al `Makefile` C3** (A3): el workflow invoca `make test-unit` y `make test-coverage` sin duplicar thresholds.
+- **`BRANCH_PROTECTION.md` dinámico** (A4): lista los jobs del `ci.yml` emitido (consistencia cruzada testeada).
+- **`ci_host ∈ {gitlab, bitbucket}` → `Error` explícito** (A5) dentro del renderer (host + `deferred` + path `workflow.ci_host`), mismo patrón que frameworks diferidos de C3. Razón: 0 repeticiones documentadas, CLAUDE.md #7.
+- **`branch_protection == false` → sólo `ci.yml`** (A6). No se emite `docs/BRANCH_PROTECTION.md` cuando la protección está desactivada.
+- **Python toolchain minimal** (ajuste explícito del usuario): `actions/setup-python` + `pip install pytest pytest-cov`. Sin `uv`/`poetry`/`pdm` — coherente con C3 que no emite `pyproject.toml`. Preferencia fuerte de toolchain se difiere hasta una rama que la haga justificable desde el output actual del proyecto generado.
+- **Composición en `generator/renderers/index.ts`, no en `run.ts`** (heredado de C2/C3): nuevo array congelado `cicdRenderers` compuesto en `allRenderers`. `run.ts` intacto.
+- **Fixture `valid-partial` actualizado** con `workflow.ci_host` + `workflow.branch_protection` explícitos (workaround heredado de C3 por `buildProfile` sin materialización de defaults).
+- **Branch protection se aplica manualmente**: el doc markdown describe la configuración recomendada; el generador no llama a la GitHub API (control-plane vs runtime-plane, ARCHITECTURE.md §1).
+
+**Criterio de salida** (cumplido): 15 `FileWrite` por profile (9 C1+C2 + 4 C3 + 2 C4), `yaml.parse(ci.yml)` OK sobre los 3 canonicals, SHA40 pins en todas las `uses:`, mutual-exclusión de stack conditionals, 45 snapshots estables, coverage ≥85%, CI verde.
 
 ### Rama C5 — `feat/c5-renderers-skills-hooks-copy`
 
