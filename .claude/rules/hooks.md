@@ -21,7 +21,9 @@ paths:
 - Campos output standard: `hookSpecificOutput.hookEventName`, `additionalContext`, `permissionDecision`, `decisionReason`.
 - Exit code 0 = éxito; exit code 2 = blocking error (Claude Code lo interpreta como `deny`).
 - Timeout por defecto: 5000ms (configurable en `settings.local.json`).
-- Política safe-fail sobre payload malformado: stdin vacío, JSON inválido, top-level no-dict o campos con tipo imposible de interpretar se tratan como `deny` explícito (exit 2 + `decisionReason` que explica el error), no como pass-through. Un hook que no puede validar su entrada no debe dejarla pasar.
+- Política safe-fail sobre payload malformado — **dos variantes según el evento**:
+  - **Blocker** (`PreToolUse`, `PreCompact`, `Stop`): stdin vacío, JSON inválido, top-level no-dict o campos con tipo imposible de interpretar → `deny` explícito (exit 2 + `decisionReason` que explica el error), nunca pass-through. Un hook que no puede validar su entrada no debe dejarla pasar. Referencia: `pre-branch-gate.py` (D1).
+  - **Informative** (`SessionStart`, `UserPromptSubmit` si llegara): nunca emite `permissionDecision`, nunca exit 2. Payload malformado → `additionalContext` mínimo (p.ej. `(error reading payload: <msg>)`) + entrada en `_log_error` (solo `session-start.jsonl`). Errores de subprocess/git → `additionalContext` mínimo + `_log_snapshot` sigue emitiendo la entrada happy-path (campos que dependen de git caen a `None`/`"unknown"`); lo que se omite es el *error log* (helpers tipo `_git` devuelven `None` sin invocar `_log_error`). Fallos del propio logging (disk full, RO fs) se tragan vía wrapper tipo `_safe_append`. Exit 0 siempre. Bloquear un evento informativo dejaría al usuario sin contexto sin ganancia de enforcement. Excepción canónica, no aplicable a blocker hooks. Referencia: `session-start.py` (D2).
 
 ## Estructura
 
@@ -64,13 +66,43 @@ Cada hook nuevo pasa por `/pos:audit-plugin` antes de entrar en `policy.yaml`. E
 
 ## Primer hook entregado — `hooks/pre-branch-gate.py` (Rama D1)
 
-Referencia de estructura para todos los hooks posteriores:
+Referencia del patrón **blocker** (PreToolUse):
 
 - Pass-through silencioso: cero stdout salvo cuando el hook tiene algo que decir (deny). Nunca loggea en pass-through (evita ruido en `.claude/logs/`).
 - Detección del contexto Bash con `shlex.split` (no regex). Maneja global options git pre-subcommand (`git -c k=v ...`, `--git-dir=X`, `-C /path`).
-- Sanitización de slug (`/` → `_`) como función local, no helper. Regla #7 (≥2 reps antes de abstraer) — extraer a `hooks/_lib/` sólo cuando un segundo hook la reuse.
 - `decisionReason` constructivo: ruta exacta del recurso esperado + comando sugerido (`touch <path>`) + referencia textual a docs (`MASTER_PLAN.md`). Sin parseo de docs ni inferencia.
-- Double log: `.claude/logs/<hook-name>.jsonl` (shape propio) + `.claude/logs/phase-gates.jsonl` (evento canónico del lifecycle). Las ramas D2..D6 siguen este shape.
+- Double log: `.claude/logs/<hook-name>.jsonl` (shape propio) + `.claude/logs/phase-gates.jsonl` (evento canónico del lifecycle). Las ramas D3..D6 siguen este shape.
 - Tests pytest: 23 subprocess (integración end-to-end) + 32 in-process (coverage visible, carga del módulo con `importlib.util.spec_from_file_location` por guión en el nombre). `.venv` local + `requirements-dev.txt` mínimo.
+
+## Segundo hook entregado — `hooks/session-start.py` (Rama D2)
+
+Referencia del patrón **informative** (SessionStart) — primera aplicación de la excepción safe-fail graceful:
+
+- Emite `hookSpecificOutput.additionalContext` con snapshot ≤10 líneas (Branch / Phase / Last merge / Warnings). Sin `permissionDecision`, sin exit 2 bajo ningún camino.
+- Fase derivada vía regex `^(feat|fix|chore|refactor)[/_]([a-z])(\d+)-` sobre nombre de rama; fallback a `.claude/logs/phase-gates.jsonl` en `main`/`master`; `unknown` si ninguna fuente resuelve. No parsea `ROADMAP.md`/`MASTER_PLAN.md` (evita acoplamiento + coste).
+- Subprocess git robusto: `shell=False`, `cwd=` explícito, `timeout=2`, `check=False`, captura `FileNotFoundError` + `SubprocessError`; `None` en error — el caller decide degradación. Ningún camino sube excepción.
+- Warnings estructurales (no conversacionales): marker ausente + docs-sync pendiente. Suprimidos en `main`/`master` y cuando git no está disponible.
+- Double log: `session-start.jsonl` + `phase-gates.jsonl` (evento `session_start`). Mismo shape que D1.
+- Tests pytest: 30 subprocess + 36 in-process (66 total). `TestMainInProcess` específicamente para cubrir los caminos git (pytest-cov no mide subprocess). 95% coverage sobre `session-start.py`.
+
+## Helpers compartidos — `hooks/_lib/` (extraído en D2)
+
+Segunda repetición de CLAUDE.md regla #7 cumplida (D1 + D2 = 2 hooks reusando los mismos patrones). Contenido mínimo:
+
+- `_lib/slug.py::sanitize_slug` (`/` → `_`).
+- `_lib/jsonl.py::append_jsonl` (append-only JSONL).
+- `_lib/time.py::now_iso` (UTC ISO-8601).
+- `_lib/__init__.py` vacío (package marker).
+
+**Cómo consumir desde un hook con nombre hyphenated** (no importable como módulo Python):
+
+```python
+sys.path.insert(0, str(Path(__file__).parent))
+from _lib.slug import sanitize_slug  # noqa: E402
+from _lib.jsonl import append_jsonl  # noqa: E402
+from _lib.time import now_iso  # noqa: E402
+```
+
+Las ramas D3..D6 **deben reusar** estos helpers en lugar de redefinir. Añadir a `_lib/` sólo cuando ≥2 hooks usen el nuevo helper (regla #7 sigue aplicando incrementalmente). No añadir tests en `hooks/tests/test_lib/` salvo que `_lib/` crezca a lógica no trivial — se testea via los hooks que lo consumen.
 
 Ver [ROADMAP.md § Progreso Fase D](../../ROADMAP.md) para el detalle de entregables y ajustes.

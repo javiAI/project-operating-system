@@ -221,7 +221,26 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 
 ### Rama D2 — `feat/d2-hook-session-start`
 
-**Scope**: `hooks/session-start.py` — snapshot 30s (rama actual, último merge, fase en curso, warnings).
+**Status**: ✅ COMPLETADA (PR pendiente).
+
+**Scope entregado**: `hooks/session-start.py` — snapshot 30s (branch / phase / last merge / warnings) como `hookSpecificOutput.additionalContext` en cada `SessionStart` (source `startup` / `resume` / `clear` / `compact`). Double log: `.claude/logs/session-start.jsonl` (shape propio) + `.claude/logs/phase-gates.jsonl` (evento `session_start`). Hook informativo: nunca bloquea — payload malformado o git indisponible degradan a snapshot mínimo + log de error, exit 0 siempre. En paralelo: extracción de `hooks/_lib/` (segunda repetición de CLAUDE.md regla #7) con rewire de D1 en el mismo PR.
+
+**Ajustes vs plan original** (Fase -1 aprobada con decisiones A1/B1/C1/E1/F/G/H1/I):
+
+- **Extracción `hooks/_lib/` ejecutada en este PR** (decisión A1): `slug.sanitize_slug`, `jsonl.append_jsonl`, `time.now_iso`. `_lib/__init__.py` vacío (package marker). D1 rewireado en el mismo commit de refactor: sus 60 tests siguen verdes (re-export `pbg.sanitize_slug` preservado). No se extrae helper de git subprocess — `_git` permanece local a `session-start.py` hasta que un segundo hook lo reuse (regla #7, primera repetición).
+- **Imports sin package formal** (decisión B1): `sys.path.insert(0, str(Path(__file__).parent))` + `from _lib.X import Y  # noqa: E402` en ambos hooks. El nombre hyphenated no es importable como módulo; `_lib` sí (package). Sin renombrar los hooks ni crear setup.py.
+- **Derivación de fase híbrida** (decisión C1): regex `^(feat|fix|chore|refactor)[/_]([a-z])(\d+)-` sobre nombre de rama (case-insensitive; salida canónica `[A-Z]\d+`, p.ej. `D2`). En `main`/`master` fallback a `.claude/logs/phase-gates.jsonl` con recorrido hacia delante conservando la última fase parseable (streaming O(1) memoria). `unknown` si ninguna fuente resuelve. No se parsea `ROADMAP.md` ni `MASTER_PLAN.md` (evita acoplamiento + coste).
+- **Warning docs-sync** (decisión E1): se emite cuando `git diff --name-only main..HEAD` no incluye `ROADMAP.md` ni `HANDOFF.md`. Suprimido cuando la rama es `main`/`master` y cuando git no está disponible (evita falsos positivos en repos recién clonados o sin `main`).
+- **Warning marker ausente** (decisión F): se emite cuando `.claude/branch-approvals/<sanitized-slug>.approved` no existe sobre cualquier rama distinta de `main`/`master` (slug sanitizado vía `_lib.slug.sanitize_slug`, idéntico al de `pre-branch-gate`). Suprimido en `main`/`master`.
+- **Safe-fail informativo canonicalizado** (decisión G): excepción explícita a la política general de blocker hooks (D1/D3/D4/D6). `SessionStart` es informativo por naturaleza — degradar a snapshot mínimo + log de error es preferible a exit 2, que dejaría al usuario sin contexto. Matización añadida a `.claude/rules/hooks.md` y `docs/ARCHITECTURE.md §7 Capa 1`.
+- **Sin diferenciación por `source`** en el output del snapshot (decisión H1): `startup` / `resume` / `clear` / `compact` producen el mismo payload. El `source` se loggea en `session-start.jsonl` y `phase-gates.jsonl` para futuros análisis (F3 `/pos:audit-session`), pero no modula el texto emitido al LLM. Simplicidad > personalización prematura.
+- **Subprocess git robusto** (decisión I): `_git(cwd, *args)` con `shell=False`, `cwd=` explícito, `timeout=2`, `check=False`. Captura `FileNotFoundError` (git no instalado) + `subprocess.SubprocessError` (timeout/interrupt). Return `None` en cualquier error; el caller decide degradación. Ningún camino sube excepción.
+- **Snapshot ≤10 líneas** (ajuste del usuario sobre el plan original): prosa mínima, formato determinista (`pos snapshot` header + 4 líneas fijas + bloque de warnings opcional). `Warnings: (none)` cuando no hay warnings para evitar ambigüedad de ausencia. Contenido estrictamente útil, sin repetir info derivable del propio Claude Code (session_id, tools disponibles, etc.).
+- **Sin `hooks/tests/test_lib/`** (ajuste del usuario): `_lib/` se testea únicamente via los tests de los hooks que lo consumen. Lógica trivial (una línea por función); crear suite paralela sería sobreingeniería. Regla #7 aplica también a tests: la justificación vendría sólo si `_lib/` creciera a lógica no trivial.
+- **Test pattern replicado de D1**: 66 tests nuevos (subprocess + in-process via `importlib.util.spec_from_file_location`). `TestMainInProcess` añadió 5 tests post-GREEN para cubrir los caminos git (subprocess tests no son visibles a pytest-cov). Coverage final: 95% sobre `session-start.py`, 99% combinado.
+- **`.claude/settings.json` no modificado**: ya referenciaba `./hooks/session-start.py` desde Fase A (mismo patrón que D1).
+
+**Criterio de salida**: 126 tests verdes (60 D1 intactos + 66 D2), coverage ≥80% lines / ≥75% branches (alcanzado 99% combinado), `_lib/` consumido por al menos 2 hooks (D1 + D2) con tests de ambos pasando, docs-sync en el propio PR (ROADMAP + HANDOFF + MASTER_PLAN + ARCHITECTURE + `.claude/rules/hooks.md`), hook instalado (snapshot visible al arrancar una nueva sesión). Cumplido.
 
 ### Rama D3 — `feat/d3-hook-pre-write-guard`
 

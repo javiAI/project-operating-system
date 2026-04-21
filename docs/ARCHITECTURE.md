@@ -340,14 +340,35 @@ Cada agent declara sus tools permitidas (`allowed-tools:`) — subset mínimo. U
 
 Código Python/bash. Exit code 2 = bloqueo. El LLM no puede ignorarlos. Son el último recurso de enforcement.
 
-**Implementación canónica — `hooks/pre-branch-gate.py`** (entregado en rama D1):
+**Dos variantes canónicas** según el evento:
 
-- Shebang `#!/usr/bin/env python3` + stdlib-only (json, shlex, sys, pathlib, datetime).
+- **Blocker** (PreToolUse / PreCompact / Stop): safe-fail estricto — payload malformado → `deny` + exit 2 + `decisionReason`. El hook no puede dejar pasar lo que no puede validar. Referencia: `hooks/pre-branch-gate.py` (D1).
+- **Informative** (SessionStart): safe-fail graceful — nunca emite `permissionDecision`, nunca exit 2. Payload malformado → `additionalContext` mínimo + entrada en `session-start.jsonl` vía `_log_error` (no se escribe a `phase-gates.jsonl`). Errores de git/subprocess → `additionalContext` mínimo + `_log_snapshot` sigue emitiendo la entrada happy-path (`branch=None`, `phase="unknown"`) en ambos logs; lo que se omite es la entrada de *error* (absorbidos por `_git` como `None`, sin `_log_error`). Fallos del propio logging (disk full, read-only fs) se tragan vía `_safe_append`. Exit 0 siempre. Bloquear un evento informativo dejaría al usuario sin contexto sin ganancia de enforcement. Referencia: `hooks/session-start.py` (D2).
+
+**Implementación canónica blocker — `hooks/pre-branch-gate.py`** (entregado en rama D1):
+
+- Shebang `#!/usr/bin/env python3` + stdlib-only (json, shlex, sys, pathlib).
 - Lee JSON de stdin; `permissionDecision: deny` + `decisionReason` en stdout cuando bloquea.
-- Exit codes: `0` en allow + pass-through; `2` en bloqueo y en payload malformado (stdin vacío, JSON inválido, top-level no-dict, `tool_input` no-dict para un `Bash` call). Política safe-fail: un payload que no podemos interpretar se deniega, no se pasa.
+- Exit codes: `0` en allow + pass-through; `2` en bloqueo y en payload malformado (stdin vacío, JSON inválido, top-level no-dict, `tool_input` no-dict para un `Bash` call).
 - Pass-through silencioso (sin stdout, sin log) para non-Bash tools, `tool_input` ausente o `null`, `command` vacío, y comandos Bash que no crean rama.
 - Detección con `shlex.split` (robusto a quoting + global options git pre-subcommand).
-- Double log: `.claude/logs/<hook-name>.jsonl` propio + `.claude/logs/phase-gates.jsonl` (evento canónico del ciclo, p.ej. `branch_creation`). Las ramas D2..D6 siguen este mismo shape.
+- Double log: `.claude/logs/<hook-name>.jsonl` propio + `.claude/logs/phase-gates.jsonl` (evento canónico del ciclo, p.ej. `branch_creation`).
+
+**Implementación canónica informative — `hooks/session-start.py`** (entregado en rama D2):
+
+- Shebang + stdlib-only (json, re, subprocess, sys, pathlib).
+- Emite `hookSpecificOutput.additionalContext` con snapshot ≤10 líneas (Branch / Phase / Last merge / Warnings).
+- Fase derivada vía regex `^(feat|fix|chore|refactor)[/_]([a-z])(\d+)-` sobre nombre de rama; en `main`/`master` fallback a `.claude/logs/phase-gates.jsonl` (último evento con slug parseable). `unknown` si ninguna fuente resuelve.
+- Warnings: marker ausente (`.claude/branch-approvals/<sanitized>.approved`) + docs-sync pendiente (diff `main..HEAD` sin tocar `ROADMAP.md` ni `HANDOFF.md`). Suprimidos en `main`/`master` y cuando git no está disponible.
+- Subprocess git con `shell=False`, `cwd=` explícito, `timeout=2`, `check=False`, captura `FileNotFoundError` + `SubprocessError`; `None` en cualquier error — el caller decide degradación.
+- Exit 0 siempre. Payload malformado → snapshot mínimo `(error reading payload: ...)` + log a `.claude/logs/session-start.jsonl`. `phase-gates.jsonl` sólo recibe el evento `session_start` en el happy path (parse OK). Nunca emite `permissionDecision`.
+
+**Helpers compartidos — `hooks/_lib/`** (extraído en D2 tras segunda repetición, CLAUDE.md regla #7):
+
+- `_lib/slug.py::sanitize_slug` (`/` → `_`).
+- `_lib/jsonl.py::append_jsonl` (append-only JSONL).
+- `_lib/time.py::now_iso` (UTC ISO-8601).
+- Consumidos desde hooks con nombre hyphenated via `sys.path.insert(0, str(Path(__file__).parent))` + `from _lib.X import Y  # noqa: E402` (sin convertir el hook a package formal). Las ramas D3..D6 deben reusar estos helpers en lugar de redefinir; añadir a `_lib/` sólo cuando ≥2 hooks usen el nuevo helper.
 
 ### Capa 2: Logs auditables
 

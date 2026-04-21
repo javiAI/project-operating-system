@@ -11,8 +11,12 @@ from __future__ import annotations
 import json
 import shlex
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from _lib.jsonl import append_jsonl  # noqa: E402
+from _lib.slug import sanitize_slug  # noqa: E402
+from _lib.time import now_iso  # noqa: E402
 
 HOOK_EVENT = "PreToolUse"
 HOOK_NAME = "pre-branch-gate"
@@ -30,10 +34,6 @@ GIT_GLOBAL_OPTS_WITH_ARG = {
     "--exec-path",
     "--upload-pack",
 }
-
-
-def sanitize_slug(slug: str) -> str:
-    return slug.replace("/", "_")
 
 
 def _flag_value(args: list[str], flag: str) -> str | None:
@@ -79,16 +79,6 @@ def extract_branch_slug(command: str) -> str | None:
 
 def marker_path(repo_root: Path, sanitized_slug: str) -> Path:
     return repo_root / APPROVALS_DIR / f"{sanitized_slug}.approved"
-
-
-def append_jsonl(path: Path, entry: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-
-
-def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 
 def build_deny_reason(marker: Path, command: str) -> str:
