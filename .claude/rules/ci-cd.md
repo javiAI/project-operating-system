@@ -17,12 +17,14 @@ El hook `pre-push.sh` corre la suite local; GitHub Actions corre la misma suite 
 
 ## Workflows obligatorios (meta-repo)
 
-1. **`.github/workflows/ci.yml`** — por PR y push a `main`:
-   - Lint + format check (eslint, prettier, ruff).
-   - Typecheck (`tsc --noEmit` para generador; `mypy` para hooks).
-   - Unit tests (vitest generador; pytest hooks).
-   - Integración (`./bin/pos-selftest.sh`).
-   - Snapshot diff check (valida templates deterministic).
+1. **`.github/workflows/ci.yml`** — por PR y push a `main`. Entregado de forma incremental, rama a rama. La versión actual cubre:
+   - **Aterrizado**: typecheck generator (`tsc --noEmit`), validación cuestionario + profiles, render generator dry-run, unit tests generator (vitest con coverage), unit tests hooks (pytest, matriz ubuntu + macos × Python 3.10/3.11).
+   - **Diferidos a rama dedicada** (declarados en `policy.yaml.pre_push.checks_required` como `command_meta`, no enforzados aún):
+     - Lint + format check (`eslint`, `prettier`, `ruff`).
+     - Typecheck hooks (`mypy hooks/`).
+     - Integración (`./bin/pos-selftest.sh`).
+     - Snapshot diff check (valida templates deterministic).
+   - **Invariante**: cuando una rama añade un check al workflow, también mueve su bullet de "Diferidos" a "Aterrizado" y ajusta el bloque `command_meta` en `policy.yaml` si procede.
 
 2. **`.github/workflows/audit.yml`** — nightly + on-demand:
    - Re-corre `/pos:audit-plugin --self` en el propio repo.

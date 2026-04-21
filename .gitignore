@@ -21,6 +21,13 @@ coverage/
 /out/
 /generated/
 
+# Python
+/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+
 # Editor
 .idea/
 .vscode/

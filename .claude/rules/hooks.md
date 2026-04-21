@@ -21,6 +21,7 @@ paths:
 - Campos output standard: `hookSpecificOutput.hookEventName`, `additionalContext`, `permissionDecision`, `decisionReason`.
 - Exit code 0 = éxito; exit code 2 = blocking error (Claude Code lo interpreta como `deny`).
 - Timeout por defecto: 5000ms (configurable en `settings.local.json`).
+- Política safe-fail sobre payload malformado: stdin vacío, JSON inválido, top-level no-dict o campos con tipo imposible de interpretar se tratan como `deny` explícito (exit 2 + `decisionReason` que explica el error), no como pass-through. Un hook que no puede validar su entrada no debe dejarla pasar.
 
 ## Estructura
 
@@ -60,3 +61,16 @@ if __name__ == "__main__":
 ## Auditoría
 
 Cada hook nuevo pasa por `/pos:audit-plugin` antes de entrar en `policy.yaml`. El auditor valida las reglas duras + scope declarado.
+
+## Primer hook entregado — `hooks/pre-branch-gate.py` (Rama D1)
+
+Referencia de estructura para todos los hooks posteriores:
+
+- Pass-through silencioso: cero stdout salvo cuando el hook tiene algo que decir (deny). Nunca loggea en pass-through (evita ruido en `.claude/logs/`).
+- Detección del contexto Bash con `shlex.split` (no regex). Maneja global options git pre-subcommand (`git -c k=v ...`, `--git-dir=X`, `-C /path`).
+- Sanitización de slug (`/` → `_`) como función local, no helper. Regla #7 (≥2 reps antes de abstraer) — extraer a `hooks/_lib/` sólo cuando un segundo hook la reuse.
+- `decisionReason` constructivo: ruta exacta del recurso esperado + comando sugerido (`touch <path>`) + referencia textual a docs (`MASTER_PLAN.md`). Sin parseo de docs ni inferencia.
+- Double log: `.claude/logs/<hook-name>.jsonl` (shape propio) + `.claude/logs/phase-gates.jsonl` (evento canónico del lifecycle). Las ramas D2..D6 siguen este shape.
+- Tests pytest: 23 subprocess (integración end-to-end) + 32 in-process (coverage visible, carga del módulo con `importlib.util.spec_from_file_location` por guión en el nombre). `.venv` local + `requirements-dev.txt` mínimo.
+
+Ver [ROADMAP.md § Progreso Fase D](../../ROADMAP.md) para el detalle de entregables y ajustes.

@@ -197,9 +197,27 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 
 ### Rama D1 — `feat/d1-hook-pre-branch-gate`
 
-**Scope**: `hooks/pre-branch-gate.py` + tests. Bloquea `git checkout -b` / `git switch -c` sin marker.
+**Status**: ✅ COMPLETADA (PR pendiente).
+
+**Scope entregado**: `hooks/pre-branch-gate.py` + test pair pytest + bootstrap test env (`.venv` + `requirements-dev.txt`). Bloquea `git checkout -b`, `git switch -c`, `git worktree add -b` sin marker `.claude/branch-approvals/<sanitized-slug>.approved`. `permissionDecision: deny` + exit 2 con `decisionReason` informativo (ruta marker + `touch` sugerido + ref textual a `MASTER_PLAN.md`). Pass-through silencioso en el resto. Double log: `.claude/logs/pre-branch-gate.jsonl` + `.claude/logs/phase-gates.jsonl` (evento `branch_creation`).
 
 **Referencia**: ver [master_repo_blueprint.md](master_repo_blueprint.md) y el homólogo del repo de referencia (mentalmente; NO copiar literal).
+
+**Ajustes vs plan original** (Fase -1 aprobada):
+
+- **Alcance ampliado**: además del `checkout -b` / `switch -c` del plan original, cubre también `git worktree add -b` (bypass obvio que el plan no cubría). `git branch <slug>` deliberadamente excluido (ref sin checkout, no inicia trabajo).
+- **Sin bypass env var** (rechazado `POS_SKIP_BRANCH_GATE=1`). Bypass legítimo = crear marker explícito.
+- **Parsing con `shlex.split`** (robusto a quoting + global options git pre-subcommand: `git -c k=v ...`, `--git-dir=X`, `-C /path`).
+- **Double log** desde D1 (`pre-branch-gate.jsonl` + `phase-gates.jsonl`): prepara `/pos:audit-session` (F3) sin refactor posterior.
+- **Mensaje al bloquear** con `decisionReason` que incluye ruta del marker, `touch` sugerido, y referencia textual a `MASTER_PLAN.md`. Sin parseo del plan ni inferencia de sección específica.
+- **Sin `hooks/_lib/` compartido**: CLAUDE.md regla #7 (≥2 reps antes de abstraer). D1 es la primera repetición; D2 (`session-start`) será la señal para extraer helpers (`sanitize_slug`, `append_jsonl`, `now_iso`).
+- **Bootstrap de test env dentro de esta rama**: `.venv` + `requirements-dev.txt` (solo `pytest>=7` + `pytest-cov>=4`). `.gitignore` añade entradas Python (`/.venv/`, `__pycache__/`, `*.pyc`, `.pytest_cache/`, `.coverage`). **Sin ruff**, **sin `bin/pos-selftest.sh`** (ambos explícitamente fuera de scope D1).
+- **In-process tests añadidos** (+32 sobre los 23 subprocess): pytest-cov no mide subprocesses; se cargan el módulo vía `importlib.util.spec_from_file_location` (por guión en el nombre del archivo) y se invoca `main()` con `monkeypatch` de `sys.stdin` + `chdir`. 60 tests total, 99% coverage (única línea no cubierta: `sys.exit(main())` bajo `__main__` guard).
+- **`.claude/settings.json` no modificado**: ya referenciaba `./hooks/pre-branch-gate.py` desde Fase A. D1 sólo materializa el binario ausente.
+- **Review follow-up** (post-PR #11, Copilot + feedback humano):
+  - Validación de `tool_input`: si es `null` → `{}` (pass-through); si no es `dict` → `deny` exit 2. Evita `AttributeError` en payloads malformados con `tool_input` lista/string.
+  - Contract de stdin explicitado en `docs/ARCHITECTURE.md §7` y `.claude/rules/hooks.md`: payload malformado (stdin vacío, JSON inválido, top-level no-dict, `tool_input` no-dict) → `deny` exit 2 con `decisionReason`, no pass-through. Política safe-fail ahora canónica para todos los hooks.
+  - CI: nuevo job `python` en `.github/workflows/ci.yml` (matriz ubuntu + macos × Python 3.10/3.11, pytest + coverage). D1 pasa a estar cubierto por CI real, no sólo por pytest local. Alineado con `.claude/rules/ci-cd.md §Workflows obligatorios §1`.
 
 ### Rama D2 — `feat/d2-hook-session-start`
 
