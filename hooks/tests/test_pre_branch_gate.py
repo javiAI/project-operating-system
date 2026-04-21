@@ -363,6 +363,15 @@ class TestMainInProcess:
     def test_bash_no_tool_input_returns_0(self, monkeypatch, repo):
         assert self._run(monkeypatch, repo, '{"tool_name": "Bash"}') == 0
 
+    def test_bash_null_tool_input_returns_0(self, monkeypatch, repo):
+        assert self._run(monkeypatch, repo, '{"tool_name": "Bash", "tool_input": null}') == 0
+
+    def test_bash_list_tool_input_returns_2(self, monkeypatch, repo):
+        assert self._run(monkeypatch, repo, '{"tool_name": "Bash", "tool_input": [1,2]}') == 2
+
+    def test_bash_string_tool_input_returns_2(self, monkeypatch, repo):
+        assert self._run(monkeypatch, repo, '{"tool_name": "Bash", "tool_input": "ls"}') == 2
+
     def test_bash_empty_command_returns_0(self, monkeypatch, repo):
         payload = '{"tool_name": "Bash", "tool_input": {"command": "   "}}'
         assert self._run(monkeypatch, repo, payload) == 0

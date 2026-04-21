@@ -127,7 +127,13 @@ def main() -> int:
     if payload.get("tool_name") != "Bash":
         return 0
 
-    tool_input = payload.get("tool_input") or {}
+    tool_input = payload.get("tool_input")
+    if tool_input is None:
+        tool_input = {}
+    elif not isinstance(tool_input, dict):
+        emit_deny("pre-branch-gate: tool_input must be a JSON object.")
+        return 2
+
     command = tool_input.get("command")
     if not isinstance(command, str) or not command.strip():
         return 0

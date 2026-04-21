@@ -21,6 +21,7 @@ paths:
 - Campos output standard: `hookSpecificOutput.hookEventName`, `additionalContext`, `permissionDecision`, `decisionReason`.
 - Exit code 0 = éxito; exit code 2 = blocking error (Claude Code lo interpreta como `deny`).
 - Timeout por defecto: 5000ms (configurable en `settings.local.json`).
+- Política safe-fail sobre payload malformado: stdin vacío, JSON inválido, top-level no-dict o campos con tipo imposible de interpretar se tratan como `deny` explícito (exit 2 + `decisionReason` que explica el error), no como pass-through. Un hook que no puede validar su entrada no debe dejarla pasar.
 
 ## Estructura
 

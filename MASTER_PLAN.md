@@ -212,8 +212,12 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 - **Mensaje al bloquear** con `decisionReason` que incluye ruta del marker, `touch` sugerido, y referencia textual a `MASTER_PLAN.md`. Sin parseo del plan ni inferencia de sección específica.
 - **Sin `hooks/_lib/` compartido**: CLAUDE.md regla #7 (≥2 reps antes de abstraer). D1 es la primera repetición; D2 (`session-start`) será la señal para extraer helpers (`sanitize_slug`, `append_jsonl`, `now_iso`).
 - **Bootstrap de test env dentro de esta rama**: `.venv` + `requirements-dev.txt` (solo `pytest>=7` + `pytest-cov>=4`). `.gitignore` añade entradas Python (`/.venv/`, `__pycache__/`, `*.pyc`, `.pytest_cache/`, `.coverage`). **Sin ruff**, **sin `bin/pos-selftest.sh`** (ambos explícitamente fuera de scope D1).
-- **In-process tests añadidos** (+32 sobre los 23 subprocess): pytest-cov no mide subprocesses; se cargan el módulo vía `importlib.util.spec_from_file_location` (por guión en el nombre del archivo) y se invoca `main()` con `monkeypatch` de `sys.stdin` + `chdir`. 55 tests total, 99% coverage (única línea no cubierta: `sys.exit(main())` bajo `__main__` guard).
+- **In-process tests añadidos** (+32 sobre los 23 subprocess): pytest-cov no mide subprocesses; se cargan el módulo vía `importlib.util.spec_from_file_location` (por guión en el nombre del archivo) y se invoca `main()` con `monkeypatch` de `sys.stdin` + `chdir`. 60 tests total, 99% coverage (única línea no cubierta: `sys.exit(main())` bajo `__main__` guard).
 - **`.claude/settings.json` no modificado**: ya referenciaba `./hooks/pre-branch-gate.py` desde Fase A. D1 sólo materializa el binario ausente.
+- **Review follow-up** (post-PR #11, Copilot + feedback humano):
+  - Validación de `tool_input`: si es `null` → `{}` (pass-through); si no es `dict` → `deny` exit 2. Evita `AttributeError` en payloads malformados con `tool_input` lista/string.
+  - Contract de stdin explicitado en `docs/ARCHITECTURE.md §7` y `.claude/rules/hooks.md`: payload malformado (stdin vacío, JSON inválido, top-level no-dict, `tool_input` no-dict) → `deny` exit 2 con `decisionReason`, no pass-through. Política safe-fail ahora canónica para todos los hooks.
+  - CI: nuevo job `python` en `.github/workflows/ci.yml` (matriz ubuntu + macos × Python 3.10/3.11, pytest + coverage). D1 pasa a estar cubierto por CI real, no sólo por pytest local. Alineado con `.claude/rules/ci-cd.md §Workflows obligatorios §1`.
 
 ### Rama D2 — `feat/d2-hook-session-start`
 
