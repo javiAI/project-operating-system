@@ -244,7 +244,22 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 
 ### Rama D3 — `feat/d3-hook-pre-write-guard`
 
-**Scope**: `hooks/pre-write-guard.py` — enforza test-pair, inyecta patterns path-scoped, bloquea anti-patterns.
+**Scope (entregado)**: `hooks/pre-write-guard.py` — PreToolUse(Write) blocker que enforza test-pair sobre `hooks/*.py` top-level + `generator/**/*.ts`. Shape canónico blocker (D1), no informative (D2).
+
+**Ajustes vs plan original** (Fase -1 aprobada):
+
+- **Scope recortado a sólo test-pair enforcement**. El plan original mencionaba además "inyecta patterns path-scoped, bloquea anti-patterns". Ambas piezas **diferidas a rama post-E3a**: `.claude/patterns/` y `.claude/anti-patterns/` están vacías hasta que `/pos:compound` las pueble en E3a; implementar inyector/bloqueador sobre dirs vacíos sería código sin datos (CLAUDE.md regla #7). D3 recortado sigue cerrando el criterio funcional de CLAUDE.md regla #3 (desbloquea TDD hard-enforced para E*).
+- **Contrato explícito del hook** (crystal-clear en la suite y en `.claude/rules/hooks.md`):
+  - enforced + archivo inexistente + sin test pair → deny exit 2.
+  - enforced + archivo inexistente + con test pair → allow exit 0.
+  - enforced + archivo ya existente → allow exit 0 (edit flow; D4 detecta pérdida de cobertura sobre impl existente).
+  - excluido o fuera de scope → pass-through silencioso (cero log).
+- **`generator/run.ts` queda enforced** uniforme (no se introduce excepción). Tiene `generator/run.test.ts` co-located, así que nunca bloquea hoy.
+- **Clasificador con dos buckets de exclusión separados** (`.claude/rules/hooks.md`): (1) tests/docs/templates/meta; (2) helper internals `hooks/_lib/**` (decisión repo D2, motivo distinto, clase separada en la suite).
+- **`file_path` ausente o no-string → pass-through** (no es malformación total del payload). Distinto de `tool_input` no-dict que sí es deny.
+- **Lista de paths hardcoded**. Mover a `policy.yaml` diferido a D4 (cuando `policy.yaml` esté enforced).
+- **Evento canónico en phase-gates**: `pre_write` (se suma a `branch_creation` de D1 y `session_start` de D2).
+- **Sin waiver `// test-waiver: <razón>`** pese a estar mencionado en `.claude/rules/tests.md`. Ningún caso real lo demanda hoy (regla #7 — evidencia antes de abstraer).
 
 ### Rama D4 — `feat/d4-hook-pre-pr-gate`
 

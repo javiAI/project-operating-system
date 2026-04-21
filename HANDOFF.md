@@ -5,7 +5,7 @@
 ## 1. Snapshot
 
 - Repo: `project-operating-system` (plugin `pos`).
-- Fase actual: **D2 ✅ cerrada en rama** (`feat/d2-hook-session-start`, PR pendiente de abrir). Anterior: **D1 ✅ PR #11** (`c3354d0`). Siguiente: **D3 — `feat/d3-hook-pre-write-guard`**.
+- Fase actual: **D3 ✅ cerrada en rama** (`feat/d3-hook-pre-write-guard`, PR pendiente de abrir). Anterior: **D2 ✅ PR #12** (`1346178`). Siguiente: **D4 — `feat/d4-hook-pre-pr-gate`**.
 - Fuente de verdad ejecutable: [MASTER_PLAN.md](MASTER_PLAN.md).
 - Estado vivo: [ROADMAP.md](ROADMAP.md).
 - Arquitectura canonical: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -94,7 +94,8 @@ Ejecuta §2.1 Fase -1 completo. Espera aprobación explícita antes de `git chec
 
 - El hook `pre-branch-gate.py` **ya está vivo** desde D1: `git checkout -b`, `git switch -c` y `git worktree add -b` sin marker quedan bloqueados por exit 2 + `permissionDecision: deny`. El bypass legítimo es crear marker explícito.
 - El hook `session-start.py` **ya está vivo** desde D2: imprime snapshot (branch, phase, last merge, warnings) como `additionalContext` en cada SessionStart (`startup` / `resume` / `clear` / `compact`). Informativo, nunca bloquea — errores de payload o git degradan a snapshot mínimo + log de error (exit 0 siempre).
-- Otros hooks referenciados en `.claude/settings.json` (`pre-write-guard.py`, `post-action.py`, `pre-compact.py`, `stop-policy-check.py`) siguen ausentes — tolerados por Claude Code como no-op. Entregados en D3..D6.
+- El hook `pre-write-guard.py` **ya está vivo** desde D3: PreToolUse(Write) blocker. Bloquea con exit 2 la creación de archivos en paths enforced (`hooks/*.py` top-level + `generator/**/*.ts` excluyendo tests/fixtures) sin test pair co-located. Pass-through silencioso en edits sobre archivos existentes, en `hooks/_lib/**`, en tests/docs/templates/meta, y en paths fuera del repo. Bypass legítimo: crear primero `hooks/tests/test_<x>.py` o `<path>.test.ts` con un test que falle (RED), luego escribir la implementación.
+- Otros hooks referenciados en `.claude/settings.json` (`post-action.py`, `pre-compact.py`, `stop-policy-check.py`) siguen ausentes — tolerados por Claude Code como no-op. Entregados en D4..D6.
 - `policy.yaml` declarado pero no enforced todavía (Fase D4). Hasta entonces, docs-sync requiere disciplina manual.
 - `/pos:*` skills no existen aún (Fase E*). Invocaciones fallarán silenciosas. Usar comportamiento manual equivalente.
 
@@ -123,44 +124,48 @@ Hasta que `pos` tenga sus propias skills:
 
 ## 9. Próxima rama
 
-**D3 — `feat/d3-hook-pre-write-guard`**
+**D4 — `feat/d4-hook-pre-pr-gate`**
 
-Scope (ver [MASTER_PLAN.md § Rama D3](MASTER_PLAN.md)):
+Scope (ver [MASTER_PLAN.md § Rama D4](MASTER_PLAN.md)):
 
-- Tercer hook Python: `hooks/pre-write-guard.py` — enforza test-pair en `generator/**` y `hooks/**` (test antes que implementación, CLAUDE.md regla #3), inyecta patterns path-scoped como `additionalContext`, bloquea anti-patterns declarados.
+- Cuarto hook Python: `hooks/pre-pr-gate.py` — valida `policy.yaml` contra logs reales antes de abrir PR. Chequeos incluidos en el scope textual del plan: docs-sync (`ROADMAP.md` + `HANDOFF.md` + condicionales según `lifecycle.pre_pr.docs_sync_conditional`), skills required (qué skills deberían haber corrido según el lifecycle), CI dry-run, invariants. Shape blocker (PreToolUse(Bash) matcher `gh pr create` / `git push`).
 
 Lectura mínima al arrancar:
 
-- [MASTER_PLAN.md § Rama D3](MASTER_PLAN.md)
-- [docs/ARCHITECTURE.md § 7 Determinismo](docs/ARCHITECTURE.md) (Capa 1 ya con pre-branch-gate + session-start como canónicos)
-- [.claude/rules/hooks.md](.claude/rules/hooks.md) (ahora con "Segundo hook entregado" + matización safe-fail blocking vs informative)
-- [hooks/pre-branch-gate.py](hooks/pre-branch-gate.py) + [hooks/session-start.py](hooks/session-start.py) como patrones de referencia (blocker vs informative)
-- [hooks/_lib/](hooks/_lib/) — helpers ya extraídos en D2 (`slug.sanitize_slug`, `jsonl.append_jsonl`, `time.now_iso`)
+- [MASTER_PLAN.md § Rama D4](MASTER_PLAN.md)
+- [policy.yaml](policy.yaml) — esquema ya declarado en Fase A; D4 es el primer enforzador real.
+- [.claude/rules/hooks.md](.claude/rules/hooks.md) (ya con "Tercer hook entregado" D3 + buckets de exclusión separados)
+- [docs/ARCHITECTURE.md § 7 Determinismo](docs/ARCHITECTURE.md) (Capa 1 con pre-branch-gate + session-start + pre-write-guard como canónicos)
+- [hooks/pre-branch-gate.py](hooks/pre-branch-gate.py) + [hooks/pre-write-guard.py](hooks/pre-write-guard.py) como patrones de referencia blocker (2 aplicaciones; reglas específicas distintas pero shape idéntico).
+- [hooks/_lib/](hooks/_lib/) — `append_jsonl` + `now_iso` disponibles. Añadir al `_lib/` sólo si ≥2 hooks consumen el nuevo helper (regla #7).
+- [.claude/logs/phase-gates.jsonl](.claude/logs/) — D4 lee este archivo para validar policy-vs-logs; eventos ya presentes: `branch_creation` (D1), `session_start` (D2), `pre_write` (D3). D4 añadirá `pre_pr` (o equivalente).
 
-## 10. Estado D2 (cerrada en rama)
+## 10. Estado D3 (cerrada en rama)
 
-`session-start` vivo: en cada `SessionStart` (source `startup` / `resume` / `clear` / `compact`) emite `hookSpecificOutput.additionalContext` con snapshot ≤10 líneas (Branch / Phase / Last merge / Warnings). Fase derivada vía regex `^(feat|fix|chore|refactor)[/_]([a-z])(\d+)-` sobre nombre de rama; en `main`/`master` hace fallback a `.claude/logs/phase-gates.jsonl` (último evento con slug parseable); `unknown` si ninguna fuente resuelve. Warnings: marker ausente (`.claude/branch-approvals/<sanitized>.approved`) + docs-sync pendiente (diff `main..HEAD` sin tocar `ROADMAP.md` ni `HANDOFF.md`, suprimidos en `main`/`master` y cuando git no está disponible). Safe-fail informativo: payload malformado (stdin vacío, JSON inválido, top-level no-dict) → exit 0 + snapshot mínimo con `(error reading payload: ...)` + log de error; excepción canónica vs blocker hooks. Double log a `.claude/logs/session-start.jsonl` + `phase-gates.jsonl` (evento `session_start`). 126 tests totales (D1 60 intactos + D2 66 nuevos), 99% coverage combinado, 95% sobre `session-start.py`.
+`pre-write-guard` vivo: en cada `PreToolUse(Write)` evalúa `tool_input.file_path`, lo normaliza contra `Path.cwd()`, y aplica el clasificador de 2 buckets de exclusión (tests/docs/templates/meta + `hooks/_lib/**`). Contrato crystal-clear:
 
-`hooks/_lib/` extraído (segunda repetición de CLAUDE.md regla #7 cumplida):
+- enforced + archivo inexistente + sin test pair → deny exit 2 con `decisionReason` que lista la ruta exacta esperada + comando `touch` + referencia a CLAUDE.md regla #3 + el write bloqueado.
+- enforced + archivo inexistente + con test pair → allow exit 0 (log en ambos archivos).
+- enforced + archivo ya existente → allow exit 0 — edit flow explícito (log en ambos archivos; D4 `pre-pr-gate` detecta la pérdida de cobertura sobre impl existente).
+- excluido o fuera de scope → pass-through silencioso (cero stdout, cero log).
 
-- `_lib/slug.py::sanitize_slug` (`/` → `_`).
-- `_lib/jsonl.py::append_jsonl` (append-only JSONL).
-- `_lib/time.py::now_iso` (UTC ISO-8601).
-- `_lib/__init__.py` vacío (package marker).
-- D1 rewireado en el mismo PR: `pre-branch-gate.py` ahora importa desde `_lib` vía `sys.path.insert(0, str(Path(__file__).parent))` + `from _lib.X import Y # noqa: E402` (decisión B1: imports relativos sin convertir a package formal por nombre hyphenated). Sus 60 tests siguen verdes (re-export `pbg.sanitize_slug` preservado).
+Enforced paths (hardcoded hasta D4): `hooks/*.py` top-level (excluye `_lib/` y `tests/`) + `generator/**/*.ts` (excluye `*.test.ts`, `__tests__/`, `__fixtures__/`). `generator/run.ts` queda enforced por decisión explícita Fase -1. Safe-fail blocker canonical (D1): stdin vacío / JSON inválido / top-level no-dict / `tool_input` no-dict → deny exit 2. `file_path` ausente o no-string → pass-through exit 0 (decisión Fase -1: no es malformación total). Double log: `.claude/logs/pre-write-guard.jsonl` + `.claude/logs/phase-gates.jsonl` (evento canónico `pre_write`). 84 tests D3 nuevos, 222 totales en `hooks/**` (D1 60 + D2 66 + D3 84 + lib indirectos), 96% coverage sobre `pre-write-guard.py`; D1/D2 intactos.
 
-**Lo que D2 NO hace** (explícito):
+**Lo que D3 NO hace** (explícito):
 
-- No modifica `.claude/settings.json` (ya referenciaba `./hooks/session-start.py` desde Fase A; el hook sólo materializa el binario).
-- No añade tests a `_lib/` (decisión del usuario: sólo via tests de los hooks que los usan; lógica trivial, sin justificación para suite paralela).
-- No extiende `bin/pos-selftest.sh` (sigue fuera de scope hasta F2).
-- No introduce network calls, nuevas deps, ni ruff (stdlib-only + `pytest` + `pytest-cov` ya presentes desde D1).
-- No persiste mensajes recientes de la sesión: el snapshot es estructural (branch/phase/warnings), no historial conversacional.
+- No modifica `.claude/settings.json` (ya referenciaba `./hooks/pre-write-guard.py` desde Fase A con `timeout: 3`; el hook sólo materializa el binario).
+- No inyecta patterns path-scoped ni bloquea anti-patterns declarados (scope recortado en Fase -1; diferido a rama post-E3a cuando `/pos:compound` haya poblado `.claude/patterns/` y `.claude/anti-patterns/`).
+- No valida docs-sync, coverage, CI dry-run ni policy.yaml (esa es la frontera con D4).
+- No detecta merge ni dispara `/pos:compound` (D5).
+- No mueve la lista de paths enforced a `policy.yaml` (decisión Fase -1: hardcode aceptado hasta que D4 tenga `policy.yaml` enforced).
+- No introduce `read_jsonl` ni nuevos helpers en `_lib/` (sólo consume `append_jsonl` + `now_iso`; `sanitize_slug` no aplica aquí).
+- No añade waiver `// test-waiver: <razón>` pese a estar mencionado en `.claude/rules/tests.md`. Ningún caso real lo demanda hoy (regla #7 — ≥2 repeticiones antes de abstraer).
 
-Apuntes para quien arranque D3 (o cualquier rama post-D2):
+Apuntes para quien arranque D4 (o cualquier rama post-D3):
 
-- **Patrón hook consolidado (2ª aplicación)**: blocker (D1) vs informative (D2) son las dos variantes canónicas. D3 es blocker (PreToolUse(Write)), mismo shape que D1. Detalle en [.claude/rules/hooks.md](.claude/rules/hooks.md).
-- **`hooks/_lib/` ya disponible** — D3 debe reusar `sanitize_slug` / `append_jsonl` / `now_iso` en lugar de redefinir. Nuevo helper sólo si ≥2 hooks lo usan (regla #7).
-- **Double log** con su propio archivo + `phase-gates.jsonl` con evento canónico (p.ej. `pre_write`). Mismo shape que D1/D2.
-- Carry-over Fase N+7: **sin carry-over abierto** al arrancar D3. Carry-over de C5 (copia real hooks/skills + `FileWrite.mode`) sigue abierto para rama post-E1a — no relevante para D3.
-- Snapshots del generador (total 54) inalterados en D2 (no se tocó `generator/**`).
+- **Patrón hook consolidado (3ª aplicación)**: blocker (D1 + D3) vs informative (D2). D4 será la 3ª aplicación blocker; shape idéntico a D1/D3 (`hookSpecificOutput.permissionDecision: deny` + exit 2 en rutas de bloqueo; pass-through silencioso en el resto; safe-fail canonical sobre payload malformado).
+- **`hooks/_lib/` estable** — `sanitize_slug` (D1, D4 probablemente no lo use), `append_jsonl`, `now_iso`. D4 puede necesitar un helper nuevo (p.ej. reader de `phase-gates.jsonl` para validar policy-vs-logs); añadir a `_lib/` sólo si ≥2 hooks lo consumen (regla #7).
+- **`policy.yaml` entra en juego**: D4 es el primer hook que lo lee realmente. `docs/SAFETY_POLICY.md` + `docs/TOKEN_BUDGET.md` quedan fuera de scope D4 (se enforza policy.yaml, no las otras policy docs).
+- **Evento canónico en phase-gates**: D4 añade `pre_pr` (o equivalente) al vocabulario ya instalado (`branch_creation` / `session_start` / `pre_write`).
+- Carry-over Fase N+7: **sin carry-over abierto** al arrancar D4. Carry-over de C5 (copia real hooks/skills + `FileWrite.mode`) sigue abierto para rama post-E1a — no relevante para D4.
+- Snapshots del generador (total 54) inalterados en D3 (no se tocó `generator/**`).
