@@ -496,14 +496,15 @@ class TestDerivePhaseFromSlugUnit:
 
 
 class TestMainInProcess:
+    STARTUP = '{"hook_event_name":"SessionStart","session_id":"x","source":"startup"}'
+
     def _run(self, monkeypatch, repo: Path, stdin_text: str) -> int:
         monkeypatch.chdir(repo)
         monkeypatch.setattr("sys.stdin", io.StringIO(stdin_text))
         return ss.main()
 
-    def test_startup_returns_zero(self, monkeypatch, repo):
-        payload = '{"hook_event_name":"SessionStart","session_id":"x","source":"startup"}'
-        assert self._run(monkeypatch, repo, payload) == 0
+    def test_startup_on_main_returns_zero(self, monkeypatch, repo):
+        assert self._run(monkeypatch, repo, self.STARTUP) == 0
 
     def test_malformed_returns_zero(self, monkeypatch, repo):
         assert self._run(monkeypatch, repo, "not json") == 0
@@ -513,3 +514,47 @@ class TestMainInProcess:
 
     def test_empty_returns_zero(self, monkeypatch, repo):
         assert self._run(monkeypatch, repo, "") == 0
+
+    def test_feat_branch_warnings_path_in_process(self, monkeypatch, repo):
+        checkout_feat(repo, "feat/d2-test")
+        (repo / "some_code.py").write_text("pass\n")
+        git(repo, "add", ".")
+        git(repo, "commit", "-q", "-m", "code only")
+        assert self._run(monkeypatch, repo, self.STARTUP) == 0
+        hook_log = repo / ".claude" / "logs" / "session-start.jsonl"
+        entry = json.loads(hook_log.read_text().splitlines()[-1])
+        assert entry["branch"] == "feat/d2-test"
+        assert entry["phase"] == "D2"
+        assert any("marker" in w for w in entry["warnings"])
+        assert any("docs-sync" in w for w in entry["warnings"])
+
+    def test_feat_with_docs_diff_no_docs_warning_in_process(self, monkeypatch, repo):
+        (repo / "ROADMAP.md").write_text("# r\n")
+        git(repo, "add", ".")
+        git(repo, "commit", "-q", "-m", "add roadmap")
+        checkout_feat(repo, "feat/d2-test")
+        place_marker(repo, "feat_d2-test")
+        (repo / "ROADMAP.md").write_text("# r\n- x\n")
+        git(repo, "add", ".")
+        git(repo, "commit", "-q", "-m", "bump roadmap")
+        assert self._run(monkeypatch, repo, self.STARTUP) == 0
+        hook_log = repo / ".claude" / "logs" / "session-start.jsonl"
+        entry = json.loads(hook_log.read_text().splitlines()[-1])
+        assert entry["warnings"] == []
+
+    def test_main_phase_fallback_in_process(self, monkeypatch, repo):
+        seed_phase_log(repo, [
+            {"ts": "2026-01-01T00:00:00Z", "event": "branch_creation", "slug": "feat_d1-x", "decision": "allow"},
+        ])
+        assert self._run(monkeypatch, repo, self.STARTUP) == 0
+        hook_log = repo / ".claude" / "logs" / "session-start.jsonl"
+        entry = json.loads(hook_log.read_text().splitlines()[-1])
+        assert entry["phase"] == "D1"
+
+    def test_non_git_cwd_in_process(self, monkeypatch, tmp_path):
+        (tmp_path / ".claude" / "logs").mkdir(parents=True)
+        assert self._run(monkeypatch, tmp_path, self.STARTUP) == 0
+        hook_log = tmp_path / ".claude" / "logs" / "session-start.jsonl"
+        entry = json.loads(hook_log.read_text().splitlines()[-1])
+        assert entry["branch"] is None
+        assert entry["phase"] == "unknown"
