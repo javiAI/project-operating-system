@@ -237,7 +237,7 @@ Entregables:
 - **Bootstrap de test env dentro de esta rama**: `.venv` local + `requirements-dev.txt`. Alternativa descartada: pip --user o `pyproject.toml` (ambas contaminan más o son ecosistema prematuro).
 - **Sin `ruff`**: lint Python queda fuera de scope D1. Reabrir cuando exista justificación independiente.
 - **Sin `bin/pos-selftest.sh`**: la integración end-to-end del plugin queda fuera de scope D1. La rama se limita a hook + test pair + docs-sync.
-- **In-process tests añadidos vs Fase -1**: `pytest-cov` no mide subprocesses; se añadieron 32 unit tests in-process (`importlib.util.spec_from_file_location` para cargar el módulo con guión en el nombre) para alcanzar el 85% comprometido. Subprocess tests conservados como integración end-to-end.
+- **In-process tests añadidos vs Fase -1**: `pytest-cov` no mide subprocesses; se añadieron tests unitarios in-process (`importlib.util.spec_from_file_location` para cargar el módulo con guión en el nombre) para alcanzar el 85% comprometido. Subprocess tests conservados como integración end-to-end.
 - **`.claude/settings.json` no modificado**: ya referencia `./hooks/pre-branch-gate.py` desde Fase A. D1 sólo materializa el binario ausente.
 
 ## Convenciones de este archivo
