@@ -1,0 +1,26 @@
+# Branch Protection — TODO(identity.name)
+
+Configuración recomendada para proteger la rama `main`. GitHub no permite aplicarla desde el generador (requeriría un token con permisos sensibles); aplícala manualmente en **Settings → Branches → Branch protection rules**.
+
+## Regla sobre `main`
+
+- Require a pull request before merging.
+- Require status checks to pass before merging.
+- Require branches to be up to date before merging.
+- Do not allow bypassing the above settings.
+- (Opcional) Require signed commits.
+
+## Checks requeridos
+
+El workflow emitido en `.github/workflows/ci.yml` define los siguientes jobs que deben estar verdes antes del merge:
+
+- `unit`
+
+## Targets invocados
+
+Los jobs invocan los targets universales del `Makefile` (no llaman binarios directos):
+
+- `make test-unit`
+- `make test-coverage`
+
+Si un check nuevo se añade en el workflow, actualiza esta lista manualmente para mantener la consistencia.
