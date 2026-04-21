@@ -28,6 +28,41 @@
 
 El meta-repo nunca ejecuta código del proyecto destino. El proyecto destino nunca depende del meta-repo en runtime (todo se copia).
 
+## 1.1. Knowledge plane (opcional)
+
+> **Opcional.** Capa extra mountable *dentro* del repo generado. No sustituye ni modifica la relación control-plane → runtime-plane descrita arriba; el repo generado puede adoptarla o no según opt-in del questionnaire. Introducida como roadmap en [MASTER_PLAN.md § FASE G](../MASTER_PLAN.md); no implementada todavía.
+
+```
+┌────────────────────────────────────────┐
+│  META-REPO (control plane)             │
+└───────────────┬────────────────────────┘
+                │ genera
+                ▼
+┌────────────────────────────────────────┐
+│  REPO GENERADO (runtime plane)         │
+│                                        │
+│  [opcional] vault/ (knowledge plane):  │
+│    raw/       fuentes inmutables       │
+│    wiki/      síntesis (LLM + humano)  │
+│    schema.md  configuración            │
+└────────────────────────────────────────┘
+```
+
+**Tres capas separadas** (terminología adaptada del gist de Karpathy sobre wikis LLM-friendly):
+
+- `vault/raw/` — fuentes inmutables (artículos, papers, notas importadas, clippings). No se reescriben; se añaden.
+- `vault/wiki/` — síntesis mantenida por LLM o humano. Cross-referenced, git-diffable.
+- `vault/schema.md` — documento de configuración de la instancia: convenciones, reglas de síntesis, mapa de categorías.
+
+**Principios invariantes**:
+
+- **File-based**: todo es Markdown plano. Sin DB, sin formato propietario. Compatible con cualquier editor Markdown.
+- **Tool-agnostic**: no impone cliente. Obsidian + Web Clipper es el **primer reference adapter** previsto (ver [MASTER_PLAN.md § FASE G Rama G2](../MASTER_PLAN.md)), pero Logseq / Foam / plain-text son igualmente válidos por construcción.
+- **Opt-in**: el questionnaire declara `integrations.knowledge_plane.enabled` (shape final en G1). Con flag off, `vault/` no se emite.
+- **Sin runtime compartido**: el knowledge plane vive en el repo generado, no en el meta-repo. El generador sólo emite el esqueleto; el mantenimiento es local al proyecto destino.
+
+**Roadmap**: G1 (contrato), G2 (adapter Obsidian de referencia), G3 (stub ingest CLI, diferida), G4 (wiki-lint, diferida). Ver [MASTER_PLAN.md § FASE G](../MASTER_PLAN.md) para scope y criterio de salida de cada rama.
+
 ## 2. Cuestionario → profile → generación
 
 ### Flujo

@@ -9,6 +9,7 @@
 - Fuente de verdad ejecutable: [MASTER_PLAN.md](MASTER_PLAN.md).
 - Estado vivo: [ROADMAP.md](ROADMAP.md).
 - Arquitectura canonical: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+- **Horizonte post-F4**: Fase G (Knowledge Plane, opcional) planificada sin fecha — ver [MASTER_PLAN.md § FASE G](MASTER_PLAN.md).
 
 ## 2. Verificación de estado (1 comando)
 
