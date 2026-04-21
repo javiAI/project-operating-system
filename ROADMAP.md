@@ -9,7 +9,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | A | Skeleton & bootstrap | ✅ |
 | B | Cuestionario + profiles + runner | ✅ |
 | C | Templates + renderers | ✅ (C1 ✅, C2 ✅, C3 ✅, C4 ✅, C5 ✅) |
-| D | Hooks (Python) | ⏳ parcial (D1 ✅, D2 ✅) |
+| D | Hooks (Python) | ⏳ parcial (D1 ✅, D2 ✅, D3 ✅) |
 | E1 | Skills orquestación | ⏳ pendiente |
 | E2 | Skills calidad | ⏳ pendiente |
 | E3 | Skills patterns + tests | ⏳ pendiente |
@@ -30,7 +30,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | `feat/c5-renderers-skills-hooks-copy` | `.claude/` skeleton (settings.json + hooks/README + skills/README); copia real diferida a D/E | ✅ | — |
 | `feat/d1-hook-pre-branch-gate` | Bloqueo `git checkout -b` / `switch -c` / `worktree add -b` sin marker | ✅ | #11 |
 | `feat/d2-hook-session-start` | Snapshot 30s + extracción `hooks/_lib/` (refactor D1) | ✅ | — (PR pendiente) |
-| `feat/d3-hook-pre-write-guard` | Test-pair + pattern injection + anti-pattern block | ⏳ | — |
+| `feat/d3-hook-pre-write-guard` | Test-pair enforcement (PreToolUse(Write)); pattern injection + anti-pattern block diferidos post-E3a | ✅ | — (PR pendiente) |
 | `feat/d4-hook-pre-pr-gate` | Policy vs logs + docs-sync + CI dry-run | ⏳ | — |
 | `feat/d5-hook-post-action-compound` | Trigger `/pos:compound` por touched_paths | ⏳ | — |
 | `feat/d6-hook-pre-compact-stop` | Persist pre-compact + stop policy check | ⏳ | — |
@@ -261,6 +261,27 @@ Entregables:
 - **Subprocess git robusto** (decisión I Fase -1): `shell=False`, `cwd=Path.cwd()` explícito, `timeout=2s` por call, `check=False`. Maneja `FileNotFoundError` (git no instalado) y `SubprocessError`; cwd no-git → snapshot con branch=None, phase=unknown, sin crash.
 - **`.claude/settings.json` no modificado**: ya referenciaba `./hooks/session-start.py` desde Fase A (wire existente con `timeout: 5s` + `statusMessage`). D2 sólo materializa el binario ausente (mismo patrón que D1).
 - **Coverage**: 99% total en `hooks/**`. `hooks/session-start.py` 95% (6 líneas no cubiertas: FileNotFoundError/SubprocessError de git no instalado, 3 fallbacks de `_base_ref`/`_diff_touches_docs` cuando git falla, y `sys.exit(main())` del `__main__` guard). `hooks/pre-branch-gate.py` mantiene 99% tras refactor, sin regresión.
+
+### `feat/d3-hook-pre-write-guard` — ✅ (PR pendiente)
+
+Entregables:
+
+- `hooks/pre-write-guard.py` (ejecutable, stdlib-only, Python 3.10+) — PreToolUse(Write) blocker que enforza CLAUDE.md regla #3 (test antes que implementación) sobre `hooks/*.py` top-level y `generator/**/*.ts`. Shape canónico blocker D1 (no patrón informative D2).
+- Contrato fijado por la suite:
+  - enforced + archivo inexistente + sin test pair → deny (exit 2).
+  - enforced + archivo inexistente + con test pair → allow (exit 0).
+  - enforced + archivo ya existente → allow (exit 0) — edit flow; D4 `pre-pr-gate` será el que detecte pérdida de cobertura sobre impl existente.
+  - excluido o fuera de scope → pass-through silencioso (cero log).
+- Clasificador con dos buckets de exclusión separados (tests/docs/templates/meta vs helper internals `hooks/_lib/**`); detalle completo en [.claude/rules/hooks.md § Tercer hook](.claude/rules/hooks.md).
+- Expected test pair: `hooks/<name>.py` → `hooks/tests/test_<name_underscore>.py` (`-`→`_`); `generator/**/<name>.ts` → `<same-dir>/<name>.test.ts` (co-located, incluye `generator/run.ts`).
+- Safe-fail blocker canonical (stdin vacío / JSON inválido / top-level o `tool_input` no-dict → deny exit 2). `file_path` ausente o no-string → pass-through exit 0 (decisión Fase -1).
+- Double log: `.claude/logs/pre-write-guard.jsonl` + `.claude/logs/phase-gates.jsonl` (evento `pre_write`). Pass-throughs NO loguean (replica D1). Allow sobre impl existente sí loguea (trazabilidad del edit flow).
+- Reuso `hooks/_lib/`: `append_jsonl` + `now_iso`. No introduce `read_jsonl` ni nuevos helpers.
+- `.claude/settings.json` no modificado: wire existente desde Fase A con `timeout: 3`; D3 sólo materializa el binario.
+- Tests: 83 casos en `hooks/tests/test_pre_write_guard.py`, 95% coverage. 221 totales en `hooks/**`; D1/D2 intactos.
+- 6 fixtures JSON nuevos en `hooks/tests/fixtures/payloads/` con rutas relativas (normalizadas contra `Path.cwd()`).
+
+**Ajustes vs plan original**: ver [MASTER_PLAN.md § Rama D3](MASTER_PLAN.md).
 
 ## Convenciones de este archivo
 

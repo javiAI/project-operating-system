@@ -105,4 +105,56 @@ from _lib.time import now_iso  # noqa: E402
 
 Las ramas D3..D6 **deben reusar** estos helpers en lugar de redefinir. Añadir a `_lib/` sólo cuando ≥2 hooks usen el nuevo helper (regla #7 sigue aplicando incrementalmente). No añadir tests en `hooks/tests/test_lib/` salvo que `_lib/` crezca a lógica no trivial — se testea via los hooks que lo consumen.
 
-Ver [ROADMAP.md § Progreso Fase D](../../ROADMAP.md) para el detalle de entregables y ajustes.
+## Tercer hook entregado — `hooks/pre-write-guard.py` (Rama D3)
+
+Segunda aplicación del patrón **blocker** (PreToolUse(Write)) — shape idéntico a D1, regla específica distinta. Enforza CLAUDE.md regla #3 (test antes que implementación) sobre `hooks/**` y `generator/**`.
+
+- Clasifica cada Write por `tool_input.file_path` (normalizado contra `Path.cwd()`; absolutos fuera del repo → pass-through).
+- Contrato crystal-clear que la suite fija sin ambigüedad:
+  - enforced + archivo inexistente + sin test pair → **deny exit 2** con `decisionReason` construido (ruta esperada + comando `touch` + referencia a CLAUDE.md regla #3 + write bloqueado).
+  - enforced + archivo inexistente + con test pair → **allow exit 0** (double log).
+  - enforced + archivo ya existente → **allow exit 0** — edit flow (double log; fricción en rewrites queda para D4 `pre-pr-gate`).
+  - excluido o fuera de scope → **pass-through silencioso** (cero stdout, cero log).
+- Double log: `.claude/logs/pre-write-guard.jsonl` (`{ts, hook, file_path, decision, reason}`) + `.claude/logs/phase-gates.jsonl` (evento `pre_write`, `{ts, event, file_path, decision}`). Pass-throughs NO loguean (replica D1; evita ruido).
+- Safe-fail blocker canonical: stdin vacío / JSON inválido / top-level no-dict / `tool_input` no-dict → deny exit 2. `file_path` ausente o no-string → pass-through exit 0 (decisión Fase -1: no es malformación total).
+- Reuso `_lib/`: `append_jsonl` + `now_iso`. `sanitize_slug` no aplica (D3 no deriva slugs de file paths). No introduce `read_jsonl`.
+- Tests pytest: 83 casos, 95% coverage sobre `pre-write-guard.py`. Suite organizada por clase de contrato (enforced/exclusions/out-of-scope/logging/robustness) + unit tests del clasificador.
+
+### Clasificador — paths (hardcoded hasta D4 mueva la lista a `policy.yaml`)
+
+**Enforced** (requiere test pair cuando se crea archivo nuevo):
+
+| Path pattern | Expected test pair |
+|---|---|
+| `hooks/<name>.py` (top-level, excluye `_lib/` y `tests/`) | `hooks/tests/test_<name_underscore>.py` (`-` → `_`) |
+| `generator/**/<name>.ts` (excluye `*.test.ts`, `__tests__/`, `__fixtures__/`) | `<same-dir>/<name>.test.ts` (co-located) |
+| `generator/run.ts` | `generator/run.test.ts` (co-located) — decisión Fase -1 |
+
+**Excluido — Bucket 1: tests / docs / templates / meta**
+
+Pass-through silencioso porque estos archivos **no son implementación a cubrir**. Son input para otros hooks/renderers o documentación:
+
+| Path pattern | Motivo |
+|---|---|
+| `hooks/tests/**/*.py` | Son los tests; bloquearlos sería circular |
+| `**/*.test.ts` | Tests co-located del generador |
+| `generator/__tests__/**` | Tests cross-cutting (snapshots) |
+| `generator/__fixtures__/**` | Fixtures de tests, no lógica |
+| `hooks/README.md` | Documentación del dir |
+| `**/*.md` | Docs (ROADMAP, HANDOFF, etc.) — docs-sync lo gobierna D4, no D3 |
+| `**/*.yaml`, `**/*.yml` | Schemas, profiles, configs |
+| `**/*.json` | `.claude/settings.json`, `package.json`, etc. |
+| `**/*.hbs` | Templates Handlebars — no impl directa |
+| `**/*.snap` | Snapshots generados por vitest |
+
+**Excluido — Bucket 2: helper internals**
+
+Pass-through silencioso por **decisión explícita del repo (D2)**. Categoría separada a propósito — no se mezcla con Bucket 1 porque la razón es distinta:
+
+| Path pattern | Motivo |
+|---|---|
+| `hooks/_lib/**/*.py` | Helpers triviales (3-20 líneas cada uno); se testean vía los hooks que los consumen, no aisladamente. Ver HANDOFF.md §10 D2 y nota al final de esta rule. `.claude/rules/hooks.md` L106 ratifica: *"No añadir tests en `hooks/tests/test_lib/` salvo que `_lib/` crezca a lógica no trivial — se testea via los hooks que lo consumen."* |
+
+**Fuera de scope** (también pass-through): cualquier otro path que no caiga en enforced ni en los buckets excluidos — `scripts/**`, paths arbitrarios fuera del repo, etc. No logueados.
+
+Scope recortado (pattern injection + anti-pattern blocking diferidos post-E3a) documentado en [MASTER_PLAN.md § Rama D3](../../MASTER_PLAN.md). Ver también [ROADMAP.md § Progreso Fase D](../../ROADMAP.md).
