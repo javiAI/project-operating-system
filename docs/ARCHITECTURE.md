@@ -365,12 +365,10 @@ Código Python/bash. Exit code 2 = bloqueo. El LLM no puede ignorarlos. Son el �
 
 **Segunda aplicación blocker — `hooks/pre-write-guard.py`** (entregado en rama D3):
 
-- Shape idéntico a D1 (shebang + stdlib-only; `permissionDecision: deny` + `decisionReason` en stdout sobre bloqueo; safe-fail canonical sobre payload malformado → deny exit 2). Regla específica distinta: enforza CLAUDE.md regla #3 (test antes que implementación) sobre `hooks/*.py` top-level + `generator/**/*.ts`.
-- Clasificador con dos buckets de exclusión explícitamente separados en `.claude/rules/hooks.md`: (1) tests / docs / templates / meta; (2) helper internals (`hooks/_lib/**`, decisión repo D2). Fuera de scope (otros paths) → pass-through silencioso igual que exclusión.
-- Contrato crystal-clear: enforced + archivo inexistente + sin test pair → deny; con test pair → allow; enforced + archivo ya existente → allow (edit flow — D4 `pre-pr-gate` detecta pérdida de cobertura sobre impl existente); excluido o fuera de scope → pass-through silencioso sin log.
-- `file_path` ausente o no-string → pass-through (decisión Fase -1: no es malformación total, distinto de `tool_input` no-dict que sí es deny).
-- Double log: `.claude/logs/pre-write-guard.jsonl` propio + `phase-gates.jsonl` (evento `pre_write`). Allow sobre impl existente también loguea (trazabilidad del edit flow); pass-throughs NO loguean (replica D1, evita ruido).
-- Scope recortado en Fase -1: pattern injection path-scoped y anti-pattern blocking declarado quedan diferidos a rama post-E3a (hoy `.claude/patterns/` y `.claude/anti-patterns/` están vacías; implementar inyector/bloqueador sobre dirs vacías sería código sin datos, CLAUDE.md regla #7).
+- Shape idéntico a D1. Regla específica: enforza CLAUDE.md regla #3 sobre `hooks/*.py` top-level + `generator/**/*.ts`.
+- Clasificador con dos buckets de exclusión separados (tests/docs/templates/meta vs helper internals `hooks/_lib/**`); contrato y tablas en [.claude/rules/hooks.md § Tercer hook](../.claude/rules/hooks.md).
+- Double log propio + `phase-gates.jsonl` (evento `pre_write`). Pass-throughs no loguean (replica D1); allow sobre impl existente sí loguea (trazabilidad edit flow).
+- Scope recortado en Fase -1 (pattern injection + anti-pattern blocking diferidos post-E3a): ver [MASTER_PLAN.md § Rama D3](../MASTER_PLAN.md).
 
 **Helpers compartidos — `hooks/_lib/`** (extraído en D2 tras segunda repetición, CLAUDE.md regla #7):
 

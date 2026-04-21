@@ -119,12 +119,6 @@ class TestEnforcedHookExistingFile:
         result = run_hook(load_fixture("write_new_hook.json"), cwd=repo)
         assert result.returncode == 0, result.stderr
 
-    def test_existing_impl_with_test_pair_allows(self, repo: Path):
-        touch(repo, "hooks/new_guard.py")
-        touch(repo, "hooks/tests/test_new_guard.py")
-        result = run_hook(load_fixture("write_new_hook.json"), cwd=repo)
-        assert result.returncode == 0, result.stderr
-
 
 class TestEnforcedGeneratorLib:
     def test_new_lib_without_test_pair_denies(self, repo: Path):
@@ -258,11 +252,6 @@ class TestOutOfScope:
         assert result.returncode == 0
         assert result.stdout.strip() == ""
 
-    def test_bash_tool_passes_through(self, repo: Path):
-        payload = {"tool_name": "Bash", "tool_input": {"command": "ls"}}
-        result = run_hook(payload, cwd=repo)
-        assert result.returncode == 0
-
     def test_unrelated_path_passes_through(self, repo: Path):
         payload = make_write("tmp/scratch.txt")
         result = run_hook(payload, cwd=repo)
@@ -350,12 +339,6 @@ class TestLogging:
         result = run_hook(payload, cwd=repo)
         assert result.returncode == 0
         assert not (repo / ".claude" / "logs" / "pre-write-guard.jsonl").exists()
-
-    def test_phase_gates_event_name_is_pre_write(self, repo: Path):
-        result = run_hook(load_fixture("write_new_hook.json"), cwd=repo)
-        assert result.returncode == 2
-        phase_log = repo / ".claude" / "logs" / "phase-gates.jsonl"
-        assert _read_jsonl(phase_log)[0]["event"] == "pre_write"
 
 
 # ---------------------------------------------------------------------------

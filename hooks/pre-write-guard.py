@@ -40,11 +40,7 @@ def is_enforced(rel_path: str) -> bool:
         return False
     parts = rel_path.split("/")
     if rel_path.endswith(".py"):
-        if parts[0] != "hooks":
-            return False
-        if len(parts) != 2:
-            return False
-        return True
+        return parts[0] == "hooks" and len(parts) == 2
     if rel_path.endswith(".ts"):
         if rel_path.endswith(".test.ts"):
             return False
@@ -88,16 +84,6 @@ def emit_deny(reason: str) -> None:
     print(json.dumps(output, ensure_ascii=False))
 
 
-def _relative_to_repo(file_path: str, repo_root: Path) -> str | None:
-    p = Path(file_path)
-    if p.is_absolute():
-        try:
-            return p.resolve().relative_to(repo_root.resolve()).as_posix()
-        except ValueError:
-            return None
-    return p.as_posix()
-
-
 def main() -> int:
     raw = sys.stdin.read()
     try:
@@ -125,9 +111,14 @@ def main() -> int:
         return 0
 
     repo_root = Path.cwd()
-    rel = _relative_to_repo(file_path, repo_root)
-    if rel is None:
-        return 0
+    p = Path(file_path)
+    if p.is_absolute():
+        try:
+            rel = p.resolve().relative_to(repo_root.resolve()).as_posix()
+        except ValueError:
+            return 0
+    else:
+        rel = p.as_posix()
 
     if not is_enforced(rel):
         return 0

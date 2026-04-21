@@ -134,38 +134,14 @@ Lectura mínima al arrancar:
 
 - [MASTER_PLAN.md § Rama D4](MASTER_PLAN.md)
 - [policy.yaml](policy.yaml) — esquema ya declarado en Fase A; D4 es el primer enforzador real.
-- [.claude/rules/hooks.md](.claude/rules/hooks.md) (ya con "Tercer hook entregado" D3 + buckets de exclusión separados)
-- [docs/ARCHITECTURE.md § 7 Determinismo](docs/ARCHITECTURE.md) (Capa 1 con pre-branch-gate + session-start + pre-write-guard como canónicos)
+- [.claude/rules/hooks.md](.claude/rules/hooks.md)
+- [docs/ARCHITECTURE.md § 7 Determinismo](docs/ARCHITECTURE.md)
 - [hooks/pre-branch-gate.py](hooks/pre-branch-gate.py) + [hooks/pre-write-guard.py](hooks/pre-write-guard.py) como patrones de referencia blocker (2 aplicaciones; reglas específicas distintas pero shape idéntico).
 - [hooks/_lib/](hooks/_lib/) — `append_jsonl` + `now_iso` disponibles. Añadir al `_lib/` sólo si ≥2 hooks consumen el nuevo helper (regla #7).
 - [.claude/logs/phase-gates.jsonl](.claude/logs/) — D4 lee este archivo para validar policy-vs-logs; eventos ya presentes: `branch_creation` (D1), `session_start` (D2), `pre_write` (D3). D4 añadirá `pre_pr` (o equivalente).
 
 ## 10. Estado D3 (cerrada en rama)
 
-`pre-write-guard` vivo: en cada `PreToolUse(Write)` evalúa `tool_input.file_path`, lo normaliza contra `Path.cwd()`, y aplica el clasificador de 2 buckets de exclusión (tests/docs/templates/meta + `hooks/_lib/**`). Contrato crystal-clear:
+`pre-write-guard` vivo: en cada `PreToolUse(Write)` clasifica `tool_input.file_path` (normalizado contra `Path.cwd()`), aplica los 2 buckets de exclusión (tests/docs/templates/meta + `hooks/_lib/**`) y enforza el contrato crystal-clear (enforced+new+no-pair → deny; enforced+new+pair → allow; enforced+existing → allow edit-flow; excluded/out-of-scope → pass-through silencioso). Enforced: `hooks/*.py` top-level + `generator/**/*.ts` (incluido `generator/run.ts`). Safe-fail blocker canonical D1. Double log: `pre-write-guard.jsonl` + `phase-gates.jsonl` (evento `pre_write`). 81 tests D3, 219 totales en `hooks/**`, 96% coverage; D1/D2 intactos.
 
-- enforced + archivo inexistente + sin test pair → deny exit 2 con `decisionReason` que lista la ruta exacta esperada + comando `touch` + referencia a CLAUDE.md regla #3 + el write bloqueado.
-- enforced + archivo inexistente + con test pair → allow exit 0 (log en ambos archivos).
-- enforced + archivo ya existente → allow exit 0 — edit flow explícito (log en ambos archivos; D4 `pre-pr-gate` detecta la pérdida de cobertura sobre impl existente).
-- excluido o fuera de scope → pass-through silencioso (cero stdout, cero log).
-
-Enforced paths (hardcoded hasta D4): `hooks/*.py` top-level (excluye `_lib/` y `tests/`) + `generator/**/*.ts` (excluye `*.test.ts`, `__tests__/`, `__fixtures__/`). `generator/run.ts` queda enforced por decisión explícita Fase -1. Safe-fail blocker canonical (D1): stdin vacío / JSON inválido / top-level no-dict / `tool_input` no-dict → deny exit 2. `file_path` ausente o no-string → pass-through exit 0 (decisión Fase -1: no es malformación total). Double log: `.claude/logs/pre-write-guard.jsonl` + `.claude/logs/phase-gates.jsonl` (evento canónico `pre_write`). 84 tests D3 nuevos, 222 totales en `hooks/**` (D1 60 + D2 66 + D3 84 + lib indirectos), 96% coverage sobre `pre-write-guard.py`; D1/D2 intactos.
-
-**Lo que D3 NO hace** (explícito):
-
-- No modifica `.claude/settings.json` (ya referenciaba `./hooks/pre-write-guard.py` desde Fase A con `timeout: 3`; el hook sólo materializa el binario).
-- No inyecta patterns path-scoped ni bloquea anti-patterns declarados (scope recortado en Fase -1; diferido a rama post-E3a cuando `/pos:compound` haya poblado `.claude/patterns/` y `.claude/anti-patterns/`).
-- No valida docs-sync, coverage, CI dry-run ni policy.yaml (esa es la frontera con D4).
-- No detecta merge ni dispara `/pos:compound` (D5).
-- No mueve la lista de paths enforced a `policy.yaml` (decisión Fase -1: hardcode aceptado hasta que D4 tenga `policy.yaml` enforced).
-- No introduce `read_jsonl` ni nuevos helpers en `_lib/` (sólo consume `append_jsonl` + `now_iso`; `sanitize_slug` no aplica aquí).
-- No añade waiver `// test-waiver: <razón>` pese a estar mencionado en `.claude/rules/tests.md`. Ningún caso real lo demanda hoy (regla #7 — ≥2 repeticiones antes de abstraer).
-
-Apuntes para quien arranque D4 (o cualquier rama post-D3):
-
-- **Patrón hook consolidado (3ª aplicación)**: blocker (D1 + D3) vs informative (D2). D4 será la 3ª aplicación blocker; shape idéntico a D1/D3 (`hookSpecificOutput.permissionDecision: deny` + exit 2 en rutas de bloqueo; pass-through silencioso en el resto; safe-fail canonical sobre payload malformado).
-- **`hooks/_lib/` estable** — `sanitize_slug` (D1, D4 probablemente no lo use), `append_jsonl`, `now_iso`. D4 puede necesitar un helper nuevo (p.ej. reader de `phase-gates.jsonl` para validar policy-vs-logs); añadir a `_lib/` sólo si ≥2 hooks lo consumen (regla #7).
-- **`policy.yaml` entra en juego**: D4 es el primer hook que lo lee realmente. `docs/SAFETY_POLICY.md` + `docs/TOKEN_BUDGET.md` quedan fuera de scope D4 (se enforza policy.yaml, no las otras policy docs).
-- **Evento canónico en phase-gates**: D4 añade `pre_pr` (o equivalente) al vocabulario ya instalado (`branch_creation` / `session_start` / `pre_write`).
-- Carry-over Fase N+7: **sin carry-over abierto** al arrancar D4. Carry-over de C5 (copia real hooks/skills + `FileWrite.mode`) sigue abierto para rama post-E1a — no relevante para D4.
-- Snapshots del generador (total 54) inalterados en D3 (no se tocó `generator/**`).
+**Detalle + "Lo que D3 NO hace" + apuntes D4**: ver [ROADMAP.md § feat/d3](ROADMAP.md), [MASTER_PLAN.md § Rama D3](MASTER_PLAN.md) y [.claude/rules/hooks.md § Tercer hook](.claude/rules/hooks.md).

@@ -118,7 +118,7 @@ Segunda aplicación del patrón **blocker** (PreToolUse(Write)) — shape idént
 - Double log: `.claude/logs/pre-write-guard.jsonl` (`{ts, hook, file_path, decision, reason}`) + `.claude/logs/phase-gates.jsonl` (evento `pre_write`, `{ts, event, file_path, decision}`). Pass-throughs NO loguean (replica D1; evita ruido).
 - Safe-fail blocker canonical: stdin vacío / JSON inválido / top-level no-dict / `tool_input` no-dict → deny exit 2. `file_path` ausente o no-string → pass-through exit 0 (decisión Fase -1: no es malformación total).
 - Reuso `_lib/`: `append_jsonl` + `now_iso`. `sanitize_slug` no aplica (D3 no deriva slugs de file paths). No introduce `read_jsonl`.
-- Tests pytest: 84 casos (36 subprocess + 48 in-process), 96% coverage sobre `pre-write-guard.py`. Clases organizadas por contrato: `TestEnforcedHookNewFile`/`ExistingFile`, `TestEnforcedGeneratorLib`/`Renderer`/`RunTs`, `TestExclusionsTestsDocsTemplatesMeta`, `TestExclusionsHelperInternals`, `TestOutOfScope`, `TestLogging`, `TestRobustness`, + unit tests de `is_enforced`, `expected_test_pair`, `build_deny_reason`, y `TestMainInProcess` para paths cwd/stdin no medidos por subprocess.
+- Tests pytest: 81 casos, 96% coverage sobre `pre-write-guard.py`. Suite organizada por clase de contrato (enforced/exclusions/out-of-scope/logging/robustness) + unit tests del clasificador.
 
 ### Clasificador — paths (hardcoded hasta D4 mueva la lista a `policy.yaml`)
 
@@ -157,15 +157,4 @@ Pass-through silencioso por **decisión explícita del repo (D2)**. Categoría s
 
 **Fuera de scope** (también pass-through): cualquier otro path que no caiga en enforced ni en los buckets excluidos — `scripts/**`, paths arbitrarios fuera del repo, etc. No logueados.
 
-### Lo que D3 NO hace (trazabilidad del scope recortado)
-
-El scope textual de [MASTER_PLAN.md § Rama D3](../../MASTER_PLAN.md) mencionaba además *"inyecta patterns path-scoped, bloquea anti-patterns"*. Ambas piezas **se difieren** (decisión Fase -1 aprobada):
-
-- **Pattern injection path-scoped** → diferido a rama post-E3a. `.claude/patterns/` está vacío hasta que `/pos:compound` corra en E3a; implementar inyector sobre dir vacío sería código sin datos (CLAUDE.md regla #7, patrones antes de abstraer).
-- **Anti-pattern blocking declarado** → diferido a la misma rama. `.claude/anti-patterns/` vacío por el mismo motivo.
-
-D3 con scope recortado sigue cerrando el criterio funcional de CLAUDE.md regla #3 (el que desbloquea TDD hard-enforced para E*).
-
----
-
-Ver [ROADMAP.md § Progreso Fase D](../../ROADMAP.md) para el detalle de entregables y ajustes.
+Scope recortado (pattern injection + anti-pattern blocking diferidos post-E3a) documentado en [MASTER_PLAN.md § Rama D3](../../MASTER_PLAN.md). Ver también [ROADMAP.md § Progreso Fase D](../../ROADMAP.md).
