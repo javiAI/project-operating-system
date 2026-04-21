@@ -165,6 +165,33 @@ describe("renderers/ci-cd — stack conditionals do not leak", () => {
   });
 });
 
+describe("renderers/ci-cd — TS test deps install step (contract closure)", () => {
+  it.each(["nextjs-app", "cli-tool"])(
+    "%s (TS) — workflow installs vitest + @vitest/coverage-v8 with pinned versions before invoking make",
+    (slug) => {
+      const files = render(bySlug[slug]!);
+      const yml = files.find((f) => f.path === ".github/workflows/ci.yml")!;
+      expect(yml.content).toMatch(/name:\s*Install test deps/);
+      expect(yml.content).toMatch(/npm\s+install\s+--no-save/);
+      expect(yml.content).toMatch(/vitest@\d+\.\d+\.\d+/);
+      expect(yml.content).toMatch(/@vitest\/coverage-v8@\d+\.\d+\.\d+/);
+
+      const installIdx = yml.content.indexOf("Install test deps");
+      const testUnitIdx = yml.content.indexOf("make test-unit");
+      expect(installIdx).toBeGreaterThan(-1);
+      expect(testUnitIdx).toBeGreaterThan(installIdx);
+    }
+  );
+
+  it("agent-sdk (Python) — workflow does NOT declare a Node 'Install test deps' step (npm/vitest must not leak)", () => {
+    const files = render(bySlug["agent-sdk"]!);
+    const yml = files.find((f) => f.path === ".github/workflows/ci.yml")!;
+    expect(yml.content).not.toMatch(/npm\s+install/);
+    expect(yml.content).not.toMatch(/vitest/);
+    expect(yml.content).not.toMatch(/@vitest\/coverage-v8/);
+  });
+});
+
 describe("renderers/ci-cd — BRANCH_PROTECTION.md consistency with ci.yml", () => {
   it.each(profiles)(
     "$slug — BRANCH_PROTECTION.md lists the 'unit' job required check",

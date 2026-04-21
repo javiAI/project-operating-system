@@ -192,6 +192,8 @@ Entregables:
 - **`gitlab` / `bitbucket` diferidos con `Error` explícito** (A5): mismo patrón que frameworks diferidos de C3. 0 repeticiones documentadas en profiles canónicos (CLAUDE.md #7). Reabrir cuando un profile canónico los adopte.
 - **`branch_protection=false` → sólo `ci.yml`** (A6). No se emite `docs/BRANCH_PROTECTION.md` si el usuario desactiva la protección.
 - **Python toolchain minimal** (no `uv`): `actions/setup-python` + `pip install pytest pytest-cov`. Coherente con C3 que no emite `pyproject.toml`. Preferencia fuerte de toolchain (uv, poetry, pdm) se pospone hasta una rama que haga justificable la decisión desde el output actual del proyecto generado.
+- **Contrato del workflow cerrado en revisión** (ajuste post-Fase-1 tras PR review): TS añade step `Install test deps` con `npm install --no-save vitest@3.0.5 @vitest/coverage-v8@3.0.5` (versiones pinneadas alineadas con `package.json` del meta-repo). Python ya tenía `pip install pytest pytest-cov`. Tests semánticos: presencia del step + versiones pinneadas en TS (antes de `make test-unit`), no-leak en Python (sin `npm`/`vitest`). Cuando C5/C6 emita `package.json`/`pyproject.toml`, migrar a `npm ci` / `pip install -e .[dev]` y sacar los pins al manifest.
+- **Header comment de `BRANCH_PROTECTION.md.hbs`**: rebajado de "Dynamic: mirrors…" a guía alineada con el workflow + aviso explícito de que la lista de required checks se actualiza a mano (evita sugerir sincronización automática).
 - **Branch protection no se aplica programáticamente**: documento markdown + aplicación manual en GitHub Settings. Mantiene la separación control-plane vs runtime-plane (ARCHITECTURE.md §1).
 
 ## Convenciones de este archivo
