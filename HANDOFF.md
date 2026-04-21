@@ -135,7 +135,7 @@ Lectura mínima al arrancar:
 - [docs/ARCHITECTURE.md § 7 Determinismo](docs/ARCHITECTURE.md) (Capa 1 ya con pre-branch-gate + session-start como canónicos)
 - [.claude/rules/hooks.md](.claude/rules/hooks.md) (ahora con "Segundo hook entregado" + matización safe-fail blocking vs informative)
 - [hooks/pre-branch-gate.py](hooks/pre-branch-gate.py) + [hooks/session-start.py](hooks/session-start.py) como patrones de referencia (blocker vs informative)
-- [hooks/_lib/](hooks/_lib/) — helpers ya extraídos en D2 (`slug.sanitize_slug`, `jsonl.append_jsonl`/`read_jsonl`, `time.now_iso`)
+- [hooks/_lib/](hooks/_lib/) — helpers ya extraídos en D2 (`slug.sanitize_slug`, `jsonl.append_jsonl`, `time.now_iso`)
 
 ## 10. Estado D2 (cerrada en rama)
 
@@ -144,7 +144,7 @@ Lectura mínima al arrancar:
 `hooks/_lib/` extraído (segunda repetición de CLAUDE.md regla #7 cumplida):
 
 - `_lib/slug.py::sanitize_slug` (`/` → `_`).
-- `_lib/jsonl.py::append_jsonl` + `read_jsonl` (append-only JSONL + reader tolerante a líneas inválidas).
+- `_lib/jsonl.py::append_jsonl` (append-only JSONL).
 - `_lib/time.py::now_iso` (UTC ISO-8601).
 - `_lib/__init__.py` vacío (package marker).
 - D1 rewireado en el mismo PR: `pre-branch-gate.py` ahora importa desde `_lib` vía `sys.path.insert(0, str(Path(__file__).parent))` + `from _lib.X import Y # noqa: E402` (decisión B1: imports relativos sin convertir a package formal por nombre hyphenated). Sus 60 tests siguen verdes (re-export `pbg.sanitize_slug` preservado).
@@ -160,7 +160,7 @@ Lectura mínima al arrancar:
 Apuntes para quien arranque D3 (o cualquier rama post-D2):
 
 - **Patrón hook consolidado (2ª aplicación)**: blocker (D1) vs informative (D2) son las dos variantes canónicas. D3 es blocker (PreToolUse(Write)), mismo shape que D1. Detalle en [.claude/rules/hooks.md](.claude/rules/hooks.md).
-- **`hooks/_lib/` ya disponible** — D3 debe reusar `sanitize_slug` / `append_jsonl` / `read_jsonl` / `now_iso` en lugar de redefinir. Nuevo helper sólo si ≥2 hooks lo usan (regla #7).
+- **`hooks/_lib/` ya disponible** — D3 debe reusar `sanitize_slug` / `append_jsonl` / `now_iso` en lugar de redefinir. Nuevo helper sólo si ≥2 hooks lo usan (regla #7).
 - **Double log** con su propio archivo + `phase-gates.jsonl` con evento canónico (p.ej. `pre_write`). Mismo shape que D1/D2.
 - Carry-over Fase N+7: **sin carry-over abierto** al arrancar D3. Carry-over de C5 (copia real hooks/skills + `FileWrite.mode`) sigue abierto para rama post-E1a — no relevante para D3.
 - Snapshots del generador (total 54) inalterados en D2 (no se tocó `generator/**`).

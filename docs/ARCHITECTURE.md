@@ -366,7 +366,7 @@ Código Python/bash. Exit code 2 = bloqueo. El LLM no puede ignorarlos. Son el �
 **Helpers compartidos — `hooks/_lib/`** (extraído en D2 tras segunda repetición, CLAUDE.md regla #7):
 
 - `_lib/slug.py::sanitize_slug` (`/` → `_`).
-- `_lib/jsonl.py::append_jsonl` + `read_jsonl` (append-only JSONL + reader tolerante a líneas inválidas).
+- `_lib/jsonl.py::append_jsonl` (append-only JSONL).
 - `_lib/time.py::now_iso` (UTC ISO-8601).
 - Consumidos desde hooks con nombre hyphenated via `sys.path.insert(0, str(Path(__file__).parent))` + `from _lib.X import Y  # noqa: E402` (sin convertir el hook a package formal). Las ramas D3..D6 deben reusar estos helpers en lugar de redefinir; añadir a `_lib/` sólo cuando ≥2 hooks usen el nuevo helper.
 

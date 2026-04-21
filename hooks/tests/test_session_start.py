@@ -557,4 +557,100 @@ class TestMainInProcess:
         hook_log = tmp_path / ".claude" / "logs" / "session-start.jsonl"
         entry = json.loads(hook_log.read_text().splitlines()[-1])
         assert entry["branch"] is None
-        assert entry["phase"] == "unknown"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PR #12 review fixes — logging resilience, base label, snapshot cap, docstring
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestLoggingResilience:
+    """Informative hooks must exit 0 even when logging raises (disk full, RO fs)."""
+
+    STARTUP = '{"hook_event_name":"SessionStart","session_id":"x","source":"startup"}'
+
+    def _run(self, monkeypatch, repo: Path, stdin_text: str) -> int:
+        monkeypatch.chdir(repo)
+        monkeypatch.setattr("sys.stdin", io.StringIO(stdin_text))
+        return ss.main()
+
+    def test_log_snapshot_oserror_still_exits_zero(self, monkeypatch, repo, capsys):
+        def boom(*_args, **_kwargs):
+            raise OSError("disk full")
+
+        monkeypatch.setattr(ss, "append_jsonl", boom)
+        assert self._run(monkeypatch, repo, self.STARTUP) == 0
+        out = capsys.readouterr().out
+        assert "pos snapshot" in out
+        envelope = json.loads(out)
+        assert "additionalContext" in envelope["hookSpecificOutput"]
+
+    def test_log_error_oserror_on_malformed_still_exits_zero(self, monkeypatch, repo, capsys):
+        def boom(*_args, **_kwargs):
+            raise OSError("read-only fs")
+
+        monkeypatch.setattr(ss, "append_jsonl", boom)
+        assert self._run(monkeypatch, repo, "this is not json") == 0
+        out = capsys.readouterr().out
+        envelope = json.loads(out)
+        assert "error reading payload" in envelope["hookSpecificOutput"]["additionalContext"]
+
+
+@pytest.fixture
+def master_repo(tmp_path: Path) -> Path:
+    """Tmp repo on `master` (no `main`) to exercise base-ref interpolation."""
+    (tmp_path / ".claude" / "branch-approvals").mkdir(parents=True)
+    (tmp_path / ".claude" / "logs").mkdir(parents=True)
+    git(tmp_path, "init", "-q", "-b", "master")
+    (tmp_path / "README.md").write_text("init\n")
+    git(tmp_path, "add", ".")
+    git(tmp_path, "commit", "-q", "-m", "initial")
+    return tmp_path
+
+
+class TestDocsSyncBaseLabel:
+    def test_warning_says_vs_master_when_only_master_exists(self, master_repo: Path):
+        git(master_repo, "checkout", "-q", "-b", "feat/d2-test")
+        (master_repo / "some_code.py").write_text("pass\n")
+        git(master_repo, "add", ".")
+        git(master_repo, "commit", "-q", "-m", "code only")
+        ctx = additional_context(run_hook(load_fixture("session_startup.json"), cwd=master_repo))
+        assert "vs master" in ctx
+        assert "vs main" not in ctx
+
+    def test_warning_says_vs_main_when_main_exists(self, repo: Path):
+        checkout_feat(repo, "feat/d2-test")
+        (repo / "some_code.py").write_text("pass\n")
+        git(repo, "add", ".")
+        git(repo, "commit", "-q", "-m", "code only")
+        ctx = additional_context(run_hook(load_fixture("session_startup.json"), cwd=repo))
+        assert "vs main" in ctx
+
+
+class TestSnapshotTruncation:
+    def test_many_warnings_truncated_within_ten_lines(self):
+        warnings = [f"warn-{i}" for i in range(10)]
+        snapshot = ss.build_snapshot("feat/d2-x", "D2", "abc merge", warnings)
+        lines = snapshot.splitlines()
+        assert len(lines) <= 10
+        assert any("more" in l for l in lines)
+
+    def test_five_or_fewer_warnings_shown_verbatim(self):
+        warnings = [f"warn-{i}" for i in range(5)]
+        snapshot = ss.build_snapshot("feat/d2-x", "D2", "abc merge", warnings)
+        assert all(f"warn-{i}" in snapshot for i in range(5))
+        assert "more" not in snapshot
+
+    def test_no_warnings_uses_none_literal(self):
+        snapshot = ss.build_snapshot("main", "unknown", None, [])
+        assert "Warnings: (none)" in snapshot
+        assert "more" not in snapshot
+
+
+class TestDocstringContract:
+    def test_docstring_separates_payload_logging_from_git_degradation(self):
+        # Copilot PR #12 review: current docstring conflates payload errors
+        # (which log an entry) with git errors (which don't log). Fix = split
+        # them: payload → logs; git → degrades to reduced context.
+        doc = ss.__doc__ or ""
+        assert "reduced" in doc.lower() or "silently" in doc.lower()

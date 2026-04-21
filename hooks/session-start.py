@@ -2,8 +2,11 @@
 """session-start: emit pos snapshot as additionalContext on SessionStart.
 
 Informational hook (SessionStart). Never denies — exit 0 always. On payload
-or git error, degrades gracefully: logs an error entry and emits a minimal
-additionalContext. See docs/ARCHITECTURE.md §7 Capa 1 and
+error, logs an error entry and emits a minimal additionalContext. Git
+unavailability or git command failure degrades gracefully to reduced
+context (no error entry — git faults are silently absorbed by `_git`).
+Logging failures (disk full / read-only fs) are also swallowed so the
+hook still returns 0. See docs/ARCHITECTURE.md §7 Capa 1 and
 .claude/rules/hooks.md for the safe-fail exception for informative hooks.
 """
 from __future__ import annotations
@@ -15,7 +18,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from _lib.jsonl import append_jsonl, read_jsonl  # noqa: E402
+from _lib.jsonl import append_jsonl  # noqa: E402
 from _lib.slug import sanitize_slug  # noqa: E402
 from _lib.time import now_iso  # noqa: E402
 
@@ -26,6 +29,7 @@ HOOK_LOG = ".claude/logs/session-start.jsonl"
 PHASE_LOG = ".claude/logs/phase-gates.jsonl"
 
 GIT_TIMEOUT_S = 2
+MAX_SNAPSHOT_LINES = 10
 
 _PHASE_RE = re.compile(
     r"^(?:feat|fix|chore|refactor)[/_]([a-z])(\d+)-",
@@ -74,10 +78,7 @@ def _base_ref(cwd: Path) -> str | None:
     return None
 
 
-def _diff_touches_docs(cwd: Path) -> bool:
-    base = _base_ref(cwd)
-    if base is None:
-        return True
+def _diff_touches_docs_against(cwd: Path, base: str) -> bool:
     out = _git(cwd, "diff", "--name-only", f"{base}..HEAD")
     if out is None:
         return True
@@ -85,15 +86,35 @@ def _diff_touches_docs(cwd: Path) -> bool:
     return "ROADMAP.md" in files or "HANDOFF.md" in files
 
 
+def _latest_phase_from_log(path: Path) -> str | None:
+    """Single forward scan over phase-gates.jsonl keeping the last parseable
+    phase. O(1) memory regardless of log size."""
+    if not path.exists():
+        return None
+    latest: str | None = None
+    with path.open(encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            p = phase_from_slug(entry.get("slug"))
+            if p:
+                latest = p
+    return latest
+
+
 def derive_phase(branch: str | None, phase_log_path: Path) -> str:
     p = phase_from_slug(branch)
     if p:
         return p
     if branch in ("main", "master"):
-        for entry in reversed(read_jsonl(phase_log_path)):
-            p = phase_from_slug(entry.get("slug"))
-            if p:
-                return p
+        p = _latest_phase_from_log(phase_log_path)
+        if p:
+            return p
     return "unknown"
 
 
@@ -104,9 +125,10 @@ def detect_warnings(repo_root: Path, branch: str | None) -> list[str]:
     marker = repo_root / APPROVALS_DIR / f"{sanitize_slug(branch)}.approved"
     if not marker.exists():
         warnings.append(f"marker ausente: {marker.relative_to(repo_root)}")
-    if not _diff_touches_docs(repo_root):
+    base = _base_ref(repo_root)
+    if base is not None and not _diff_touches_docs_against(repo_root, base):
         warnings.append(
-            "docs-sync pendiente: rama sin cambios en ROADMAP.md ni HANDOFF.md vs main"
+            f"docs-sync pendiente: rama sin cambios en ROADMAP.md ni HANDOFF.md vs {base}"
         )
     return warnings
 
@@ -117,19 +139,22 @@ def build_snapshot(
     last_merge_str: str | None,
     warnings: list[str],
 ) -> str:
-    lines = [
+    header = [
         "pos snapshot",
         f"Branch: {branch or '(unknown)'}",
         f"Phase: {phase}",
         f"Last merge: {last_merge_str or '(none)'}",
     ]
     if not warnings:
-        lines.append("Warnings: (none)")
+        return "\n".join(header + ["Warnings: (none)"])
+    budget = MAX_SNAPSHOT_LINES - len(header) - 1  # reserve 1 line for "Warnings:"
+    if len(warnings) <= budget:
+        warning_lines = [f"- {w}" for w in warnings]
     else:
-        lines.append("Warnings:")
-        for w in warnings:
-            lines.append(f"- {w}")
-    return "\n".join(lines)
+        shown = warnings[: budget - 1]  # reserve 1 line for "(+N more)"
+        warning_lines = [f"- {w}" for w in shown]
+        warning_lines.append(f"- (+{len(warnings) - len(shown)} more)")
+    return "\n".join(header + ["Warnings:"] + warning_lines)
 
 
 def emit(context: str) -> None:
@@ -142,6 +167,15 @@ def emit(context: str) -> None:
     print(json.dumps(out, ensure_ascii=False))
 
 
+def _safe_append(path: Path, entry: dict) -> None:
+    """Best-effort log write. Logging failures (disk full, read-only fs) must
+    not break an informative hook's exit-0 contract."""
+    try:
+        append_jsonl(path, entry)
+    except OSError:
+        pass
+
+
 def _log_snapshot(
     repo_root: Path,
     ts: str,
@@ -150,7 +184,7 @@ def _log_snapshot(
     phase: str,
     warnings: list[str],
 ) -> None:
-    append_jsonl(
+    _safe_append(
         repo_root / HOOK_LOG,
         {
             "ts": ts,
@@ -161,7 +195,7 @@ def _log_snapshot(
             "warnings": warnings,
         },
     )
-    append_jsonl(
+    _safe_append(
         repo_root / PHASE_LOG,
         {
             "ts": ts,
@@ -174,7 +208,7 @@ def _log_snapshot(
 
 
 def _log_error(repo_root: Path, ts: str, source: str | None, error: str) -> None:
-    append_jsonl(
+    _safe_append(
         repo_root / HOOK_LOG,
         {"ts": ts, "hook": HOOK_NAME, "source": source, "error": error},
     )

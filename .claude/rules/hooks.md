@@ -90,7 +90,7 @@ Referencia del patrón **informative** (SessionStart) — primera aplicación de
 Segunda repetición de CLAUDE.md regla #7 cumplida (D1 + D2 = 2 hooks reusando los mismos patrones). Contenido mínimo:
 
 - `_lib/slug.py::sanitize_slug` (`/` → `_`).
-- `_lib/jsonl.py::append_jsonl` + `read_jsonl` (append-only + reader tolerante a líneas inválidas).
+- `_lib/jsonl.py::append_jsonl` (append-only JSONL).
 - `_lib/time.py::now_iso` (UTC ISO-8601).
 - `_lib/__init__.py` vacío (package marker).
 
@@ -99,7 +99,7 @@ Segunda repetición de CLAUDE.md regla #7 cumplida (D1 + D2 = 2 hooks reusando l
 ```python
 sys.path.insert(0, str(Path(__file__).parent))
 from _lib.slug import sanitize_slug  # noqa: E402
-from _lib.jsonl import append_jsonl, read_jsonl  # noqa: E402
+from _lib.jsonl import append_jsonl  # noqa: E402
 from _lib.time import now_iso  # noqa: E402
 ```
 
