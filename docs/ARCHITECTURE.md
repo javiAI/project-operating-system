@@ -340,6 +340,14 @@ Cada agent declara sus tools permitidas (`allowed-tools:`) — subset mínimo. U
 
 Código Python/bash. Exit code 2 = bloqueo. El LLM no puede ignorarlos. Son el último recurso de enforcement.
 
+**Implementación canónica — `hooks/pre-branch-gate.py`** (entregado en rama D1):
+
+- Shebang `#!/usr/bin/env python3` + stdlib-only (json, shlex, sys, pathlib, datetime).
+- Lee JSON de stdin; `permissionDecision: deny` + `decisionReason` en stdout cuando bloquea; exit 2 en bloqueo / malformado, exit 0 en allow y pass-through.
+- Pass-through silencioso (sin stdout) para non-Bash tools, commands no-branch, stdin vacío/sin campos esperados.
+- Detección con `shlex.split` (robusto a quoting + global options git pre-subcommand).
+- Double log: `.claude/logs/<hook-name>.jsonl` propio + `.claude/logs/phase-gates.jsonl` (evento canónico del ciclo, p.ej. `branch_creation`). Las ramas D2..D6 siguen este mismo shape.
+
 ### Capa 2: Logs auditables
 
 `.claude/logs/`:

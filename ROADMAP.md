@@ -9,7 +9,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | A | Skeleton & bootstrap | ✅ |
 | B | Cuestionario + profiles + runner | ✅ |
 | C | Templates + renderers | ✅ (C1 ✅, C2 ✅, C3 ✅, C4 ✅, C5 ✅) |
-| D | Hooks (Python) | ⏳ pendiente |
+| D | Hooks (Python) | ⏳ parcial (D1 ✅) |
 | E1 | Skills orquestación | ⏳ pendiente |
 | E2 | Skills calidad | ⏳ pendiente |
 | E3 | Skills patterns + tests | ⏳ pendiente |
@@ -28,7 +28,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | `feat/c3-renderers-tests-harness` | Test harness mínimo por stack | ✅ | — |
 | `feat/c4-renderers-ci-cd` | GitHub Actions CI workflow + BRANCH_PROTECTION doc (GitLab/Bitbucket diferidos) | ✅ | — |
 | `feat/c5-renderers-skills-hooks-copy` | `.claude/` skeleton (settings.json + hooks/README + skills/README); copia real diferida a D/E | ✅ | — |
-| `feat/d1-hook-pre-branch-gate` | Bloqueo `git checkout -b` sin marker | ⏳ | — |
+| `feat/d1-hook-pre-branch-gate` | Bloqueo `git checkout -b` / `switch -c` / `worktree add -b` sin marker | ✅ | — (PR pendiente) |
 | `feat/d2-hook-session-start` | Snapshot 30s | ⏳ | — |
 | `feat/d3-hook-pre-write-guard` | Test-pair + pattern injection + anti-pattern block | ⏳ | — |
 | `feat/d4-hook-pre-pr-gate` | Policy vs logs + docs-sync + CI dry-run | ⏳ | — |
@@ -214,6 +214,31 @@ Entregables:
 - **`.claude/settings.json` mínimo conservador** — decisión explícita del usuario: solo `hooks: {}` + `_note`. **No** se siembra `permissions` baseline; esa decisión la toma Fase D cuando los hooks reales definan su superficie.
 - **Renderer naming** — `skills-hooks-skeleton.ts` (no `settings-skeleton.ts`). Refleja el dominio real de la rama aunque el scope se haya recortado.
 - **Docs-sync explícito** — esta entrada deja cristalino que C5 cierra la *estructura* de `.claude/`, no la *copia real*. El riesgo de ambigüedad fue la causa raíz del replanteo en Fase -1.
+
+## Progreso Fase D
+
+### `feat/d1-hook-pre-branch-gate` — ✅ (PR pendiente)
+
+Entregables:
+
+- `hooks/pre-branch-gate.py` (ejecutable, stdlib-only, Python 3.10+) — PreToolUse(Bash) hook que bloquea branch creation sin marker `.claude/branch-approvals/<sanitized-slug>.approved`. Detecta `git checkout -b`, `git switch -c`, `git worktree add -b` con `shlex.split` (robusto a quoting + global options pre-subcommand). `git branch <slug>` excluido (ref sin checkout ≠ inicio de trabajo).
+- `hooks/tests/test_pre_branch_gate.py` — 55 tests pytest en 8 clases (subprocess integration + in-process unit): detection, pass-through, sanitization, logging, robustness, `sanitize_slug`, `extract_branch_slug`, `build_deny_reason`, `main()`. 99% coverage (única línea no cubierta: `sys.exit(main())` bajo `__main__` guard, intrínseco al script entrypoint).
+- `hooks/tests/fixtures/payloads/` — 6 JSON fixtures (`checkout_b`, `switch_c`, `worktree_add_b`, `git_status`, `git_branch_no_flag`, `non_bash`).
+- `requirements-dev.txt` — `pytest>=7`, `pytest-cov>=4`. Minimum viable test env, sin ruff ni infraestructura adicional.
+- `.gitignore` — entradas Python (`/.venv/`, `__pycache__/`, `*.pyc`, `.pytest_cache/`, `.coverage`).
+- Double logging: `.claude/logs/pre-branch-gate.jsonl` (append-only) + `.claude/logs/phase-gates.jsonl` (evento `branch_creation`). Prepara `/pos:audit-session` (F3) sin refactor posterior.
+- Mensaje al bloquear: ruta exacta del marker + comando `touch` sugerido + referencia textual a `MASTER_PLAN.md` (sin parseo). Pass-through silencioso en todo el resto.
+
+**Ajustes vs plan original** (Fase -1 aprobada):
+
+- **Alcance ampliado vs MASTER_PLAN.md L200**: además de `checkout -b` y `switch -c` (scope textual original), cubre `git worktree add -b` para tapar bypass obvio. `git branch <slug>` deliberadamente excluido.
+- **Sin bypass env var** (`POS_SKIP_BRANCH_GATE=1` rechazado): el bypass legítimo es crear marker explícito.
+- **Sin `hooks/_lib/` compartido**: CLAUDE.md regla #7 (≥2 repeticiones antes de abstraer). D1 es el primer hook; `sanitize_slug`/`append_jsonl`/`now_iso` quedan locales al archivo. Reevaluar extracción en D2 si se repiten.
+- **Bootstrap de test env dentro de esta rama**: `.venv` local + `requirements-dev.txt`. Alternativa descartada: pip --user o `pyproject.toml` (ambas contaminan más o son ecosistema prematuro).
+- **Sin `ruff`**: lint Python queda fuera de scope D1. Reabrir cuando exista justificación independiente.
+- **Sin `bin/pos-selftest.sh`**: la integración end-to-end del plugin queda fuera de scope D1. La rama se limita a hook + test pair + docs-sync.
+- **In-process tests añadidos vs Fase -1**: `pytest-cov` no mide subprocesses; se añadieron 32 unit tests in-process (`importlib.util.spec_from_file_location` para cargar el módulo con guión en el nombre) para alcanzar el 85% comprometido. Subprocess tests conservados como integración end-to-end.
+- **`.claude/settings.json` no modificado**: ya referencia `./hooks/pre-branch-gate.py` desde Fase A. D1 sólo materializa el binario ausente.
 
 ## Convenciones de este archivo
 

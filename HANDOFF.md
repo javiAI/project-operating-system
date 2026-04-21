@@ -5,7 +5,7 @@
 ## 1. Snapshot
 
 - Repo: `project-operating-system` (plugin `pos`).
-- Fase actual: **C5 ✅ cerrada en rama** (`feat/c5-renderers-skills-hooks-copy`, PR pendiente de abrir). Anterior: **C4 ✅ PR #8** (`c57570b`). Siguiente: **D1 — `feat/d1-hook-pre-branch-gate`**.
+- Fase actual: **D1 ✅ cerrada en rama** (`feat/d1-hook-pre-branch-gate`, PR pendiente de abrir). Anterior: **C5 ✅ PRs #9/#10** (`539f964` + `b447d01`). Siguiente: **D2 — `feat/d2-hook-session-start`**.
 - Fuente de verdad ejecutable: [MASTER_PLAN.md](MASTER_PLAN.md).
 - Estado vivo: [ROADMAP.md](ROADMAP.md).
 - Arquitectura canonical: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -92,10 +92,10 @@ Ejecuta §2.1 Fase -1 completo. Espera aprobación explícita antes de `git chec
 
 ## 7. Gotchas del entorno
 
-- El hook `pre-branch-gate.py` **aún no existe** (Fase D1). Hasta entonces, el marker es convención, no enforcement. Respetar manualmente.
+- El hook `pre-branch-gate.py` **ya está vivo** desde D1: `git checkout -b`, `git switch -c` y `git worktree add -b` sin marker quedan bloqueados por exit 2 + `permissionDecision: deny`. El bypass legítimo es crear marker explícito.
+- Otros hooks referenciados en `.claude/settings.json` (`session-start.py`, `pre-write-guard.py`, `post-action.py`, `pre-compact.py`, `stop-policy-check.py`) siguen ausentes — tolerados por Claude Code como no-op. Entregados en D2..D6.
 - `policy.yaml` declarado pero no enforced todavía (Fase D4). Hasta entonces, docs-sync requiere disciplina manual.
 - `/pos:*` skills no existen aún (Fase E*). Invocaciones fallarán silenciosas. Usar comportamiento manual equivalente.
-- Todo hook declarado en `settings.local.json` con `_note: "Entregado en Fase D"` es un stub — el sistema tolera su ausencia.
 
 ### Deuda técnica abierta — schema defaults no materializados en `buildProfile`
 
@@ -122,37 +122,38 @@ Hasta que `pos` tenga sus propias skills:
 
 ## 9. Próxima rama
 
-**D1 — `feat/d1-hook-pre-branch-gate`**
+**D2 — `feat/d2-hook-session-start`**
 
-Scope (ver [MASTER_PLAN.md § Rama D1](MASTER_PLAN.md)):
+Scope (ver [MASTER_PLAN.md § Rama D2](MASTER_PLAN.md)):
 
-- Primer hook Python del plugin: `PreToolUse(Bash)` bloquea `git checkout -b <slug>` cuando `.claude/branch-approvals/<slug>.approved` no existe. Cierra la regla no-negociable #1 de CLAUDE.md pasando de convención manual a enforcement real.
-- Abre la fase de hooks (`hooks/**`). Convenciones de test pair obligatorio (`hooks/tests/test_<x>.py`) vigentes desde este momento vía `.claude/rules/tests.md`.
+- Segundo hook Python: `hooks/session-start.py` — snapshot 30s al iniciar sesión de Claude Code (rama actual, último merge, fase en curso, warnings).
+- Señal de reabrir extracción de helpers compartidos: si `session-start.py` repite patrones de D1 (`sanitize_slug`, `append_jsonl`, `now_iso`, lectura/escritura de `.claude/logs/*.jsonl`), evaluar extracción a `hooks/_lib/` (CLAUDE.md regla #7: D1 + D2 = 2 repeticiones documentadas).
 
 Lectura mínima al arrancar:
 
-- [MASTER_PLAN.md § Rama D1](MASTER_PLAN.md)
-- [docs/ARCHITECTURE.md § 4 Hooks](docs/ARCHITECTURE.md)
-- [.claude/rules/tests.md](.claude/rules/tests.md) (test pair + waiver)
-- `.claude/settings.local.json` (estructura declarativa de hooks en Claude Code)
+- [MASTER_PLAN.md § Rama D2](MASTER_PLAN.md)
+- [docs/ARCHITECTURE.md § 7 Determinismo](docs/ARCHITECTURE.md) (Capa 1 ya concreta con pre-branch-gate)
+- [.claude/rules/hooks.md](.claude/rules/hooks.md) (ahora con "Primer hook entregado" como referencia)
+- [hooks/pre-branch-gate.py](hooks/pre-branch-gate.py) como patrón de referencia (structure + logging + pass-through semantics)
 
-## 10. Estado C5 (cerrada en rama)
+## 10. Estado D1 (cerrada en rama)
 
-`.claude/` esqueleto emitido por `pos` en el proyecto generado: `.claude/settings.json` (`hooks: {}` + `_note` deferral, **sin** `permissions` baseline) + `.claude/hooks/README.md` (deferral a Fase D + nota sobre `FileWrite.mode`) + `.claude/skills/README.md` (deferral a Fase E). 18 archivos por profile cuando `workflow.branch_protection == true` (17 si `false`): 15 de C1–C4 + 3 de C5. Pipeline `allRenderers` compone `coreDocRenderers + policyAndRulesRenderers + testsHarnessRenderers + cicdRenderers + skillsHooksRenderers` desde `generator/renderers/index.ts`. Detalle en [ROADMAP.md § Progreso Fase C](ROADMAP.md).
+`pre-branch-gate` vivo: `git checkout -b` / `git switch -c` / `git worktree add -b` sin `.claude/branch-approvals/<sanitized>.approved` fallan con exit 2 + `permissionDecision: deny` + `decisionReason` con ruta del marker, comando `touch` sugerido y ref textual a `MASTER_PLAN.md`. Pass-through silencioso en todo el resto (no-Bash tools, non-branch Bash, `git branch <slug>`, stdin vacío/malformado → exit 2 sin crash pero no loggea). Double log a `.claude/logs/pre-branch-gate.jsonl` + `phase-gates.jsonl` (evento `branch_creation`). 55 tests pytest, 99% coverage.
 
-**Lo que C5 NO hace** (explícito):
+**Lo que D1 NO hace** (explícito):
 
-- No copia los hooks ejecutables del plugin al proyecto generado. La copia real de `hooks/**` queda diferida a rama post-D1 cuando el catálogo de hooks exista.
-- No copia skills del plugin. La copia real de `.claude/skills/pos/**` queda diferida a rama post-E1a cuando el catálogo de skills esté auditado.
-- No extiende el shape `FileWrite` con `mode`. Mientras `pos` no copie ejecutables reales, el shape `{ path, content }` basta. La extensión llegará en la primera rama que necesite preservar bit `+x`.
+- No valida `skill_log pos:branch-plan` declarado en `policy.yaml.branch_creation.prerequisites`. Esa validación queda diferida a D4 (`pre-pr-gate.py`) o a la rama que entregue la skill (E1b).
+- No genera marker automáticamente. La dirección explícita del usuario prohibió "automatismo ciego"; el bypass legítimo es crear marker a mano.
+- No abstrae helpers a `hooks/_lib/`. CLAUDE.md regla #7: D1 es la primera repetición; D2 será la señal para extraer.
+- No extiende `bin/pos-selftest.sh`. Scope explícitamente recortado en Fase -1.
+- No introduce ruff u otro lint Python. Scope explícitamente recortado.
 
-Apuntes para quien arranque D1 (o cualquier rama post-C):
+Apuntes para quien arranque D2 (o cualquier rama post-D1):
 
-- Patrón `renderer-group` consolidado (5ª aplicación: core + policy/rules + tests-harness + ci-cd + skills-hooks-skeleton). Cualquier grupo nuevo en fases posteriores sigue el mismo shape: frozen tuple + composición en `allRenderers`. `run.ts` no se toca.
-- **Carry-over abierto — copia real hooks/skills + `FileWrite.mode`**: rama post-D1/E1a. Al abrir, añadir `mode?` al tipo `FileWrite`, extender `writeFiles` para respetarlo, reemplazar los 2 READMEs de C5 por contenido real copiado, y poblar `settings.json.hooks` con los hooks reales. Ver detalle en [.claude/rules/generator.md § Deferrals](.claude/rules/generator.md).
-- `settings.json` **no** siembra `permissions` baseline en C5. Cuando D1+ introduzca hooks reales con superficie de permisos conocida, decidir si se materializa un `permissions` mínimo en el renderer o se delega al hook mismo al instalarse.
-- CI hosts no-github (`gitlab`, `bitbucket`) siguen diferidos. Fase D/E no los reabren salvo señal explícita.
-- `release.yml` / `audit.yml` / matrix multi-OS y multi-runtime siguen diferidos. Ramas propias futuras.
-- `buildProfile` sigue sin materializar defaults: `valid-partial` declara 4 paths explícitos hoy (`testing.coverage_threshold`, `testing.e2e_framework`, `workflow.ci_host`, `workflow.branch_protection`). Si una rama futura añade paths con `default:`, actualizar los 3 canonicals + `valid-partial` (mismo patrón).
-- Snapshots por convención en `generator/__snapshots__/<slug>/<path>.snap`. +9 archivos añadidos en C5; total actual 54 (18 C1 + 9 C2 + 12 C3 + 6 C4 + 9 C5).
-- Carry-over Fase N+7: **sin carry-over abierto** al arrancar D1.
+- **Patrón hook consolidado (1ª aplicación)**: shebang + docstring + stdlib-only + `shlex.split` para comandos Bash + `Path.cwd()` como repo root + JSONL logs append-only + `permissionDecision` + `decisionReason` + exit 2 denies. Ver `hooks/pre-branch-gate.py` como referencia.
+- **Signal para D2**: si `session-start.py` reusa `append_jsonl`, `now_iso`, o lógica de sanitización de paths/slugs, extraer a `hooks/_lib/` en D2 y refactorizar D1 para usarlo en el mismo PR. Segunda repetición documentada habilita la extracción.
+- **Test pattern**: pytest con subprocess integration + in-process unit (loaded via `importlib.util.spec_from_file_location` por el guión en el nombre). 99% coverage es alcanzable; la línea `sys.exit(main())` bajo `__name__ == "__main__"` queda intrínsecamente fuera.
+- **Test env**: `.venv` + `requirements-dev.txt`. D2 no debería requerir nuevas deps salvo justificación explícita. Invocación local: `.venv/bin/pytest hooks/tests/`.
+- **Double log** ya consolidado (`pre-branch-gate.jsonl` + `phase-gates.jsonl` con evento `branch_creation`). D2 puede añadir su propio `session-start.jsonl` + evento `session_start` al `phase-gates.jsonl` siguiendo el mismo shape.
+- Carry-over Fase N+7: **sin carry-over abierto** al arrancar D2. Carry-over de C5 (copia real hooks/skills + `FileWrite.mode`) sigue abierto para rama post-E1a — no relevante para D2.
+- Snapshots del generador (total 54) inalterados en D1.
