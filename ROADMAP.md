@@ -14,7 +14,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | E2 | Skills calidad | ⏳ pendiente |
 | E3 | Skills patterns + tests | ⏳ pendiente |
 | F | Audit + selftest + marketplace | ⏳ pendiente |
-| G | Knowledge Plane (opcional) | ⏳ planificación only (scope cerrado, sin implementación) |
+| G | Knowledge Plane (opcional) | ⏳ solo planificación (scope cerrado, sin implementación) |
 
 ## Ramas
 
