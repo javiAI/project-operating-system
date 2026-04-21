@@ -303,6 +303,12 @@ class TestExtractBranchSlugUnit:
     def test_global_opt_paginate_no_arg(self):
         assert pbg.extract_branch_slug("git --no-pager checkout -b feat/x") == "feat/x"
 
+    def test_global_opt_exec_path_space_form(self):
+        assert pbg.extract_branch_slug("git --exec-path /foo checkout -b feat/x") == "feat/x"
+
+    def test_global_opt_upload_pack_space_form(self):
+        assert pbg.extract_branch_slug("git --upload-pack /foo checkout -b feat/x") == "feat/x"
+
     def test_checkout_b_no_arg_none(self):
         assert pbg.extract_branch_slug("git checkout -b") is None
 

@@ -27,11 +27,21 @@ GIT_GLOBAL_OPTS_WITH_ARG = {
     "--work-tree",
     "--namespace",
     "--super-prefix",
+    "--exec-path",
+    "--upload-pack",
 }
 
 
 def sanitize_slug(slug: str) -> str:
     return slug.replace("/", "_")
+
+
+def _flag_value(args: list[str], flag: str) -> str | None:
+    if flag in args:
+        i = args.index(flag)
+        if i + 1 < len(args):
+            return args[i + 1]
+    return None
 
 
 def extract_branch_slug(command: str) -> str | None:
@@ -58,22 +68,12 @@ def extract_branch_slug(command: str) -> str | None:
     subcmd = tokens[idx]
     args = tokens[idx + 1 :]
 
-    if subcmd in ("checkout", "switch"):
-        flag = "-b" if subcmd == "checkout" else "-c"
-        if flag in args:
-            flag_idx = args.index(flag)
-            if flag_idx + 1 < len(args):
-                return args[flag_idx + 1]
-        return None
-
+    if subcmd == "checkout":
+        return _flag_value(args, "-b")
+    if subcmd == "switch":
+        return _flag_value(args, "-c")
     if subcmd == "worktree" and args and args[0] == "add":
-        rest = args[1:]
-        if "-b" in rest:
-            b_idx = rest.index("-b")
-            if b_idx + 1 < len(rest):
-                return rest[b_idx + 1]
-        return None
-
+        return _flag_value(args[1:], "-b")
     return None
 
 
@@ -140,33 +140,24 @@ def main() -> int:
     repo_root = Path.cwd()
     marker = marker_path(repo_root, sanitized)
     ts = now_iso()
-    base_entry = {
-        "ts": ts,
-        "hook": HOOK_NAME,
-        "command": command,
-        "slug": sanitized,
-    }
 
-    if marker.exists():
+    def log(decision: str, reason: str) -> None:
         append_jsonl(
             repo_root / HOOK_LOG,
-            {**base_entry, "decision": "allow", "reason": "marker present"},
+            {"ts": ts, "hook": HOOK_NAME, "command": command, "slug": sanitized,
+             "decision": decision, "reason": reason},
         )
         append_jsonl(
             repo_root / PHASE_LOG,
-            {"ts": ts, "event": "branch_creation", "slug": sanitized, "decision": "allow"},
+            {"ts": ts, "event": "branch_creation", "slug": sanitized, "decision": decision},
         )
+
+    if marker.exists():
+        log("allow", "marker present")
         return 0
 
     reason = build_deny_reason(marker, command)
-    append_jsonl(
-        repo_root / HOOK_LOG,
-        {**base_entry, "decision": "deny", "reason": reason},
-    )
-    append_jsonl(
-        repo_root / PHASE_LOG,
-        {"ts": ts, "event": "branch_creation", "slug": sanitized, "decision": "deny"},
-    )
+    log("deny", reason)
     emit_deny(reason)
     return 2
 
