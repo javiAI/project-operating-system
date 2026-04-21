@@ -1,0 +1,19 @@
+# .claude/skills/
+
+Directorio reservado por `pos` (C5) para las skills de Claude Code del proyecto.
+
+## Estado actual — contenido diferido
+
+Esta rama (C5) **sólo** materializa la estructura del directorio `.claude/`. La copia real de las skills queda **diferida a Fase E**, cuando `pos` entregue el catálogo auditado (`/pos:kickoff`, `/pos:branch-plan`, `/pos:pre-commit-review`, …) con sus agentes, policy y model routing resueltos.
+
+Motivo: en este momento, las skills del plugin viven en un catálogo en evolución activa. Copiar una instantánea hoy garantiza drift inmediato respecto al plugin instalado. Es abstracción prematura (CLAUDE.md regla #7 — patterns before abstraction).
+
+## Qué entra aquí en Fase E
+
+- Skills por dominio en `skills/<dominio>/SKILL.md` con frontmatter (`name`, `description`, `model`, `context`, `agent`).
+- Registro en `policy.yaml` (el renderer `policy.ts` de C2 ya declara la forma esperada).
+- Integración con `/pos:audit-plugin` para validar que cada skill pasa GO antes de quedar activa.
+
+## No toques este README a mano
+
+El contenido de este archivo es determinista (regenerado por `pos`). Cualquier cambio manual se sobrescribirá en la próxima invocación.

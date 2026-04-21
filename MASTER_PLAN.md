@@ -169,9 +169,27 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 
 **Criterio de salida** (cumplido): 15 `FileWrite` por profile (9 C1+C2 + 4 C3 + 2 C4), `yaml.parse(ci.yml)` OK sobre los 3 canonicals, SHA40 pins en todas las `uses:`, mutual-exclusión de stack conditionals, 45 snapshots estables, coverage ≥85%, CI verde.
 
-### Rama C5 — `feat/c5-renderers-skills-hooks-copy`
+### Rama C5 — `feat/c5-renderers-skills-hooks-copy` ✅
 
-**Scope**: renderer que copia `skills/` + `hooks/` del plugin al proyecto generado, ajustando paths y permisos.
+**Scope original**: renderer que copia `skills/` + `hooks/` del plugin al proyecto generado, ajustando paths y permisos.
+
+**Scope entregado (recortado en Fase -1)**: renderer único `skills-hooks-skeleton.ts` que emite **solo la estructura** del directorio `.claude/` del proyecto generado: `.claude/settings.json` (`hooks: {}` + `_note` de deferral; **sin** `permissions` baseline) + `.claude/hooks/README.md` (documenta deferral a Fase D) + `.claude/skills/README.md` (documenta deferral a Fase E). 3 FileWrite por profile; 18 archivos totales por profile (15 C1–C4 + 3 C5).
+
+**Lo que C5 NO hace** (explícito por docs-sync):
+
+- **No copia real de hooks ejecutables**. Razón: `hooks/` del meta-repo no existe todavía; copiar placeholders sería abstracción prematura (CLAUDE.md regla #7). Diferido a rama post-D1 cuando exista el catálogo estable.
+- **No copia real de skills**. Razón: las skills del plugin viven en un catálogo en evolución activa; una instantánea copiada hoy garantiza drift inmediato. Diferido a rama post-E1a cuando el catálogo esté auditado (`/pos:audit-plugin --self` green).
+- **No extiende `FileWrite` con `mode`**. Razón: mientras `pos` no emita ejecutables reales, `{ path, content }` basta. La extensión a `{ path, content, mode? }` llegará en la misma rama que copie ejecutables.
+
+**Ajustes vs plan original** (Fase -1 aprobada):
+
+- **Scope recortado** (decisión explícita del usuario): solo esqueleto, cero copia real. Evita mezclar alcance C con alcance D/E.
+- **Renderer naming**: `skills-hooks-skeleton.ts` (no `settings-skeleton.ts`) — el nombre refleja el dominio real del directorio emitido, aunque el scope actual sea estructural.
+- **`.claude/settings.json` mínimo conservador**: solo `hooks: {}` + `_note`. **Sin** `permissions` baseline; esa decisión la toma Fase D cuando los hooks reales definan su superficie.
+- **Patrón `renderer-group` 5ª aplicación** (`skillsHooksRenderers` frozen compuesto en `allRenderers`). `run.ts` intacto.
+- **Docs-sync explícito sobre los 3 deferrals** (copia hooks, copia skills, `FileWrite.mode`). Ver [HANDOFF.md §10](HANDOFF.md), [.claude/rules/generator.md § Deferrals](.claude/rules/generator.md).
+
+**Criterio de salida** (cumplido): 18 `FileWrite` por profile (15 C1–C4 + 3 C5), `JSON.parse(settings.json)` OK sobre los 3 canonicals con `hooks === {}` y `_note` string, READMEs documentan deferral (`/pos/` + `/Fase\s*D|E/` + `/diferid/i`), contenido stack-agnostic (sin leaks vitest/pytest/npm/pip), 54 snapshots estables (45 previos + 9 nuevos), `validate:generator` + `render:generator` exit 0, vitest 515/0.
 
 ---
 

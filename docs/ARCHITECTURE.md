@@ -180,7 +180,7 @@ Los tres modos son mutuamente exclusivos (error → exit 2). Sin flags = `--vali
 - `--schema` flag — diferido hasta que exista 2º schema.
 - `--force` flag — fuera de scope C1; `--out` sobre dir no vacío aborta con exit 3.
 
-### Renderers (entregado en C1, ampliado en C2, C3 y C4)
+### Renderers (entregado en C1, ampliado en C2, C3, C4 y C5)
 
 Un renderer por output. Función pura `Renderer = (profile: Profile) => FileWrite[]`. Sin efectos secundarios, sin `Date.now()`, sin `Math.random()`, sin env vars del host.
 
@@ -190,7 +190,7 @@ Un renderer por output. Función pura `Renderer = (profile: Profile) => FileWrit
 type FileWrite = { path: string; content: string };
 ```
 
-`path` es relativo al root del repo generado (permite subdirs: `.claude/rules/docs.md`). `mode` no existe en C1 — se añadirá en C5 cuando aparezcan hooks ejecutables con bits de permiso.
+`path` es relativo al root del repo generado (permite subdirs: `.claude/rules/docs.md`). `mode` no existe en C1–C5 — se añadirá en la primera rama post-D1/E1a que copie ejecutables reales con bits de permiso. C5 sólo emite esqueleto `.claude/` (JSON + 2 READMEs), por lo que la extensión sigue sin justificarse.
 
 **Pipeline** ([generator/lib/render-pipeline.ts](../generator/lib/render-pipeline.ts)):
 
@@ -204,14 +204,15 @@ export async function isDirEmpty(dir: string): Promise<boolean>;
 
 **Determinismo**: byte-identical entre runs. Tests asseveran con `JSON.stringify(renderAll(p, rs)) === JSON.stringify(renderAll(p, rs))`. Sin timestamps en templates (se añadirá `profile.metadata.generatedAt` inyectado desde fuera si una fase posterior lo requiere).
 
-**Lista actual** (C1 + C2 + C3 + C4, 15 archivos por profile cuando `workflow.branch_protection == true`; 14 cuando `false`):
+**Lista actual** (C1 + C2 + C3 + C4 + C5, 18 archivos por profile cuando `workflow.branch_protection == true`; 17 cuando `false`):
 
 - **Core docs** (C1, tuple congelada `coreDocRenderers`): CLAUDE.md, MASTER_PLAN.md, ROADMAP.md, HANDOFF.md, AGENTS.md, README.md.
 - **Policy + rules** (C2, tuple congelada `policyAndRulesRenderers`): `policy.yaml`, `.claude/rules/docs.md`, `.claude/rules/patterns.md`.
 - **Tests harness** (C3, tuple congelada `testsHarnessRenderers`, 1 renderer): set variable por stack. `typescript+vitest` → `tests/README.md` + `tests/smoke.test.ts` + `vitest.config.ts` + `Makefile`. `python+pytest` → `tests/README.md` + `tests/test_smoke.py` + `pytest.ini` + `Makefile`.
 - **CI/CD** (C4, tuple congelada `cicdRenderers`, 1 renderer): `.github/workflows/ci.yml` siempre (cuando `workflow.ci_host == "github"`); `docs/BRANCH_PROTECTION.md` sólo si `workflow.branch_protection == true`. `workflow.ci_host ∈ {gitlab, bitbucket}` → `Error` explícito desde el renderer ("deferred" + path del schema).
+- **Skills + hooks skeleton** (C5, tuple congelada `skillsHooksRenderers`, 1 renderer): `.claude/settings.json` (`hooks: {}` + `_note` explicando la deferral; **sin** `permissions` baseline), `.claude/hooks/README.md` (documenta deferral a Fase D), `.claude/skills/README.md` (documenta deferral a Fase E). 3 FileWrite por profile, stack-agnostic. **No** copia hooks ejecutables ni skills reales; ambos diferidos a rama post-D1/E1a.
 
-Composición expuesta como `allRenderers` en [generator/renderers/index.ts](../generator/renderers/index.ts) — `Object.freeze([...coreDocRenderers, ...policyAndRulesRenderers, ...testsHarnessRenderers, ...cicdRenderers])`. `generator/run.ts` importa únicamente `allRenderers`; la composición no vive en `run.ts` para evitar que crezca por fase (decisión de Fase -1 de C2, consolidada como 4ª aplicación del patrón `renderer-group` en C4).
+Composición expuesta como `allRenderers` en [generator/renderers/index.ts](../generator/renderers/index.ts) — `Object.freeze([...coreDocRenderers, ...policyAndRulesRenderers, ...testsHarnessRenderers, ...cicdRenderers, ...skillsHooksRenderers])`. `generator/run.ts` importa únicamente `allRenderers`; la composición no vive en `run.ts` para evitar que crezca por fase (decisión de Fase -1 de C2, consolidada como 5ª aplicación del patrón `renderer-group` en C5).
 
 **`policy.yaml` — detalles del renderer**:
 
@@ -245,7 +246,16 @@ Composición expuesta como `allRenderers` en [generator/renderers/index.ts](../g
 - `workflow.release_strategy` y `release.yml` diferidos: las 3 ramas de release strategy divergen en pasos distintos, requieren rama propia.
 - `generator/__fixtures__/profiles/valid-partial/profile.yaml` declara `workflow.ci_host: "github"` + `workflow.branch_protection: true` explícitos (mismo workaround que C3 por defaults no materializados en `buildProfile`).
 
-**Pendientes en C\***: copia de skills + hooks (C5).
+**`.claude/settings.json` + READMEs de `.claude/{hooks,skills}/` — detalles del renderer** (C5):
+
+- Un solo renderer (`skills-hooks-skeleton.ts`) emite 3 archivos por profile, estrictamente estructurales, stack-agnósticos. Cierra la *estructura* del directorio `.claude/` del proyecto generado pero **no** copia hooks ejecutables ni skills reales.
+- `.claude/settings.json` es JSON estático mínimo conservador: `{ "_note": "<deferral a Fase D>", "hooks": {} }`. **No** declara `permissions` baseline (decisión explícita del usuario en Fase -1: sembrar una superficie de permisos sin hooks reales sería arbitrario; Fase D decidirá cuando los hooks existan).
+- `.claude/hooks/README.md` documenta que la copia real de hooks queda diferida a Fase D + la extensión prevista de `FileWrite` con `mode?: number` para preservar bit `+x`.
+- `.claude/skills/README.md` documenta que la copia real de skills queda diferida a Fase E (catálogo auditado por `/pos:audit-plugin --self` antes de quedar activo).
+- Tests validan: JSON parseable, `hooks === {}`, `_note` string >40 chars con `/pos/`, `permissions === undefined`, READMEs matching `/\bpos\b/` + `/Fase\s*D|E/` + `/diferid/i`, stack-agnostic (sin leaks `vitest`/`pytest`/`npm`/`pip`), trailing `\n`, determinismo byte-identical.
+- 5ª aplicación del pattern `renderer-group` (tuple congelada `skillsHooksRenderers` compuesta en `allRenderers`). `run.ts` no se toca.
+
+**Pendientes post-C***: copia real de hooks ejecutables + copia real de skills auditadas + extensión `FileWrite` con `mode?` para preservar bit `+x` — las tres diferidas a la misma rama post-D1/E1a (ver `.claude/rules/generator.md § Deferrals`).
 
 **Cómo añadir un renderer**:
 

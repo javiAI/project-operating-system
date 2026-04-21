@@ -1,0 +1,19 @@
+# .claude/hooks/
+
+Directorio reservado por `pos` (C5) para los hooks ejecutables del proyecto.
+
+## Estado actual — contenido diferido
+
+Esta rama (C5) **sólo** materializa la estructura del directorio `.claude/`. La copia real de los hooks ejecutables queda **diferida a Fase D**, cuando `pos` entregue el catálogo completo de hooks versionado + firmado + con permisos `+x`.
+
+Motivo: en este momento, el repositorio del plugin todavía no expone un set de hooks estable ni un canal de distribución firmado. Emitir placeholders vacíos o binarios inertes sería abstracción prematura (CLAUDE.md regla #7 — patterns before abstraction).
+
+## Qué entra aquí en Fase D
+
+- Scripts ejecutables (`.sh`, `.py`) con shebang y bit `+x`.
+- Un `settings.json` a nivel raíz de `.claude/` que los referencia por ruta relativa (el esqueleto ya existe con `hooks: {}` listo para poblarse).
+- `FileWrite.mode` — la extensión del shape del generador para preservar permisos queda diferida a la primera rama que copie ejecutables reales.
+
+## No toques este README a mano
+
+El contenido de este archivo es determinista (regenerado por `pos`). Cualquier cambio manual se sobrescribirá en la próxima invocación.
