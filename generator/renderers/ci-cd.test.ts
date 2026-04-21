@@ -192,6 +192,32 @@ describe("renderers/ci-cd — TS test deps install step (contract closure)", () 
   });
 });
 
+describe("renderers/ci-cd — Python test deps install step (contract closure)", () => {
+  it("agent-sdk (Python) — workflow installs pytest + pytest-cov with pinned versions before invoking make", () => {
+    const files = render(bySlug["agent-sdk"]!);
+    const yml = files.find((f) => f.path === ".github/workflows/ci.yml")!;
+    expect(yml.content).toMatch(/name:\s*Install test deps/);
+    expect(yml.content).toMatch(/pip\s+install[^\n]*\bpytest==\d+\.\d+(?:\.\d+)?/);
+    expect(yml.content).toMatch(/pip\s+install[^\n]*\bpytest-cov==\d+\.\d+(?:\.\d+)?/);
+
+    const installIdx = yml.content.indexOf("Install test deps");
+    const testUnitIdx = yml.content.indexOf("make test-unit");
+    expect(installIdx).toBeGreaterThan(-1);
+    expect(testUnitIdx).toBeGreaterThan(installIdx);
+  });
+
+  it.each(["nextjs-app", "cli-tool"])(
+    "%s (TS) — workflow does NOT declare a Python 'Install test deps' step (pip/pytest must not leak)",
+    (slug) => {
+      const files = render(bySlug[slug]!);
+      const yml = files.find((f) => f.path === ".github/workflows/ci.yml")!;
+      expect(yml.content).not.toMatch(/\bpip\s+install\b/);
+      expect(yml.content).not.toMatch(/\bpytest\b/);
+      expect(yml.content).not.toMatch(/\bpytest-cov\b/);
+    }
+  );
+});
+
 describe("renderers/ci-cd — BRANCH_PROTECTION.md consistency with ci.yml", () => {
   it.each(profiles)(
     "$slug — BRANCH_PROTECTION.md lists the 'unit' job required check",
