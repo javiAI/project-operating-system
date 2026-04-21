@@ -8,7 +8,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 |---|---|---|
 | A | Skeleton & bootstrap | ✅ |
 | B | Cuestionario + profiles + runner | ✅ |
-| C | Templates + renderers | 🔄 en curso (C1 ✅, C2 ✅, C3 ✅, C4 ✅, C5 siguiente) |
+| C | Templates + renderers | ✅ (C1 ✅, C2 ✅, C3 ✅, C4 ✅, C5 ✅) |
 | D | Hooks (Python) | ⏳ pendiente |
 | E1 | Skills orquestación | ⏳ pendiente |
 | E2 | Skills calidad | ⏳ pendiente |
@@ -27,7 +27,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | `feat/c2-renderers-policy-rules` | policy.yaml + rules path-scoped | ✅ | — |
 | `feat/c3-renderers-tests-harness` | Test harness mínimo por stack | ✅ | — |
 | `feat/c4-renderers-ci-cd` | GitHub Actions CI workflow + BRANCH_PROTECTION doc (GitLab/Bitbucket diferidos) | ✅ | — |
-| `feat/c5-renderers-skills-hooks-copy` | Copia skills+hooks del plugin al proyecto destino | ⏳ | — |
+| `feat/c5-renderers-skills-hooks-copy` | `.claude/` skeleton (settings.json + hooks/README + skills/README); copia real diferida a D/E | ✅ | — |
 | `feat/d1-hook-pre-branch-gate` | Bloqueo `git checkout -b` sin marker | ⏳ | — |
 | `feat/d2-hook-session-start` | Snapshot 30s | ⏳ | — |
 | `feat/d3-hook-pre-write-guard` | Test-pair + pattern injection + anti-pattern block | ⏳ | — |
@@ -195,6 +195,25 @@ Entregables:
 - **Contrato del workflow cerrado en revisión** (ajuste post-Fase-1 tras 2 pases de Copilot): ambas ramas declaran `Install test deps` con versiones pinneadas — TS: `npm install --no-save vitest@3.0.5 @vitest/coverage-v8@3.0.5` (alineado con `package.json` del meta-repo); Python: `pip install pytest==8.3.4 pytest-cov==6.0.0`. Tests semánticos en ambos stacks: presencia del step + versiones pinneadas + orden pre-`make test-unit`, más no-leak cruzado (TS sin `pip`/`pytest`; Python sin `npm`/`vitest`). Cuando C5/C6 emita `package.json`/`pyproject.toml`, migrar a `npm ci` / `pip install -e .[dev]` y sacar los pins al manifest.
 - **Header comment de `BRANCH_PROTECTION.md.hbs`**: rebajado de "Dynamic: mirrors…" a guía alineada con el workflow + aviso explícito de que la lista de required checks se actualiza a mano (evita sugerir sincronización automática).
 - **Branch protection no se aplica programáticamente**: documento markdown + aplicación manual en GitHub Settings. Mantiene la separación control-plane vs runtime-plane (ARCHITECTURE.md §1).
+
+### `feat/c5-renderers-skills-hooks-copy` — ✅
+
+Entregables:
+
+- `generator/renderers/skills-hooks-skeleton.ts` — renderer único, 3 FileWrite por profile: `.claude/settings.json` + `.claude/hooks/README.md` + `.claude/skills/README.md`. Puro, byte-identical entre runs, stack-agnostic (sin menciones a vitest/pytest/npm/pip en el contenido emitido).
+- 3 templates Handlebars: `templates/.claude/settings.json.hbs` (mínimo conservador: `hooks: {}` + `_note` explicando la deferral a Fase D; **no** siembra `permissions` baseline), `templates/.claude/hooks/README.md.hbs` (menciona `pos` + Fase D + palabra "diferid"), `templates/.claude/skills/README.md.hbs` (menciona `pos` + Fase E + "diferid").
+- `generator/renderers/index.ts` — nuevo export `skillsHooksRenderers` (frozen, 1 renderer). `allRenderers` recompuesto a `[...coreDocRenderers, ...policyAndRulesRenderers, ...testsHarnessRenderers, ...cicdRenderers, ...skillsHooksRenderers]`. `run.ts` intacto (5ª aplicación del patrón `renderer-group` — ver historial en `.claude/rules/generator.md`).
+- Tests: `generator/renderers/skills-hooks-skeleton.test.ts` (paths emitidos por los 3 canonicals, `JSON.parse(settings.json)` OK, `hooks === {}`, `_note` string >40 chars con `/pos/`, `permissions === undefined`, READMEs matching `/\bpos\b/` + `/Fase\s*D|E/` + `/diferid/i`, trailing `\n`, stack-agnostic, determinismo). `generator/renderers/index.test.ts` extendido con `skillsHooksRenderers` (length 1 + frozen) y `ALL_RENDERERS_EXPECTED_PATHS` actualizado a 18 paths por profile. `generator/run.test.ts` actualizado: `runRender` returns 18 entries (was 15), dry-run/write headers `/18 file\(s\)/`, CLI integration `--out` añade readFileSync checks de `.claude/settings.json` (JSON válido + `hooks: {}` + `_note` string) y de los READMEs (Fase D / Fase E).
+- Snapshots: +9 (3 profiles × 3 archivos: `.claude/settings.json.snap` + `.claude/hooks/README.md.snap` + `.claude/skills/README.md.snap`). Total: 45 (C1+C2+C3+C4) + 9 (C5) = 54.
+- Pipeline extremo a extremo: `validate:generator` exit 0 (3 canonicals, 3 warnings `identity.*` por diseño), `render:generator` dry-run emite 18 files/profile con los 3 nuevos paths presentes, `vitest run` 515/0.
+
+**Ajustes vs plan original** (Fase -1 aprobada):
+
+- **Scope recortado** — C5 **solo** cierra la estructura del directorio `.claude/`. **NO** implementa la copia real de hooks ejecutables ni de skills. Razón: los directorios `hooks/` y `skills/` de este repo no existen todavía; copiar placeholders o duplicar una instantánea en evolución activa sería abstracción prematura (CLAUDE.md regla #7). La copia real queda **diferida a rama post-D1/E1a**, cuando `pos` tenga un catálogo estable + canal de distribución firmado.
+- **`FileWrite.mode` diferido** — el shape sigue siendo `{ path, content }` en C1–C5. La extensión a `{ path, content, mode? }` queda diferida a la primera rama que copie ejecutables reales (post-D1/E1a). C1–C4 no se rompen; snapshots previos no cambian.
+- **`.claude/settings.json` mínimo conservador** — decisión explícita del usuario: solo `hooks: {}` + `_note`. **No** se siembra `permissions` baseline; esa decisión la toma Fase D cuando los hooks reales definan su superficie.
+- **Renderer naming** — `skills-hooks-skeleton.ts` (no `settings-skeleton.ts`). Refleja el dominio real de la rama aunque el scope se haya recortado.
+- **Docs-sync explícito** — esta entrada deja cristalino que C5 cierra la *estructura* de `.claude/`, no la *copia real*. El riesgo de ambigüedad fue la causa raíz del replanteo en Fase -1.
 
 ## Convenciones de este archivo
 

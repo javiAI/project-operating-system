@@ -5,7 +5,7 @@
 ## 1. Snapshot
 
 - Repo: `project-operating-system` (plugin `pos`).
-- Fase actual: **C4 ✅ cerrada en rama** (`feat/c4-renderers-ci-cd`, PR pendiente de abrir). Anterior: **C3 ✅ PR #7** (`77d7e43`). Siguiente: **C5 — `feat/c5-renderers-skills-hooks-copy`**.
+- Fase actual: **C5 ✅ cerrada en rama** (`feat/c5-renderers-skills-hooks-copy`, PR pendiente de abrir). Anterior: **C4 ✅ PR #8** (`c57570b`). Siguiente: **D1 — `feat/d1-hook-pre-branch-gate`**.
 - Fuente de verdad ejecutable: [MASTER_PLAN.md](MASTER_PLAN.md).
 - Estado vivo: [ROADMAP.md](ROADMAP.md).
 - Arquitectura canonical: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -88,6 +88,7 @@ Ejecuta §2.1 Fase -1 completo. Espera aprobación explícita antes de `git chec
 - **C2 (`feat/c2-renderers-policy-rules`)** ✅ **carry-over cerrado**: `templates/.claude/rules/docs.md.hbs` incluye el bullet "Trazabilidad de contexto" referenciando `HANDOFF.md §3`. Todo proyecto generado con `pos` hereda ya la disciplina completa de context-management.
 - **C3 (`feat/c3-renderers-tests-harness`)** ✅ sin carry-over abierto. Frameworks diferidos (`jest`, `go-test`, `cargo-test`) quedan como fallo explícito dentro de `renderTests(...)` — se retomarán sólo cuando un profile canónico los adopte (≥1 repetición → reevaluar con regla #7 CLAUDE.md). `package.json` / `pyproject.toml` / `playwright.config.ts` diferidos también, documentados en el README emitido ("Qué NO emite C3").
 - **C4 (`feat/c4-renderers-ci-cd`)** ✅ sin carry-over abierto. `gitlab` / `bitbucket` diferidos con `Error` explícito dentro de `ci-cd.ts` — mismo patrón que C3 (reabrir sólo si un profile canónico los adopta). `release.yml` / `audit.yml` diferidos a rama propia (ramas de `workflow.release_strategy` divergen). `stack.runtime_version` no existe en schema → Node 20.17.0 + Python 3.11 hardcoded en template C4; deuda documentada en `.claude/rules/generator.md § Deferrals`. Python toolchain mínimo (`pip install pytest pytest-cov`); adoptar `uv`/`poetry`/`pdm` se pospone hasta que C5/C6 emita `pyproject.toml`.
+- **C5 (`feat/c5-renderers-skills-hooks-copy`)** ✅ **con carry-over abierto**. C5 cierra la *estructura* del directorio `.claude/` (3 archivos esqueleto por profile: `settings.json` + `hooks/README.md` + `skills/README.md`). **NO** implementa la *copia real* de hooks ejecutables ni de skills — eso queda diferido a la primera rama post-D1/E1a que necesite copiar artefactos reales. `FileWrite.mode` sigue diferido (C1–C5 usan `{ path, content }` sin `mode`); la extensión se abrirá en la misma rama que copie ejecutables. `settings.json` **no** siembra `permissions` baseline (decisión explícita: minimo conservador); esa decisión la tomará Fase D cuando los hooks reales definan su superficie.
 
 ## 7. Gotchas del entorno
 
@@ -121,32 +122,37 @@ Hasta que `pos` tenga sus propias skills:
 
 ## 9. Próxima rama
 
-**C5 — `feat/c5-renderers-skills-hooks-copy`**
+**D1 — `feat/d1-hook-pre-branch-gate`**
 
-Scope (ver [MASTER_PLAN.md § Rama C5](MASTER_PLAN.md)):
+Scope (ver [MASTER_PLAN.md § Rama D1](MASTER_PLAN.md)):
 
-- Renderers para copiar skills (`.claude/skills/pos/**`) + hooks (`hooks/**`) del meta-repo al proyecto generado, con customización de paths según el profile destino. Primer punto del pipeline donde `FileWrite` puede requerir el campo `mode` (hooks ejecutables = bit +x). Decidir en Fase -1 si extender el shape a `{ path, content, mode? }` o mantener binary bits fuera del manifiesto.
-- Registrar nuevo array congelado (p.ej. `skillsHooksRenderers`) y componerse en `allRenderers`. 5ª aplicación del patrón `renderer-group`.
+- Primer hook Python del plugin: `PreToolUse(Bash)` bloquea `git checkout -b <slug>` cuando `.claude/branch-approvals/<slug>.approved` no existe. Cierra la regla no-negociable #1 de CLAUDE.md pasando de convención manual a enforcement real.
+- Abre la fase de hooks (`hooks/**`). Convenciones de test pair obligatorio (`hooks/tests/test_<x>.py`) vigentes desde este momento vía `.claude/rules/tests.md`.
 
 Lectura mínima al arrancar:
 
-- [MASTER_PLAN.md § Rama C5](MASTER_PLAN.md)
-- [docs/ARCHITECTURE.md § Renderers](docs/ARCHITECTURE.md) + [§ 4 Hooks](docs/ARCHITECTURE.md) + [§ 5 Skills](docs/ARCHITECTURE.md)
-- [.claude/rules/generator.md](.claude/rules/generator.md) (Renderers + Deferrals) + [.claude/rules/templates.md](.claude/rules/templates.md) + [.claude/rules/skills-map.md](.claude/rules/skills-map.md)
-- `generator/renderers/index.ts` + `generator/lib/render-pipeline.ts` (shape de `FileWrite`) + estructura de `.claude/skills/` + `hooks/` (aún vacíos; skills se pueblan en E, hooks en D — valorar si C5 copia sólo esqueleto o difiere la copia completa hasta D/E).
+- [MASTER_PLAN.md § Rama D1](MASTER_PLAN.md)
+- [docs/ARCHITECTURE.md § 4 Hooks](docs/ARCHITECTURE.md)
+- [.claude/rules/tests.md](.claude/rules/tests.md) (test pair + waiver)
+- `.claude/settings.local.json` (estructura declarativa de hooks en Claude Code)
 
-## 10. Estado C4 (cerrada en rama)
+## 10. Estado C5 (cerrada en rama)
 
-CI/CD workflow (`ci.yml`) + doc markdown `BRANCH_PROTECTION.md` emitidos por stack. 15 archivos por profile cuando `workflow.branch_protection == true` (14 si `false`): 6 docs + `policy.yaml` + 2 rules + 4 test harness + `ci.yml` + `docs/BRANCH_PROTECTION.md` opcional. Pipeline `allRenderers` compone `coreDocRenderers + policyAndRulesRenderers + testsHarnessRenderers + cicdRenderers` desde `generator/renderers/index.ts`. Detalle en [ROADMAP.md § Progreso Fase C](ROADMAP.md); pipeline documentada en [docs/ARCHITECTURE.md § Renderers](docs/ARCHITECTURE.md) + [§ 11 CI/CD integrado](docs/ARCHITECTURE.md#11-cicd-integrado).
+`.claude/` esqueleto emitido por `pos` en el proyecto generado: `.claude/settings.json` (`hooks: {}` + `_note` deferral, **sin** `permissions` baseline) + `.claude/hooks/README.md` (deferral a Fase D + nota sobre `FileWrite.mode`) + `.claude/skills/README.md` (deferral a Fase E). 18 archivos por profile cuando `workflow.branch_protection == true` (17 si `false`): 15 de C1–C4 + 3 de C5. Pipeline `allRenderers` compone `coreDocRenderers + policyAndRulesRenderers + testsHarnessRenderers + cicdRenderers + skillsHooksRenderers` desde `generator/renderers/index.ts`. Detalle en [ROADMAP.md § Progreso Fase C](ROADMAP.md).
 
-Apuntes para quien arranque C5:
+**Lo que C5 NO hace** (explícito):
 
-- Patrón `renderer-group` consolidado (4ª aplicación: core + policy/rules + tests-harness + ci-cd). C5 = 5ª aplicación — crear `skillsHooksRenderers` congelado y componerlo en `allRenderers`. `run.ts` no se toca.
-- **Decisión abierta de C5**: `FileWrite` shape hoy es `{ path, content }`. Hooks ejecutables requieren bit `+x` → probable extensión a `{ path, content, mode? }`. Documentar la decisión en Fase -1 de C5 (decisión histórica prevista ya en C1/C2/C3/C4: "se añade en C5 si hooks ejecutables lo requieren").
-- CI hosts no-github (`gitlab`, `bitbucket`) siguen diferidos. C5 no los reabre salvo señal explícita.
+- No copia los hooks ejecutables del plugin al proyecto generado. La copia real de `hooks/**` queda diferida a rama post-D1 cuando el catálogo de hooks exista.
+- No copia skills del plugin. La copia real de `.claude/skills/pos/**` queda diferida a rama post-E1a cuando el catálogo de skills esté auditado.
+- No extiende el shape `FileWrite` con `mode`. Mientras `pos` no copie ejecutables reales, el shape `{ path, content }` basta. La extensión llegará en la primera rama que necesite preservar bit `+x`.
+
+Apuntes para quien arranque D1 (o cualquier rama post-C):
+
+- Patrón `renderer-group` consolidado (5ª aplicación: core + policy/rules + tests-harness + ci-cd + skills-hooks-skeleton). Cualquier grupo nuevo en fases posteriores sigue el mismo shape: frozen tuple + composición en `allRenderers`. `run.ts` no se toca.
+- **Carry-over abierto — copia real hooks/skills + `FileWrite.mode`**: rama post-D1/E1a. Al abrir, añadir `mode?` al tipo `FileWrite`, extender `writeFiles` para respetarlo, reemplazar los 2 READMEs de C5 por contenido real copiado, y poblar `settings.json.hooks` con los hooks reales. Ver detalle en [.claude/rules/generator.md § Deferrals](.claude/rules/generator.md).
+- `settings.json` **no** siembra `permissions` baseline en C5. Cuando D1+ introduzca hooks reales con superficie de permisos conocida, decidir si se materializa un `permissions` mínimo en el renderer o se delega al hook mismo al instalarse.
+- CI hosts no-github (`gitlab`, `bitbucket`) siguen diferidos. Fase D/E no los reabren salvo señal explícita.
 - `release.yml` / `audit.yml` / matrix multi-OS y multi-runtime siguen diferidos. Ramas propias futuras.
-- Runtime version hardcoding (Node 20.17.0 / Python 3.11) en template C4 — si C5 toca paths de hooks que dependen de runtime, respetar la misma convención hasta que `stack.runtime_version` exista en schema.
-- `buildProfile` sigue sin materializar defaults: `valid-partial` declara 4 paths explícitos hoy (`testing.coverage_threshold`, `testing.e2e_framework`, `workflow.ci_host`, `workflow.branch_protection`). Si C5 usa más paths con `default:`, actualizar los 3 canonicals + `valid-partial` (mismo patrón).
-- Snapshots por convención en `generator/__snapshots__/<slug>/<path>.snap`. +6 archivos añadidos en C4; total actual 45 (18 C1 + 9 C2 + 12 C3 + 6 C4).
-- Entry-point universal sigue siendo el `Makefile` emitido por C3. Los workflows invocan `make test-unit` + `make test-coverage`. Si C5 añade hooks ejecutables, valorar si se añaden targets al Makefile o se invocan directamente.
-- Carry-over Fase N+7: **sin carry-over abierto** al arrancar C5.
+- `buildProfile` sigue sin materializar defaults: `valid-partial` declara 4 paths explícitos hoy (`testing.coverage_threshold`, `testing.e2e_framework`, `workflow.ci_host`, `workflow.branch_protection`). Si una rama futura añade paths con `default:`, actualizar los 3 canonicals + `valid-partial` (mismo patrón).
+- Snapshots por convención en `generator/__snapshots__/<slug>/<path>.snap`. +9 archivos añadidos en C5; total actual 54 (18 C1 + 9 C2 + 12 C3 + 6 C4 + 9 C5).
+- Carry-over Fase N+7: **sin carry-over abierto** al arrancar D1.
