@@ -9,7 +9,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | A | Skeleton & bootstrap | ✅ |
 | B | Cuestionario + profiles + runner | ✅ |
 | C | Templates + renderers | ✅ (C1 ✅, C2 ✅, C3 ✅, C4 ✅, C5 ✅) |
-| D | Hooks (Python) | ⏳ parcial (D1 ✅) |
+| D | Hooks (Python) | ⏳ parcial (D1 ✅, D2 ✅) |
 | E1 | Skills orquestación | ⏳ pendiente |
 | E2 | Skills calidad | ⏳ pendiente |
 | E3 | Skills patterns + tests | ⏳ pendiente |
@@ -28,8 +28,8 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | `feat/c3-renderers-tests-harness` | Test harness mínimo por stack | ✅ | — |
 | `feat/c4-renderers-ci-cd` | GitHub Actions CI workflow + BRANCH_PROTECTION doc (GitLab/Bitbucket diferidos) | ✅ | — |
 | `feat/c5-renderers-skills-hooks-copy` | `.claude/` skeleton (settings.json + hooks/README + skills/README); copia real diferida a D/E | ✅ | — |
-| `feat/d1-hook-pre-branch-gate` | Bloqueo `git checkout -b` / `switch -c` / `worktree add -b` sin marker | ✅ | — (PR pendiente) |
-| `feat/d2-hook-session-start` | Snapshot 30s | ⏳ | — |
+| `feat/d1-hook-pre-branch-gate` | Bloqueo `git checkout -b` / `switch -c` / `worktree add -b` sin marker | ✅ | #11 |
+| `feat/d2-hook-session-start` | Snapshot 30s + extracción `hooks/_lib/` (refactor D1) | ✅ | — (PR pendiente) |
 | `feat/d3-hook-pre-write-guard` | Test-pair + pattern injection + anti-pattern block | ⏳ | — |
 | `feat/d4-hook-pre-pr-gate` | Policy vs logs + docs-sync + CI dry-run | ⏳ | — |
 | `feat/d5-hook-post-action-compound` | Trigger `/pos:compound` por touched_paths | ⏳ | — |
@@ -217,7 +217,7 @@ Entregables:
 
 ## Progreso Fase D
 
-### `feat/d1-hook-pre-branch-gate` — ✅ (PR pendiente)
+### `feat/d1-hook-pre-branch-gate` — ✅ PR #11
 
 Entregables:
 
@@ -239,6 +239,28 @@ Entregables:
 - **Sin `bin/pos-selftest.sh`**: la integración end-to-end del plugin queda fuera de scope D1. La rama se limita a hook + test pair + docs-sync.
 - **In-process tests añadidos vs Fase -1**: `pytest-cov` no mide subprocesses; se añadieron tests unitarios in-process (`importlib.util.spec_from_file_location` para cargar el módulo con guión en el nombre) para alcanzar el 85% comprometido. Subprocess tests conservados como integración end-to-end.
 - **`.claude/settings.json` no modificado**: ya referencia `./hooks/pre-branch-gate.py` desde Fase A. D1 sólo materializa el binario ausente.
+
+### `feat/d2-hook-session-start` — ✅ (PR pendiente)
+
+Entregables:
+
+- `hooks/session-start.py` (ejecutable, stdlib-only, Python 3.10+) — hook `SessionStart` que emite `hookSpecificOutput.additionalContext` con un snapshot ≤10 líneas (Branch / Phase / Last merge / Warnings). Exit 0 siempre; nunca emite `permissionDecision` (evento informativo). Mismo snapshot para `source ∈ {startup, resume, clear, compact}`.
+- **`hooks/_lib/` extraído (2ª repetición tras D1, CLAUDE.md regla #7)**: `slug.py` (`sanitize_slug`), `jsonl.py` (`append_jsonl`, `read_jsonl`), `time.py` (`now_iso`). `hooks/pre-branch-gate.py` refactorizado a importar desde `_lib` en el mismo PR (API pública intacta: `pbg.sanitize_slug` sigue funcionando vía re-export transitivo). Imports desde scripts ejecutables vía `sys.path.insert(0, str(Path(__file__).parent))` — sin convertir `hooks/` en paquete formal.
+- `hooks/tests/test_session_start.py` (66 tests, 13 clases): `TestOutputEnvelope`, `TestSnapshotShape`, `TestPhaseDerivationFromBranch`, `TestPhaseDerivationFallbackOnMain`, `TestMarkerWarning`, `TestDocsSyncWarning`, `TestSourceInvariance`, `TestLogging`, `TestSafeFailGraceful`, `TestLastMerge`, `TestDerivePhaseFromSlugUnit`, `TestMainInProcess`. Subprocess integration + in-process (monkeypatched `chdir`/`stdin`) para cobertura visible de paths que corren `git` (pytest-cov no mide subprocess). Fixture `repo` con `git init -b main` aislado (`GIT_CONFIG_GLOBAL=/dev/null`, autor/fecha deterministas).
+- 4 fixtures JSON nuevos: `session_startup.json` / `session_resume.json` / `session_clear.json` / `session_compact.json`.
+- Double logging (patrón D1): `.claude/logs/session-start.jsonl` (shape `{ts, hook, source, branch, phase, warnings}`; en error path `{ts, hook, source?, error}`) + `.claude/logs/phase-gates.jsonl` (evento `session_start` con `{ts, event, source, branch, phase}`).
+
+**Ajustes vs plan original** (Fase -1 aprobada):
+
+- **Scope reformulado**: snapshot minimal <=10 líneas con orden fijo `Branch / Phase / Last merge / Warnings` y `"(none)"` literal cuando no hay warnings (ajuste explícito del usuario contra "menos automatismo ciego, más estructura + ayuda real"). Sin prose sobrante.
+- **Phase derivation**: regex case-insensitive `^(feat|fix|chore|refactor)[/_]([a-z])(\d+)-` sobre el nombre de rama → letra+num.upper() (D2, C5, B12…). Fallback en `main`/`master` a última entrada válida de `phase-gates.jsonl` iterando en reverso (tolerante a JSONDecodeError por línea). Si nada resuelve → `"unknown"`. **No** parsea `MASTER_PLAN.md` ni `ROADMAP.md` (frágil).
+- **Warnings activos**: `marker ausente` (rama feat/* sin `.claude/branch-approvals/<sanitize_slug(branch)>.approved`) + `docs-sync pendiente` (diff `main..HEAD` sin tocar `ROADMAP.md` ni `HANDOFF.md`). `docs-sync` es aviso-only; enforcement real queda diferido a D4 (`pre-pr-gate.py`). Warning "contexto >120k" descartado — no medible desde hook.
+- **Safe-fail graceful canonizado** como excepción para hooks informativos (decisión G Fase -1): payload malformado → exit 0 + `additionalContext` con `(error reading payload: ...)` + log de error. Hooks bloqueantes (`PreToolUse`, `PreCompact`, `Stop`) mantienen `deny` + exit 2. Política canónica actualizada en `.claude/rules/hooks.md` y `docs/ARCHITECTURE.md §7`.
+- **Extracción `_lib/` + refactor D1 en el mismo PR** (decisión A1): cierra deuda de duplicación antes de D3. `read_jsonl` añadido al helper aunque D1 no lo use — D2 lo necesita, y vive en `_lib/` desde el inicio para no volver a tocar `_lib/` en D3.
+- **Sin `hooks/tests/test_lib/`** (ajuste del usuario Fase -1): helpers triviales (3-20 líneas cada uno) cubren indirectamente desde los hook tests. Sobretestear `sanitize_slug("feat/x") == "feat_x"` en aislamiento sería ruido.
+- **Subprocess git robusto** (decisión I Fase -1): `shell=False`, `cwd=Path.cwd()` explícito, `timeout=2s` por call, `check=False`. Maneja `FileNotFoundError` (git no instalado) y `SubprocessError`; cwd no-git → snapshot con branch=None, phase=unknown, sin crash.
+- **`.claude/settings.json` no modificado**: ya referenciaba `./hooks/session-start.py` desde Fase A (wire existente con `timeout: 5s` + `statusMessage`). D2 sólo materializa el binario ausente (mismo patrón que D1).
+- **Coverage**: 99% total en `hooks/**`. `hooks/session-start.py` 95% (6 líneas no cubiertas: FileNotFoundError/SubprocessError de git no instalado, 3 fallbacks de `_base_ref`/`_diff_touches_docs` cuando git falla, y `sys.exit(main())` del `__main__` guard). `hooks/pre-branch-gate.py` mantiene 99% tras refactor, sin regresión.
 
 ## Convenciones de este archivo
 
