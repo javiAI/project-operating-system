@@ -138,7 +138,7 @@ Lectura mínima al arrancar:
 
 ## 10. Estado D1 (cerrada en rama)
 
-`pre-branch-gate` vivo: `git checkout -b` / `git switch -c` / `git worktree add -b` sin `.claude/branch-approvals/<sanitized>.approved` fallan con exit 2 + `permissionDecision: deny` + `decisionReason` con ruta del marker, comando `touch` sugerido y ref textual a `MASTER_PLAN.md`. Pass-through silencioso en todo el resto (no-Bash tools, non-branch Bash, `git branch <slug>`, stdin vacío/malformado → exit 2 sin crash pero no loggea). Double log a `.claude/logs/pre-branch-gate.jsonl` + `phase-gates.jsonl` (evento `branch_creation`). 55 tests pytest, 99% coverage.
+`pre-branch-gate` vivo: `git checkout -b` / `git switch -c` / `git worktree add -b` sin `.claude/branch-approvals/<sanitized>.approved` fallan con exit 2 + `permissionDecision: deny` + `decisionReason` con ruta del marker, comando `touch` sugerido y ref textual a `MASTER_PLAN.md`. Pass-through silencioso (sin stdout, sin log) para non-Bash tools, `tool_input` ausente o `null`, `command` vacío, `git branch <slug>`, y Bash no-branch. Payload malformado (stdin vacío, JSON inválido, top-level no-dict, `tool_input` no-dict) → `deny` exit 2 + `decisionReason` (safe-fail, no pass-through). Double log a `.claude/logs/pre-branch-gate.jsonl` + `phase-gates.jsonl` (evento `branch_creation`). 99% coverage; única línea no cubierta: `sys.exit(main())` bajo `__main__` guard.
 
 **Lo que D1 NO hace** (explícito):
 

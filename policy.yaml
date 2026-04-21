@@ -64,6 +64,14 @@ lifecycle:
     blocking: true
 
   pre_push:
+    # NOTA (post-D1): `command_meta` declara la intención del contrato. La
+    # aplicación efectiva se reparte en:
+    #   - CI (.github/workflows/ci.yml) → ejecuta lo ya aterrizado.
+    #   - hook pre-pr-gate.py (Fase D4) → bloqueará PR que no cumpla los checks activos.
+    # Actualmente aterrizados en CI: `npx tsc --noEmit` (node typecheck),
+    # `npx vitest run` (generator), `python3 -m pytest hooks/tests` (D1).
+    # Diferidos a ramas dedicadas: `python3 -m mypy hooks/`, `npx eslint .`,
+    # `python3 -m ruff check hooks/`. No bloquean hasta que rama dedicada los integre.
     checks_required:
       - name: "typecheck"
         command_meta: "npx tsc --noEmit && python3 -m mypy hooks/"

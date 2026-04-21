@@ -222,7 +222,7 @@ Entregables:
 Entregables:
 
 - `hooks/pre-branch-gate.py` (ejecutable, stdlib-only, Python 3.10+) — PreToolUse(Bash) hook que bloquea branch creation sin marker `.claude/branch-approvals/<sanitized-slug>.approved`. Detecta `git checkout -b`, `git switch -c`, `git worktree add -b` con `shlex.split` (robusto a quoting + global options pre-subcommand). `git branch <slug>` excluido (ref sin checkout ≠ inicio de trabajo).
-- `hooks/tests/test_pre_branch_gate.py` — 55 tests pytest en 8 clases (subprocess integration + in-process unit): detection, pass-through, sanitization, logging, robustness, `sanitize_slug`, `extract_branch_slug`, `build_deny_reason`, `main()`. 99% coverage (única línea no cubierta: `sys.exit(main())` bajo `__main__` guard, intrínseco al script entrypoint).
+- `hooks/tests/test_pre_branch_gate.py` — suite pytest (subprocess integration + in-process unit) cubriendo detection, pass-through, sanitization, logging, robustness, `sanitize_slug`, `extract_branch_slug`, `build_deny_reason`, `main()`. 99% coverage (única línea no cubierta: `sys.exit(main())` bajo `__main__` guard, intrínseco al script entrypoint).
 - `hooks/tests/fixtures/payloads/` — 6 JSON fixtures (`checkout_b`, `switch_c`, `worktree_add_b`, `git_status`, `git_branch_no_flag`, `non_bash`).
 - `requirements-dev.txt` — `pytest>=7`, `pytest-cov>=4`. Minimum viable test env, sin ruff ni infraestructura adicional.
 - `.gitignore` — entradas Python (`/.venv/`, `__pycache__/`, `*.pyc`, `.pytest_cache/`, `.coverage`).
