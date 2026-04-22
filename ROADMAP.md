@@ -297,9 +297,9 @@ Entregables:
 - Matcher: `shlex.split(command)` + `tokens[:3] == ["gh","pr","create"]`. Cubre flags `--draft`, `--title`, `--body`, `--base`. Todo lo demás (`gh pr list`/`view`/`edit`, `gh issue create`, `git push`, `git status`, non-Bash) → pass-through silencioso (cero log).
 - Skip advisory con log explícito (NO silencioso): branch `main` / `master` / `HEAD` detached; cwd no es git repo; `git merge-base HEAD main` no resoluble (main borrada localmente). Las entradas van sólo al hook-log; `phase-gates.jsonl` intacto en skips.
 - Empty diff (HEAD vs merge-base) → deny exit 2 con reason dedicado (`"PR creation blocked: no changes ... empty PR. Base: <sha>"`), textualmente separado del reason docs-sync para no inducir confusión al usuario.
-- Docs-sync check (reglas hardcoded, mirror de `policy.yaml.lifecycle.pre_pr.docs_sync_*`):
-  - **Baseline** (siempre): `ROADMAP.md` + `HANDOFF.md`.
-  - **Conditional**: `generator/**` → `docs/ARCHITECTURE.md`; `hooks/**` (excluyendo `hooks/tests/**`) → `docs/ARCHITECTURE.md`; `skills/**` → `.claude/rules/skills-map.md`; `.claude/patterns/**` → `docs/ARCHITECTURE.md`.
+- Docs-sync check (reglas hardcoded, mirror de `policy.yaml.lifecycle.pre_pr.docs_sync_required` + `docs_sync_conditional`):
+  - **Required** (siempre): `ROADMAP.md` + `HANDOFF.md`.
+  - **Conditional**: `generator/**` → `docs/ARCHITECTURE.md`; `hooks/**` (el hook excluye `hooks/tests/**` — divergencia deliberada vs `policy.yaml` que lista `hooks/**` uniforme; convergencia diferida a rama policy-loader) → `docs/ARCHITECTURE.md`; `skills/**` → `.claude/rules/skills-map.md`; `.claude/patterns/**` → `docs/ARCHITECTURE.md`.
   - Dedupe: `ARCHITECTURE.md` aparece una sola vez aunque múltiples prefijos lo exijan.
   - Triggering paths capeados a 3 por doc en el reason, con sufijo `... (+N more)` cuando hay más.
 - Advisory scaffold no-blocking (activable sin cambio de shape): en cada decisión real (allow/deny) el hook emite 3 entradas `{status: "deferred", check: <name>}` al hook log — `skills_required`, `ci_dry_run_required`, `invariants_check`. NO se emiten en skip ni en pass-through. Se convertirán en enforcement real cuando sus ramas dedicadas aporten sustrato (Fase E* / CI dry-run propia / invariants directory poblado).
@@ -309,7 +309,8 @@ Entregables:
   - `.claude/logs/phase-gates.jsonl` — `{ts, event: "pre_pr", decision}`.
 - Reuso `hooks/_lib/`: `append_jsonl` + `now_iso`. Sin nuevos helpers compartidos.
 - `.claude/settings.json` no modificado: ya referenciaba `./hooks/pre-pr-gate.py` desde Fase A; D4 sólo materializa el binario.
-- Tests: 96 casos en `hooks/tests/test_pre_pr_gate.py`, 93% coverage sobre `pre-pr-gate.py`. Suite global `hooks/**`: 317 passed (D1 + D2 + D3 + D4). Sin regresión.
+- `diff_files()` devuelve `list[str] | None`: `None` = `git diff --name-only <base> HEAD` no disponible (subprocess falla) → skip advisory con `status: "skipped"` + reason `"git diff unavailable"`; `[]` = diff verdaderamente vacío → deny dedicado `empty PR`. Evita false-deny cuando `merge-base` resuelve pero el diff subprocess falla después.
+- Tests: 101 casos en `hooks/tests/test_pre_pr_gate.py` (incluye `TestDiffUnavailable`: 5 casos para `diff_files() is None` vs `[]`), ≥94% coverage sobre `pre-pr-gate.py`. Suite global `hooks/**`: 322 passed (D1 + D2 + D3 + D4). Sin regresión.
 - 3 fixtures JSON nuevos en `hooks/tests/fixtures/payloads/`: `gh_pr_create.json`, `gh_pr_create_draft.json`, `gh_pr_list.json`. Reuso de `git_status.json` + `non_bash.json` heredados de D1/D2.
 
 **Ajustes vs plan original**: ver [MASTER_PLAN.md § Rama D4](MASTER_PLAN.md).

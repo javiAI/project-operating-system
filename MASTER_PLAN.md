@@ -282,7 +282,7 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 - **Simplify pass explícito pre-PR** (preferencia persistente del usuario): 3 cuts aplicados — docstring 10→6 líneas, `_conditional_triggers` docstring eliminada, `missing, _triggers` → `missing, _`. Todos test-safe.
 - **Trazabilidad de kickoff**: commit `e73416b` tuvo su message dañado por backticks interpretados por `$(cat <<'EOF' ...)`; follow-up `ee3099d` (empty `--allow-empty`) repone el contenido perdido sin reescribir historia.
 
-**Criterio de salida**: 96 tests verdes (`hooks/tests/test_pre_pr_gate.py`), 317 totales en `hooks/**` (D1+D2+D3+D4), coverage ≥80% lines / ≥75% branches (alcanzado 93% sobre `pre-pr-gate.py`, global ≥95%), `_lib/` consumido (regla #7 intacta), docs-sync en el propio PR (ROADMAP + HANDOFF + MASTER_PLAN + ARCHITECTURE + `.claude/rules/hooks.md`), hook instalado (el propio `pre-pr-gate` debe aprobar su PR al correr sobre esta rama — dogfooding). Cumplido.
+**Criterio de salida**: 101 tests verdes (`hooks/tests/test_pre_pr_gate.py` — incluye `TestDiffUnavailable` × 5), 322 totales en `hooks/**` (D1+D2+D3+D4), coverage ≥80% lines / ≥75% branches (alcanzado ≥94% sobre `pre-pr-gate.py`, global ≥95%), `_lib/` consumido (regla #7 intacta), docs-sync en el propio PR (ROADMAP + HANDOFF + MASTER_PLAN + ARCHITECTURE + `.claude/rules/hooks.md`), hook instalado (el propio `pre-pr-gate` debe aprobar su PR al correr sobre esta rama — dogfooding). Cumplido.
 
 ### Rama D5 — `feat/d5-hook-post-action-compound`
 

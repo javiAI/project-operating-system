@@ -2,9 +2,11 @@
 """pre-pr-gate: block `gh pr create` when docs-sync is incomplete.
 
 PreToolUse(Bash) blocker for CLAUDE.md regla #2. Mirrors
-policy.yaml.lifecycle.pre_pr.docs_sync_* as hardcoded rules (policy-driven
-parse deferred). Advisory scaffold (skills / ci_dry_run / invariants) logged
-as `deferred` on every real decision. Shape: D1 blocker.
+policy.yaml.lifecycle.pre_pr.docs_sync_required (baseline docs) and
+docs_sync_conditional (conditional docs by path prefix) as hardcoded rules;
+policy-driven parse deferred to the policy-loader rama. Advisory scaffold
+(skills / ci_dry_run / invariants) logged as `deferred` on every real
+decision. Shape: D1 blocker.
 """
 from __future__ import annotations
 
