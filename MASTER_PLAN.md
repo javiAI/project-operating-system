@@ -284,9 +284,45 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 
 **Criterio de salida**: 101 tests verdes (`hooks/tests/test_pre_pr_gate.py` — incluye `TestDiffUnavailable` × 5), 322 totales en `hooks/**` (D1+D2+D3+D4), coverage ≥80% lines / ≥75% branches (alcanzado ≥94% sobre `pre-pr-gate.py`, global ≥95%), `_lib/` consumido (regla #7 intacta), docs-sync en el propio PR (ROADMAP + HANDOFF + MASTER_PLAN + ARCHITECTURE + `.claude/rules/hooks.md`), hook instalado (el propio `pre-pr-gate` debe aprobar su PR al correr sobre esta rama — dogfooding). Cumplido.
 
-### Rama D5 — `feat/d5-hook-post-action-compound`
+### Rama D5 — `feat/d5-hook-post-action-compound` — ✅
 
-**Scope**: `hooks/post-action.py` — detecta merge, lee `policy.yaml.lifecycle.post_merge.skills_conditional`, dispara `/pos:compound` si trigger match (touched_paths).
+**Status**: cerrada en rama (PR pendiente de abrir). Primera aplicación del patrón **PostToolUse non-blocking**.
+
+**Scope entregado**: `hooks/post-action.py` — PostToolUse(Bash) hook con detección jerárquica 2 tiers (shlex command match + git reflog post-hoc confirmation). Cuando ambos tiers confirman un merge/pull local tocando paths configurados, emite `additionalContext` sugiriendo `/pos:compound`. Nunca dispatcha la skill (advisory-only; E3a entregará la skill). Exit 0 siempre — no emite `permissionDecision` bajo ningún camino.
+
+**Contexto a leer**:
+
+- `policy.yaml` L105-120 — `lifecycle.post_merge.skills_conditional[0]`: shape `touched_paths_any_of` + `skip_if_only` + `min_files_changed`.
+- `hooks/pre-pr-gate.py` como patrón de reuso `_lib/` + safe-fail + subprocess git.
+- `hooks/session-start.py` como referencia de subprocess git robusto (shell=False, cwd, timeout, check=False, catch FileNotFoundError/SubprocessError).
+- `docs/ARCHITECTURE.md § 7` — capa 1 hooks canonical (blocker + informative documentados; D5 añade el tercer patrón: PostToolUse non-blocking).
+
+**Decisiones clave (Fase -1 aprobada)**:
+
+- **Detección jerárquica 2 tiers** en vez de matcher único. Tier 1 (`shlex.split`) clasifica comando; Tier 2 (`git reflog HEAD -1 --format=%gs`) confirma que la acción cuajó localmente. Evita falsos positivos en `git merge --abort` (Tier 1 excluye) y `git pull` que terminó siendo rebase real sin flag explícito (Tier 2 descarta `"pull --rebase"`).
+- **`gh pr merge` (matcher B) descartado**. Dos razones: (a) `tool_response.exit_code` no está documentado como garantizado por Claude Code en PostToolUse(Bash) — sin él no hay forma confiable de distinguir éxito de fallo; (b) el merge se ejecuta en remoto, no deja reflog local inmediato sobre el ref local (el `pull` post-merge sí, pero eso cae en matcher C). Cerrar un caso medio roto era peor que dejarlo fuera explícitamente.
+- **Scope web UI merges fuera**. Por diseño no los detectamos aquí (no hay señal local observable). Reservado para E3a `/pos:compound` como skill invocable on-demand.
+- **Segunda repetición hardcoded de `policy.yaml`** (D4 = required/conditional docs-sync; D5 = post_merge skills_conditional). Regla #7 CLAUDE.md ya cumplida dos veces → precondición abierta para la rama policy-loader (post-D6) que unifique ambos parseos.
+- **Advisory-only (no dispatch)**. El hook sólo emite `additionalContext` sugiriendo `/pos:compound`; nunca invoca la skill (la skill no existe todavía — llega en E3a; además invocar desde un hook es antipatrón canonizado). Mantiene separación control-plane vs skill-plane.
+- **PostToolUse non-blocking canonical**. Exit 0 siempre, nunca `permissionDecision`. Payload malformado / tool_name != "Bash" / command vacío / shlex unparsable → early return 0 silencioso sin log (bloquear un PostToolUse es inviable: la acción ya ocurrió; el patrón útil es degradar a no-op). Documentado como tercer patrón canónico en `.claude/rules/hooks.md` y `docs/ARCHITECTURE.md §7`.
+
+**Contrato fijado por la suite (4 status distinguidos)**:
+
+1. Tier 1 miss → pass-through silencioso (cero log, cero stdout).
+2. Tier 1 OK + Tier 2 fail → hook log `status: tier2_unconfirmed`; `phase-gates.jsonl` intacto (no cruzó puerta del lifecycle).
+3. Tier 2 OK + diff no disponible → hook log `status: diff_unavailable`; `phase-gates.jsonl` intacto.
+4. Tier 2 OK + diff OK + trigger miss → hook log `status: confirmed_no_triggers` + `phase-gates.jsonl` evento `post_merge`.
+5. Tier 2 OK + diff OK + trigger match → hook log `status: confirmed_triggers_matched` + `phase-gates.jsonl` evento `post_merge` + `additionalContext` emitido.
+
+**Ajustes vs plan original (Fase -1 aprobada)**:
+
+- **`gh pr merge` matcher B sacado del scope** en vez de dejarlo "medio roto" con heurísticas frágiles. Reabrir cuando `gh` deje huella local observable post-merge o Claude Code documente `tool_response.exit_code` como contrato estable.
+- **Helper privado `_match(path, glob)` eliminado en simplify pass pre-PR** (preferencia persistente del usuario): era wrapper trivial sobre `fnmatch.fnmatch` con un solo caller (`match_triggers`); inlineado reduce 4 líneas sin perder legibilidad. No afecta tests (el helper era privado, no estaba en el contrato).
+- **Reuso `hooks/_lib/`**: `append_jsonl` + `now_iso`. Sin nuevos helpers compartidos. Regla #7 intacta.
+- **Fixture topológica two-repo** para integration tests (`repo_after_merge`, `repo_after_merge_ff`, `repo_after_pull`): upstream real + local clone + commit divergente + pull/merge real → reflog + diff auténticos. Evita mockear git en tests de integración (patrón D1/D2/D4 reforzado).
+- **Test contract lock-down**: 17 clases, 110 tests ejecutados + 1 skip intencional (`TestIntegrationDiffUnavailable` delega en `TestMainInProcess` vía `pytest.skip` — subprocess no puede cubrir cleanly el camino `diff_files is None` sin romper git en el repo; el in-process con monkeypatch sí).
+
+**Criterio de salida**: 111 tests verdes (110 + 1 skip intencional) en `hooks/tests/test_post_action.py`, 432 totales en `hooks/**` (D1+D2+D3+D4+D5), coverage ≥80% lines / ≥75% branches (alcanzado 97% lines sobre `hooks/post-action.py`, 99% sobre test_post_action.py), `_lib/` consumido (regla #7 intacta), docs-sync en el propio PR (ROADMAP + HANDOFF + MASTER_PLAN + ARCHITECTURE + `.claude/rules/hooks.md`), hook instalado (el propio `pre-pr-gate` aprueba este PR al correr sobre esta rama — dogfooding D4 sobre D5). Cumplido.
 
 ### Rama D6 — `feat/d6-hook-pre-compact-stop`
 

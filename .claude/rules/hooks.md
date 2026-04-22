@@ -201,3 +201,33 @@ Tercera aplicación del patrón **blocker** (PreToolUse(Bash)) — shape idénti
 La primera regla matcheada gana (ciclo de `CONDITIONAL_RULES` con `break`). Si un path no matchea ningún prefijo → no dispara docs-sync condicional extra (los docs required `ROADMAP.md` + `HANDOFF.md` siguen aplicando en todo PR).
 
 Ver también [MASTER_PLAN.md § Rama D4](../../MASTER_PLAN.md), [docs/ARCHITECTURE.md §7](../../docs/ARCHITECTURE.md#capa-1-hooks).
+
+## Quinto hook entregado — `hooks/post-action.py` (Rama D5)
+
+Primera aplicación del patrón **PostToolUse non-blocking** — tercer patrón canónico de la Capa 1 (tras blocker D1 e informative D2). Shape emparentado con el blocker D1 (shlex + double log + importlib-friendly + reuso `_lib/`), pero **exit 0 siempre** y nunca emite `permissionDecision` ni exit 2.
+
+Enforza trigger advisory de `/pos:compound` (CLAUDE.md § Flujo de rama Fase N+6) sobre merges/pulls locales que tocan paths configurados.
+
+- **Detección jerárquica 2 tiers** — separa intención (comando ejecutado) de resultado (estado local post-acción):
+  - **Tier 1** (`shlex.split(command)`, `tokens[0] == "git"`): matcher A `tokens[1] == "merge"` + ningún token en `{--abort, --quit, --continue, --skip}`; matcher C `tokens[1] == "pull"` + ningún token en `{--rebase, -r}`. Otros comandos (`git rebase`, `gh pr merge`, non-git) → early return 0 silencioso.
+  - **Tier 2** (`git reflog HEAD -1 --format=%gs`): matcher A confirma prefijo `"merge "`; matcher C confirma prefijo `"pull:" | "pull "` y NO `"pull --rebase"`. Descarta `git merge --abort`, merges `--ff-only` que no pudieron fast-forward (no tocaron HEAD), y pulls que terminaron siendo rebase real sin flag explícito.
+- Contrato (exit 0 siempre, 4 status distinguidos + pass-through):
+  - Tier 1 miss → pass-through silencioso (cero log, replica D1).
+  - Tier 2 no confirma → hook log `status: tier2_unconfirmed`; `phase-gates.jsonl` intacto.
+  - Tier 2 OK + `git diff --name-only HEAD@{1} HEAD` falla → hook log `status: diff_unavailable`; `phase-gates.jsonl` intacto.
+  - Tier 2 OK + diff OK + trigger miss → hook log `status: confirmed_no_triggers` + `phase-gates.jsonl` evento `post_merge`.
+  - Tier 2 OK + diff OK + trigger match → hook log `status: confirmed_triggers_matched` + `phase-gates.jsonl` evento `post_merge` + emite `hookSpecificOutput.additionalContext` (4 líneas, cap 3 paths con `(+N more)`, CTA `Consider running /pos:compound...`).
+- **Advisory-only (no dispatch)**. El hook nunca invoca `/pos:compound` — mantiene separación control-plane vs skill-plane. La skill real la entrega E3a; además la skill no existe todavía. Dispatch desde hook es antipatrón canonizado.
+- **`gh pr merge` (matcher B) descartado en Fase -1**. Razones: (a) `tool_response.exit_code` no está documentado como contrato estable de Claude Code en PostToolUse(Bash) — sin él no hay forma confiable de distinguir éxito de fallo; (b) el merge ocurre en remoto, no deja reflog local inmediato. Reabrir cuando `gh` deje huella local observable o Claude Code documente `exit_code`.
+- **`TRIGGER_GLOBS` / `SKIP_IF_ONLY_GLOBS` / `MIN_FILES_CHANGED` hardcoded** — mirror literal de `policy.yaml.lifecycle.post_merge.skills_conditional[0]`. `fnmatch.fnmatch` sobre paths del diff. Skip si `<MIN_FILES_CHANGED` o si todos los paths caen en `SKIP_IF_ONLY_GLOBS`. **Segunda repetición hardcoded tras D4** → CLAUDE.md regla #7 cumplida dos veces, precondición abierta para la rama policy-loader.
+- Subprocess git robusto (reusa patrón D2): `shell=False`, `cwd=Path.cwd()`, `timeout=5`, `check=False`, captura `FileNotFoundError` + `SubprocessError`; `None` en error. Ningún camino sube excepción.
+- Safe-fail PostToolUse non-blocking: stdin vacío / JSON inválido / top-level no-dict / `tool_input` no-dict / `tool_name != "Bash"` / `command` ausente o vacío / shlex unparsable → early return 0 silencioso (sin log). Bloquear un PostToolUse es inviable — la acción ya ocurrió; el patrón útil es degradar a no-op.
+- Double log: `.claude/logs/post-action.jsonl` (`{ts, hook, command, kind, status, ...}` — `kind ∈ {git_merge, git_pull}`) + `.claude/logs/phase-gates.jsonl` (evento `post_merge`, sólo en los dos status confirmed). Pass-throughs (Tier 1 miss) NO loguean. Los advisory tier2/diff loguean al hook log pero NO al phase-gates — la puerta del lifecycle sólo se cruza con confirmación real.
+- Reuso `_lib/`: `append_jsonl` + `now_iso`. Sin nuevos helpers compartidos.
+- Tests pytest: 111 casos en `hooks/tests/test_post_action.py` (17 clases — 6 in-process + 11 subprocess integration), 110 passed + 1 skip intencional (`TestIntegrationDiffUnavailable` delega en `TestMainInProcess` vía `pytest.skip` — subprocess no puede cubrir cleanly el camino `diff_files is None`). Fixtures topológicas two-repo (`repo_after_merge`, `repo_after_merge_ff`, `repo_after_pull`): upstream real + local clone + commit divergente + pull/merge real → reflog + diff auténticos. 97% coverage sobre `hooks/post-action.py`; 432 totales en `hooks/**` (D1+D2+D3+D4+D5), sin regresión.
+
+### Simplify pass pre-PR (D5)
+
+Helper privado `_match(path, glob)` inlineado en `match_triggers` — era wrapper trivial sobre `fnmatch.fnmatch` con un solo caller. Reduce 4 líneas sin perder legibilidad; no afecta contrato de tests (el helper era privado).
+
+Ver también [MASTER_PLAN.md § Rama D5](../../MASTER_PLAN.md), [docs/ARCHITECTURE.md §7](../../docs/ARCHITECTURE.md#capa-1-hooks).

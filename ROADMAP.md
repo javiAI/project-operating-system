@@ -9,7 +9,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | A | Skeleton & bootstrap | ✅ |
 | B | Cuestionario + profiles + runner | ✅ |
 | C | Templates + renderers | ✅ (C1 ✅, C2 ✅, C3 ✅, C4 ✅, C5 ✅) |
-| D | Hooks (Python) | ⏳ parcial (D1 ✅, D2 ✅, D3 ✅, D4 ✅) |
+| D | Hooks (Python) | ⏳ parcial (D1 ✅, D2 ✅, D3 ✅, D4 ✅, D5 ✅) |
 | E1 | Skills orquestación | ⏳ pendiente |
 | E2 | Skills calidad | ⏳ pendiente |
 | E3 | Skills patterns + tests | ⏳ pendiente |
@@ -33,7 +33,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | `feat/d2-hook-session-start` | Snapshot 30s + extracción `hooks/_lib/` (refactor D1) | ✅ | — (PR pendiente) |
 | `feat/d3-hook-pre-write-guard` | Test-pair enforcement (PreToolUse(Write)); pattern injection + anti-pattern block diferidos post-E3a | ✅ | — (PR pendiente) |
 | `feat/d4-hook-pre-pr-gate` | Docs-sync enforcer sobre `gh pr create` (shape D1 blocker); advisory scaffold skills/ci/invariants | ✅ | — (PR pendiente) |
-| `feat/d5-hook-post-action-compound` | Trigger `/pos:compound` por touched_paths | ⏳ | — |
+| `feat/d5-hook-post-action-compound` | Trigger `/pos:compound` por touched_paths | ✅ | — (PR pendiente) |
 | `feat/d6-hook-pre-compact-stop` | Persist pre-compact + stop policy check | ⏳ | — |
 | `feat/e1a-skill-kickoff-handoff` | `/pos:kickoff`, `/pos:handoff-write` | ⏳ | — |
 | `feat/e1b-skill-branch-plan-interview` | `/pos:branch-plan`, `/pos:deep-interview` | ⏳ | — |
@@ -314,6 +314,35 @@ Entregables:
 - 3 fixtures JSON nuevos en `hooks/tests/fixtures/payloads/`: `gh_pr_create.json`, `gh_pr_create_draft.json`, `gh_pr_list.json`. Reuso de `git_status.json` + `non_bash.json` heredados de D1/D2.
 
 **Ajustes vs plan original**: ver [MASTER_PLAN.md § Rama D4](MASTER_PLAN.md).
+
+### `feat/d5-hook-post-action-compound` — ✅ (PR pendiente)
+
+Entregables:
+
+- `hooks/post-action.py` (ejecutable, stdlib-only, Python 3.10+) — PostToolUse(Bash) hook. **Primera aplicación del patrón PostToolUse non-blocking** (shape emparentado con el blocker D1 pero sin `permissionDecision` y con exit 0 siempre; referencia canonical para futuros PostToolUse hooks).
+- **Detección jerárquica de 2 tiers** — Tier 1 (command match vía `shlex.split`): matcher A = `git merge <ref>` (excluye flags de control `--abort`/`--quit`/`--continue`/`--skip`); matcher C = `git pull` (excluye `--rebase`/`-r`). Tier 2 (confirmación post-hoc): `git reflog HEAD -1 --format=%gs` debe comenzar por `"merge "` (A) o `"pull:" | "pull "` y NO `"pull --rebase"` (C). Evita disparar en `git merge --abort` (Tier 1 descarta) o en pulls que terminan siendo rebase real sin flag explícito (Tier 2 descarta).
+- **`gh pr merge` (matcher B) descartado del scope en Fase -1**: `tool_response.exit_code` no está garantizado por Claude Code en PostToolUse(Bash) y no hay forma confiable de distinguir éxito de fallo sin él. Reabrir cuando `gh` deje huella local observable (reflog/merged commit post-pull en el merge gate, p.ej.).
+- Trigger match — literal mirror de `policy.yaml.lifecycle.post_merge.skills_conditional[0]`: `TRIGGER_GLOBS = [generator/lib/**, generator/renderers/**, hooks/**, skills/**, templates/**/*.hbs]`, `SKIP_IF_ONLY_GLOBS = [docs/**, *.md, .claude/patterns/**]`, `MIN_FILES_CHANGED = 2`. Derivación de paths tocados via `git diff --name-only HEAD@{1} HEAD`. Skip si `<2` paths o si todos caen en `SKIP_IF_ONLY_GLOBS`. Match con `fnmatch.fnmatch`.
+- Contrato (exit 0 siempre):
+  - Tier 1 no matchea → early return silencioso.
+  - Tier 1 OK + Tier 2 no confirma → hook log `status: tier2_unconfirmed` (phase-gates intacto).
+  - Tier 2 OK + diff no disponible → hook log `status: diff_unavailable` (phase-gates intacto).
+  - Tier 2 OK + diff OK + no hay trigger match → hook log `status: confirmed_no_triggers` + phase-gates `post_merge`.
+  - Tier 2 OK + diff OK + trigger match → hook log `status: confirmed_triggers_matched` + phase-gates `post_merge` + emite `hookSpecificOutput.additionalContext` con el prompt sugerido (`Consider running /pos:compound ...`).
+- Advisory-only: el hook **nunca** dispatcha la skill `/pos:compound` (eso queda para E3a). En D5 sólo emite contexto sugerido; el usuario o el agente deciden correr la skill.
+- `additionalContext` formato: 4 líneas — encabezado `D5 post_merge: compound triggers matched.`, `Matched trigger globs: <lista>`, `Touched: <cap 3 + "(+N more)">`, CTA `Consider running /pos:compound...`. Path display cap = 3 para no inundar contexto.
+- Double log canonical (shape D1..D4): `.claude/logs/post-action.jsonl` (`{ts, hook, command, kind, status, ...}` — kind ∈ `git_merge`/`git_pull`) + `.claude/logs/phase-gates.jsonl` (evento `post_merge`, sólo en decisiones confirmadas). Pass-throughs (Tier 1 no matchea) NO loguean. Los dos status advisory (`tier2_unconfirmed`/`diff_unavailable`) **sólo loguean al hook log** — `phase-gates.jsonl` permanece intacto porque la puerta del lifecycle no se cruzó (no hubo merge/pull confirmado aún tocando paths observables).
+- Safe-fail PostToolUse non-blocking: stdin vacío / JSON inválido / top-level no-dict / `tool_input` no-dict / `tool_name != "Bash"` / `command` ausente o vacío → early return 0 silencioso (no log). Bloquear un evento PostToolUse dejaría la acción ya ejecutada sin rastro útil; el patrón canónico es degradar a no-op.
+- Subprocess git robusto (reusa patrón D2): `shell=False`, `cwd=Path.cwd()`, `timeout=5`, `check=False`, captura `FileNotFoundError` + `SubprocessError`; `None` en error — el caller degrada. Ningún camino sube excepción.
+- Reuso `hooks/_lib/`: `append_jsonl` + `now_iso`. Sin nuevos helpers compartidos (regla #7: sólo añadir cuando ≥2 hooks lo reclamen; D1..D5 ya cumplen precondición para `append_jsonl`/`now_iso`, pero D5 no demanda nada nuevo).
+- Hardcode literal de la política (segunda repetición tras D4): mirror directo de `policy.yaml.lifecycle.post_merge.skills_conditional` dentro del hook. **Regla #7 CLAUDE.md cumplida dos veces para el parser declarativo** — la rama policy-loader (post-D6) ahora tiene la señal crystal-clear para unificar D4 + D5 en un parser común.
+- Tests: 111 casos en `hooks/tests/test_post_action.py` (17 clases — 6 in-process decoradas con `@needs_hook`, 11 subprocess integration), 110 pasados + 1 skipped intencional (`TestIntegrationDiffUnavailable` delega en `TestMainInProcess` vía `pytest.skip`). 97% coverage sobre `hooks/post-action.py` (líneas no cubiertas: subprocess error handling, extra>0 branch en `build_additional_context`, `__main__` guard). Suite global `hooks/**`: 432 passed, 1 skipped — D1+D2+D3+D4 intactos.
+- 7 fixtures JSON nuevos en `hooks/tests/fixtures/payloads/`: `git_merge.json`, `git_merge_no_ff.json`, `git_merge_abort.json`, `git_pull.json`, `git_pull_rebase.json`, `gh_pr_merge.json` (negative — no matchea), `git_rebase.json` (negative — no matchea).
+- Fixture topológica `repo_after_merge` (two-repo setup): upstream repo + local clone, commit divergente en upstream, `git pull` real sobre el local → reflog auténtico `"pull: ..."` + diff `HEAD@{1}..HEAD` auténtico para integration tests. Réplica `repo_after_merge_ff` (fast-forward) y `repo_after_pull` (non-ff merge).
+- `.claude/settings.json` no modificado: ya referenciaba `./hooks/post-action.py` desde Fase A con `timeout: 5`; D5 sólo materializa el binario.
+- **Simplify pass pre-PR** (preferencia persistente del usuario): helper privado `_match(path, glob)` eliminado e inlineado en `match_triggers` — era un wrapper trivial sobre `fnmatch.fnmatch` con un solo caller. Reduce 4 líneas sin perder legibilidad.
+
+**Ajustes vs plan original**: ver [MASTER_PLAN.md § Rama D5](MASTER_PLAN.md).
 
 ## Convenciones de este archivo
 
