@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """pre-pr-gate: block `gh pr create` when docs-sync is incomplete.
 
-PreToolUse(Bash) blocker for CLAUDE.md regla #2. Mirrors
-policy.yaml.lifecycle.pre_pr.docs_sync_required (baseline docs) and
-docs_sync_conditional (conditional docs by path prefix) as hardcoded rules;
-policy-driven parse deferred to the policy-loader rama. Advisory scaffold
-(skills / ci_dry_run / invariants) logged as `deferred` on every real
-decision. Shape: D1 blocker.
+PreToolUse(Bash) blocker for CLAUDE.md regla #2. Consumes `docs_sync_rules()`
+from `hooks/_lib/policy.py` — baseline + conditional rules live in
+policy.yaml § lifecycle.pre_pr. Advisory scaffold (skills / ci_dry_run /
+invariants) logged as `deferred` on every real decision. Shape: D1 blocker.
+
+Failure mode (c.2): if `docs_sync_rules()` returns None (policy missing or
+corrupt), pass-through with `status: policy_unavailable` log — never denies
+blindly (avoids bricking PR creation on a bad YAML edit).
 """
 from __future__ import annotations
 
+import fnmatch
 import json
 import shlex
 import subprocess
@@ -18,6 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from _lib.jsonl import append_jsonl  # noqa: E402
+from _lib.policy import DocsSyncRules, docs_sync_rules  # noqa: E402
 from _lib.time import now_iso  # noqa: E402
 
 HOOK_EVENT = "PreToolUse"
@@ -25,19 +29,6 @@ HOOK_NAME = "pre-pr-gate"
 PHASE_EVENT = "pre_pr"
 HOOK_LOG = ".claude/logs/pre-pr-gate.jsonl"
 PHASE_LOG = ".claude/logs/phase-gates.jsonl"
-
-DOCS_BASELINE = ["ROADMAP.md", "HANDOFF.md"]
-
-# (path_prefix, required_doc, excluded_prefix_or_None)
-# NOTE: `hooks/tests/` exclusion is a deliberate D4 divergence — policy.yaml
-# currently lists `hooks/**` uniformly. Convergence (hook ↔ policy parity)
-# deferred to the policy-loader rama; see MASTER_PLAN.md § Rama D4.
-CONDITIONAL_RULES = [
-    ("generator/", "docs/ARCHITECTURE.md", None),
-    ("hooks/", "docs/ARCHITECTURE.md", "hooks/tests/"),
-    ("skills/", ".claude/rules/skills-map.md", None),
-    (".claude/patterns/", "docs/ARCHITECTURE.md", None),
-]
 
 ADVISORY_CHECKS = [
     ("skills_required", "skills not yet landed (Fase E*)"),
@@ -57,25 +48,33 @@ def is_gh_pr_create(command: str) -> bool:
     return len(tokens) >= 3 and tokens[:3] == ["gh", "pr", "create"]
 
 
-def _conditional_triggers(files: list[str]) -> dict[str, list[str]]:
+def _path_matches_any(path: str, globs: tuple[str, ...]) -> bool:
+    return any(fnmatch.fnmatchcase(path, g) for g in globs)
+
+
+def _conditional_triggers(files: list[str],
+                          rules: DocsSyncRules) -> dict[str, list[str]]:
+    """First matching rule wins per path; emits {doc: [paths_that_triggered]}."""
     triggers: dict[str, list[str]] = {}
     for path in files:
-        for prefix, required_doc, exclude in CONDITIONAL_RULES:
-            if not path.startswith(prefix):
+        for rule in rules.conditional:
+            if not _path_matches_any(path, rule.if_touched):
                 continue
-            if exclude and path.startswith(exclude):
+            if rule.excludes and _path_matches_any(path, rule.excludes):
                 continue
-            triggers.setdefault(required_doc, []).append(path)
+            for doc in rule.then_required:
+                triggers.setdefault(doc, []).append(path)
             break
     return triggers
 
 
-def check_docs_sync(files: list[str]) -> tuple[list[str], dict[str, list[str]]]:
+def check_docs_sync(files: list[str],
+                    rules: DocsSyncRules) -> tuple[list[str], dict[str, list[str]]]:
     """Return (missing_docs, trigger_paths_capped_at_3_per_doc)."""
     file_set = set(files)
-    missing: list[str] = [d for d in DOCS_BASELINE if d not in file_set]
+    missing: list[str] = [d for d in rules.baseline if d not in file_set]
     triggers: dict[str, list[str]] = {}
-    for doc, paths in _conditional_triggers(files).items():
+    for doc, paths in _conditional_triggers(files, rules).items():
         if doc in file_set:
             continue
         if doc not in missing:
@@ -142,15 +141,16 @@ def build_empty_diff_reason(base: str) -> str:
     )
 
 
-def build_docs_deny_reason(missing: list[str], files: list[str]) -> str:
-    full = _conditional_triggers(files)
+def build_docs_deny_reason(missing: list[str], files: list[str],
+                           rules: DocsSyncRules) -> str:
+    full = _conditional_triggers(files, rules)
     lines = [
         "PR creation blocked: docs-sync incomplete (CLAUDE.md regla #2).",
         "",
         "Missing docs in diff:",
     ]
     for doc in missing:
-        if doc in DOCS_BASELINE:
+        if doc in rules.baseline:
             lines.append(f"  - {doc} — required baseline (every PR)")
             continue
         paths = full.get(doc, [])
@@ -178,11 +178,12 @@ def emit_deny(reason: str) -> None:
     }, ensure_ascii=False))
 
 
-def _log_skip(repo_root: Path, ts: str, command: str, reason: str) -> None:
+def _log_skip(repo_root: Path, ts: str, command: str, reason: str,
+              status: str = "skipped") -> None:
     append_jsonl(
         repo_root / HOOK_LOG,
         {"ts": ts, "hook": HOOK_NAME, "command": command,
-         "status": "skipped", "reason": reason},
+         "status": status, "reason": reason},
     )
 
 
@@ -237,6 +238,13 @@ def main() -> int:
     repo_root = Path.cwd()
     ts = now_iso()
 
+    rules = docs_sync_rules(repo_root)
+    if rules is None:
+        _log_skip(repo_root, ts, command,
+                  reason="policy.yaml missing or pre_pr section absent",
+                  status="policy_unavailable")
+        return 0
+
     branch = current_branch(repo_root)
     if branch is None:
         _log_skip(repo_root, ts, command, "skipped: git unavailable")
@@ -265,9 +273,9 @@ def main() -> int:
         emit_deny(reason)
         return 2
 
-    missing, _ = check_docs_sync(files)
+    missing, _ = check_docs_sync(files, rules)
     if missing:
-        reason = build_docs_deny_reason(missing, files)
+        reason = build_docs_deny_reason(missing, files, rules)
         _log_decision(repo_root, ts, command, "deny", reason)
         emit_deny(reason)
         return 2

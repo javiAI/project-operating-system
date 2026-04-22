@@ -1,0 +1,49 @@
+version: "0.1.0"
+project: "test-fixture"
+type: "meta-repo"
+
+lifecycle:
+  pre_pr:
+    docs_sync_required:
+      - "ROADMAP.md"
+      - "HANDOFF.md"
+    docs_sync_conditional:
+      - if_touched: ["generator/**"]
+        then_required: ["docs/ARCHITECTURE.md"]
+      - if_touched: ["hooks/**"]
+        then_required: ["docs/ARCHITECTURE.md"]
+        excludes: ["hooks/tests/**"]
+      - if_touched: ["skills/**"]
+        then_required: [".claude/rules/skills-map.md"]
+      - if_touched: [".claude/patterns/**"]
+        then_required: ["docs/ARCHITECTURE.md"]
+
+  post_merge:
+    skills_conditional:
+      - skill: "pos:compound"
+        trigger:
+          touched_paths_any_of:
+            - "generator/lib/**"
+            - "generator/renderers/**"
+            - "hooks/**"
+            - "skills/**"
+            - "templates/**/*.hbs"
+          skip_if_only:
+            - "docs/**"
+            - "*.md"
+            - ".claude/patterns/**"
+          min_files_changed: 2
+
+  pre_write:
+    enforced_patterns:
+      - label: "hooks_top_level_py"
+        match_glob: "hooks/*.py"
+        exclude_globs:
+          - "hooks/_lib/**"
+          - "hooks/tests/**"
+      - label: "generator_ts"
+        match_glob: "generator/**/*.ts"
+        exclude_globs:
+          - "**/*.test.ts"
+          - "generator/__tests__/**"
+          - "generator/__fixtures__/**"

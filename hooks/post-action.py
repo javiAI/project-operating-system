@@ -12,9 +12,13 @@ Tier 2 (post-hoc reflog confirmation):
     C expects "pull:" or "pull " (and NOT "pull --rebase").
 
 When both tiers confirm and `git diff --name-only HEAD@{1} HEAD` yields paths
-that match the hardcoded mirror of
-policy.yaml.lifecycle.post_merge.skills_conditional[0].trigger, emits
-additionalContext suggesting `/pos:compound`. Never dispatches the skill.
+that match the trigger declared in
+`policy.yaml.lifecycle.post_merge.skills_conditional[0].trigger` (consumed
+via `_lib.policy.post_merge_trigger()` — D5b loader, no hardcoded mirror),
+emits additionalContext suggesting `/pos:compound`. Never dispatches the
+skill. Failure mode (c.2): if `policy.yaml` is missing/corrupt and the
+loader returns `None`, the hook logs `status: policy_unavailable` and
+pass-throughs silently (exit 0) — never denies.
 
 Shape emparentado con D1 blocker (shlex + double log + importlib-friendly)
 but PostToolUse non-blocking — nunca emite permissionDecision ni exit 2.
@@ -30,6 +34,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from _lib.jsonl import append_jsonl  # noqa: E402
+from _lib.policy import PostMergeTrigger, post_merge_trigger  # noqa: E402
 from _lib.time import now_iso  # noqa: E402
 
 HOOK_EVENT = "PostToolUse"
@@ -37,22 +42,6 @@ HOOK_NAME = "post-action"
 PHASE_EVENT = "post_merge"
 HOOK_LOG = ".claude/logs/post-action.jsonl"
 PHASE_LOG = ".claude/logs/phase-gates.jsonl"
-
-# Literal mirror of policy.yaml.lifecycle.post_merge.skills_conditional[0].trigger.
-# policy-loader rama will unify this with D3/D4 hardcodes.
-TRIGGER_GLOBS = [
-    "generator/lib/**",
-    "generator/renderers/**",
-    "hooks/**",
-    "skills/**",
-    "templates/**/*.hbs",
-]
-SKIP_IF_ONLY_GLOBS = [
-    "docs/**",
-    "*.md",
-    ".claude/patterns/**",
-]
-MIN_FILES_CHANGED = 2
 
 _MERGE_CONTROL_FLAGS = {"--abort", "--quit", "--continue", "--skip"}
 _PULL_REBASE_FLAGS = {"--rebase", "-r"}
@@ -130,13 +119,13 @@ def touched_paths(repo_root: Path) -> list[str] | None:
 # --- trigger matching ---------------------------------------------------
 
 
-def match_triggers(paths: list[str]) -> list[str]:
-    if len(paths) < MIN_FILES_CHANGED:
+def match_triggers(paths: list[str], trigger: PostMergeTrigger) -> list[str]:
+    if len(paths) < trigger.min_files_changed:
         return []
-    if all(any(fnmatch.fnmatchcase(p, g) for g in SKIP_IF_ONLY_GLOBS) for p in paths):
+    if all(any(fnmatch.fnmatchcase(p, g) for g in trigger.skip_if_only) for p in paths):
         return []
     return [
-        glob for glob in TRIGGER_GLOBS
+        glob for glob in trigger.touched_paths_any_of
         if any(fnmatch.fnmatchcase(p, glob) for p in paths)
     ]
 
@@ -216,6 +205,15 @@ def main() -> int:
     repo_root = Path.cwd()
     ts = now_iso()
 
+    trigger = post_merge_trigger(repo_root)
+    if trigger is None:
+        _log_hook(repo_root, {
+            "ts": ts, "hook": HOOK_NAME, "command": command,
+            "kind": kind, "status": "policy_unavailable",
+            "reason": "policy.yaml missing or post_merge trigger absent",
+        })
+        return 0
+
     reflog = reflog_message(repo_root)
     if not reflog_confirms(kind, reflog):
         _log_hook(repo_root, {
@@ -234,7 +232,7 @@ def main() -> int:
         })
         return 0
 
-    triggers = match_triggers(paths)
+    triggers = match_triggers(paths, trigger)
     if not triggers:
         _log_hook(repo_root, {
             "ts": ts, "hook": HOOK_NAME, "command": command,

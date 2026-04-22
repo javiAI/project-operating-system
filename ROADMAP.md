@@ -9,7 +9,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | A | Skeleton & bootstrap | ✅ |
 | B | Cuestionario + profiles + runner | ✅ |
 | C | Templates + renderers | ✅ (C1 ✅, C2 ✅, C3 ✅, C4 ✅, C5 ✅) |
-| D | Hooks (Python) | ⏳ parcial (D1 ✅, D2 ✅, D3 ✅, D4 ✅, D5 ✅) |
+| D | Hooks (Python) | ⏳ parcial (D1 ✅, D2 ✅, D3 ✅, D4 ✅, D5 ✅, D5b ✅) |
 | E1 | Skills orquestación | ⏳ pendiente |
 | E2 | Skills calidad | ⏳ pendiente |
 | E3 | Skills patterns + tests | ⏳ pendiente |
@@ -34,6 +34,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | `feat/d3-hook-pre-write-guard` | Test-pair enforcement (PreToolUse(Write)); pattern injection + anti-pattern block diferidos post-E3a | ✅ | — (PR pendiente) |
 | `feat/d4-hook-pre-pr-gate` | Docs-sync enforcer sobre `gh pr create` (shape D1 blocker); advisory scaffold skills/ci/invariants | ✅ | — (PR pendiente) |
 | `feat/d5-hook-post-action-compound` | Trigger `/pos:compound` por touched_paths | ✅ | — (PR pendiente) |
+| `refactor/d5-policy-loader` | Loader declarativo `hooks/_lib/policy.py` + migración D3/D4/D5 | ✅ | — (PR pendiente) |
 | `feat/d6-hook-pre-compact-stop` | Persist pre-compact + stop policy check | ⏳ | — |
 | `feat/e1a-skill-kickoff-handoff` | `/pos:kickoff`, `/pos:handoff-write` | ⏳ | — |
 | `feat/e1b-skill-branch-plan-interview` | `/pos:branch-plan`, `/pos:deep-interview` | ⏳ | — |
@@ -343,6 +344,70 @@ Entregables:
 - **Simplify pass pre-PR** (preferencia persistente del usuario): helper privado `_match(path, glob)` eliminado e inlineado en `match_triggers` — era un wrapper trivial sobre `fnmatch.fnmatch` con un solo caller. Reduce 4 líneas sin perder legibilidad.
 
 **Ajustes vs plan original**: ver [MASTER_PLAN.md § Rama D5](MASTER_PLAN.md).
+
+### `refactor/d5-policy-loader` — ✅ (PR pendiente)
+
+**Sub-rama D5b** — precondición (regla #7 CLAUDE.md cumplida dos veces por D4 + D5) ejecutada antes de arrancar D6. Cierra la deuda de duplicación hardcoded de `policy.yaml`
+dentro de los hooks consumiendo un loader declarativo único. Mismo PR no tocar `templates/policy.yaml.hbs` — drift temporal meta-repo ↔ template documentado (ver más abajo).
+
+Entregables:
+
+- `hooks/_lib/policy.py` (stdlib + `pyyaml==6.0.2`) — loader tipado con `@dataclass(frozen=True)` para los 5 tipos consumidos por hooks: `ConditionalRule`, `DocsSyncRules`,
+  `PostMergeTrigger`, `EnforcedPattern`, `PreWriteRules`. API pública: `load_policy(repo_root)` cached (clave = path abs únicamente — sin componente mtime/size, sin invalidación implícita por edits; `reset_cache()` para tests o para forzar recarga), tres
+  accessors `docs_sync_rules(repo_root)` / `post_merge_trigger(repo_root)` / `pre_write_rules(repo_root)` (cada uno devuelve `None` si policy.yaml falta o la sección relevante
+  no existe), y `derive_test_pair(rel_path, label)` con dos ramas (`hooks_top_level_py` + `generator_ts`) — la derivación queda **en código Python**, no en YAML, keyed por el
+  campo `label` de cada `enforced_patterns` entry. Decisión (b.1) Fase -1: strings/globs declarativos, derivación procedural.
+- `policy.yaml` — nuevo bloque `pre_write.enforced_patterns` con tres entries (labels: `hooks_top_level_py` + `generator_ts` × 2 — un entry para `generator/*.ts` top-level y otro
+  para `generator/**/*.ts` recursivo, workaround por fnmatch no-recursivo en el middle `/`). Bloque `lifecycle.pre_pr.docs_sync_conditional` ajustado: `hooks/**` ahora con
+  `excludes: ["hooks/tests/**"]` (convergencia hook↔policy; desaparece la "divergencia deliberada" documentada en D4).
+- Migración de los tres hooks a consumir el loader:
+  - `hooks/pre-write-guard.py` (D3) — `classify(rel_path, rules)` recorre `rules.enforced_patterns` con `fnmatch.fnmatchcase`; derivación del test pair vía
+    `derive_test_pair(rel_path, label)`. Los dos buckets de exclusión (tests/docs/templates/meta vs `hooks/_lib/**`) siguen siendo pass-through silencioso — la lista de excluded
+    no migra a YAML (sería abstracción prematura, la cubren los `exclude_globs` de cada pattern + el implicit fall-through del classifier).
+  - `hooks/pre-pr-gate.py` (D4) — `check_docs_sync(files, rules)` y `_conditional_triggers(files, rules)` leen de `DocsSyncRules`. Advisory scaffold y todo el resto del shape
+    D1-blocker intactos.
+  - `hooks/post-action.py` (D5) — `match_triggers(paths, trigger)` lee de `PostMergeTrigger`. Tier 1/Tier 2 detection intacta; sólo cambia la fuente de los globs.
+- Failure mode (c.2) Fase -1: `policy.yaml` ausente o corrupto → los tres accessors devuelven `None` y los hooks consumidores degradan a **pass-through advisory con
+  `status: policy_unavailable` en el hook log**. Nunca deny blind (evita brick por un bad-YAML edit). Documentado como patrón canonical en `.claude/rules/hooks.md § Policy
+  loader`.
+- `requirements-dev.txt` — añadida línea `pyyaml==6.0.2` (pin exacto, acordado Fase -1). `_lib/policy.py` es el primer módulo no-stdlib en `hooks/_lib/`; justificación en
+  kickoff + MASTER_PLAN.
+- Tests: 57 casos nuevos en `hooks/tests/test_lib_policy.py` (loader cache behavior, los 3 accessors con happy path + missing section + missing file, derivación de test pairs
+  por label, validación de fnmatch semantics). Tests de los 3 hooks actualizados: `test_pre_write_guard.py` (fixture escribe `policy.yaml` + autouse `_reset_policy_cache`;
+  `TestIsEnforcedUnit` y `TestExpectedTestPairUnit` eliminadas — ~23 tests — redundantes con `test_lib_policy.py`), `test_pre_pr_gate.py` (helper `_test_rules()` inyecta
+  `DocsSyncRules` en los 13 unit tests; fixture `repo` escribe `policy.yaml`), `test_post_action.py` (`_write_policy(root)` en 4 fixtures + 3 tests inline; `TestPolicyConstants`
+  eliminada — 3 tests — sustituida por el loader test; 14 `TestMatchTriggers` reciben `_test_trigger()`). Resultado global: **462 passed + 1 skipped**, coverage `_lib/policy.py`
+  97%, `pre-write-guard.py` 93%, `pre-pr-gate.py` 93%, `post-action.py` 94%.
+
+**Ajustes vs plan original (Fase -1 aprobada)**:
+
+- **Alternativa γ** (loader único consumido por los 3 hooks existentes), descartadas α (loader + solo D6 lo usa) y β (loader + migrar sólo D4 o sólo D5). Razón: la precondición
+  regla #7 cumplida por D4+D5 habilita la migración completa; dejar hooks hardcoded tras crear el loader sería drift inmediato dentro del propio meta-repo.
+- **Decisión (b.1)**: strings/globs en YAML; derivación de paths (`derive_test_pair`) en Python, keyed por `label`. Descartado YAML DSL (b.2) — sería abstracción prematura con
+  una sola derivación real y endurecería el contrato antes de tiempo.
+- **Decisión (c.2)**: failure mode degrada a pass-through advisory con `status: policy_unavailable`. Descartado (c.1) `deny` defensivo (bloquearía PRs ante un typo de YAML) y
+  (c.3) fallback a defaults hardcoded (rompería el propósito de tener el loader como single-source-of-truth).
+- **`templates/policy.yaml.hbs` NO tocado en esta rama — drift temporal meta-repo ↔ template**. El template que `pos` genera para proyectos nuevos **sigue con el shape previo a
+  D5b**: sin `enforced_patterns` en la sección `pre_write`, y con `docs_sync_conditional.hooks/**` uniforme (sin `excludes: ["hooks/tests/**"]`). Consecuencia práctica: un
+  proyecto generado hoy con `pos` emitirá un `policy.yaml` que **no** refleja el nuevo shape. La convergencia template ↔ meta-repo queda **diferida a una rama propia post-D6**
+  que actualice el renderer `generator/renderers/policy.ts` y el template Handlebars en paralelo (además de añadir `pyyaml` al requirements-dev de proyectos Python generados).
+  El README del PR debe reiterarlo: *esta rama NO indica que el template ya refleja el nuevo shape*.
+- **Convergencia hook↔policy `hooks/tests/**`** cerrada dentro de esta rama: `policy.yaml.lifecycle.pre_pr.docs_sync_conditional.hooks/**` ahora incluye
+  `excludes: ["hooks/tests/**"]`. La divergencia deliberada documentada en D4 desaparece — el loader + policy ya son fuente única coherente con la semántica del hook.
+- **Workaround fnmatch**: `fnmatch.fnmatchcase("generator/run.ts", "generator/**/*.ts")` no matchea porque el middle `/` de `**` es literal en fnmatch. Solución: añadir un
+  segundo `enforced_pattern` con `match_glob: "generator/*.ts"` (misma `label: "generator_ts"`). Dos entries YAML con la misma label son válidos — el loader los agrega y la
+  derivación es label-driven, no pattern-driven.
+- **Simplify pass pre-PR**: helper privado trivial eliminado (ver § Simplify pass a continuación).
+
+**Drift temporal meta-repo ↔ template**: `templates/policy.yaml.hbs` está **intencionalmente desactualizado** respecto a `policy.yaml` del meta-repo. El shape nuevo de
+`pre_write.enforced_patterns` y el `excludes: ["hooks/tests/**"]` en `docs_sync_conditional` viven **sólo en el meta-repo** tras esta rama. Reconciliar template + renderer +
+requirements en una rama posterior.
+
+**Simplify pass pre-PR**: TBD tras la auto-review — pendiente paso 5 del sequence acordado.
+
+**Criterio de salida**: 462 tests verdes + 1 skipped en `hooks/**`, coverage `_lib/policy.py` ≥95% (alcanzado 97%), D3/D4/D5 coverage sin regresión (93%/93%/94%), los 3 hooks
+consumen el loader sin residuos hardcoded, docs-sync en el propio PR (ROADMAP + HANDOFF + MASTER_PLAN + ARCHITECTURE + `.claude/rules/hooks.md`) incluyendo la nota de drift
+meta↔template, hook `pre-pr-gate` aprueba este mismo PR (dogfooding post-migración). En curso.
 
 ## Convenciones de este archivo
 

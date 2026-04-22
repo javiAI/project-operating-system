@@ -58,9 +58,31 @@ def make_write(file_path: str, content: str = "x") -> dict:
     }
 
 
+POLICY_YAML_FOR_TESTS = """\
+lifecycle:
+  pre_write:
+    enforced_patterns:
+      - label: "hooks_top_level_py"
+        match_glob: "hooks/*.py"
+        exclude_globs:
+          - "hooks/_lib/**"
+          - "hooks/tests/**"
+      - label: "generator_ts"
+        match_glob: "generator/*.ts"
+        exclude_globs:
+          - "**/*.test.ts"
+      - label: "generator_ts"
+        match_glob: "generator/**/*.ts"
+        exclude_globs:
+          - "**/*.test.ts"
+          - "generator/__tests__/**"
+          - "generator/__fixtures__/**"
+"""
+
+
 @pytest.fixture
 def repo(tmp_path: Path) -> Path:
-    """Synthetic repo root with the dirs the hook reads/writes."""
+    """Synthetic repo root with the dirs the hook reads/writes + policy.yaml."""
     (tmp_path / ".claude" / "logs").mkdir(parents=True)
     (tmp_path / "hooks" / "tests").mkdir(parents=True)
     (tmp_path / "hooks" / "_lib").mkdir(parents=True)
@@ -70,7 +92,28 @@ def repo(tmp_path: Path) -> Path:
     (tmp_path / "generator" / "__fixtures__").mkdir(parents=True)
     (tmp_path / "docs").mkdir(parents=True)
     (tmp_path / "templates").mkdir(parents=True)
+    (tmp_path / "policy.yaml").write_text(POLICY_YAML_FOR_TESTS)
     return tmp_path
+
+
+@pytest.fixture(autouse=True)
+def _reset_policy_cache():
+    """Isolate loader cache between tests (different tmp_path each test)."""
+    hooks_path = str(REPO_ROOT / "hooks")
+    added = hooks_path not in sys.path
+    if added:
+        sys.path.insert(0, hooks_path)
+    from _lib.policy import reset_cache
+    reset_cache()
+    try:
+        yield
+    finally:
+        reset_cache()
+        if added:
+            try:
+                sys.path.remove(hooks_path)
+            except ValueError:
+                pass
 
 
 def touch(repo: Path, rel: str) -> Path:
@@ -396,97 +439,9 @@ class TestRobustness:
 
 
 # ---------------------------------------------------------------------------
-# TestIsEnforcedUnit — classifier unit tests
+# Unit tests for classification/test-pair derivation moved to
+# hooks/tests/test_lib_policy.py (policy loader is the source of truth).
 # ---------------------------------------------------------------------------
-
-
-class TestIsEnforcedUnit:
-    # Enforced
-    def test_hook_top_level_py_enforced(self):
-        assert pwg.is_enforced("hooks/new_guard.py") is True
-
-    def test_generator_lib_ts_enforced(self):
-        assert pwg.is_enforced("generator/lib/foo.ts") is True
-
-    def test_generator_lib_nested_ts_enforced(self):
-        assert pwg.is_enforced("generator/lib/sub/deep.ts") is True
-
-    def test_generator_renderer_ts_enforced(self):
-        assert pwg.is_enforced("generator/renderers/foo.ts") is True
-
-    def test_generator_run_ts_enforced(self):
-        assert pwg.is_enforced("generator/run.ts") is True
-
-    # Excluded by category 1 (tests/docs/templates/meta)
-    def test_hook_tests_dir_excluded(self):
-        assert pwg.is_enforced("hooks/tests/test_foo.py") is False
-
-    def test_test_ts_excluded_at_lib(self):
-        assert pwg.is_enforced("generator/lib/foo.test.ts") is False
-
-    def test_test_ts_excluded_at_renderer(self):
-        assert pwg.is_enforced("generator/renderers/foo.test.ts") is False
-
-    def test_generator_top_tests_excluded(self):
-        assert pwg.is_enforced("generator/__tests__/snapshots.test.ts") is False
-
-    def test_generator_fixtures_excluded(self):
-        assert pwg.is_enforced("generator/__fixtures__/profile.yaml") is False
-
-    def test_md_excluded(self):
-        assert pwg.is_enforced("hooks/README.md") is False
-
-    def test_yaml_excluded(self):
-        assert pwg.is_enforced("questionnaire/schema.yaml") is False
-
-    def test_hbs_excluded(self):
-        assert pwg.is_enforced("templates/X.md.hbs") is False
-
-    # Excluded by category 2 (helper internals)
-    def test_hooks_lib_excluded(self):
-        assert pwg.is_enforced("hooks/_lib/slug.py") is False
-
-    def test_hooks_lib_init_excluded(self):
-        assert pwg.is_enforced("hooks/_lib/__init__.py") is False
-
-    # Out of scope
-    def test_non_hooks_py_out_of_scope(self):
-        assert pwg.is_enforced("scripts/tool.py") is False
-
-    def test_non_generator_ts_out_of_scope(self):
-        assert pwg.is_enforced("unrelated/foo.ts") is False
-
-    def test_hooks_deep_py_out_of_scope(self):
-        # Non-_lib subdir under hooks is not enforced (we only require
-        # test-pair for top-level hooks/*.py; anything deeper has no
-        # declared pair convention).
-        assert pwg.is_enforced("hooks/other/thing.py") is False
-
-
-class TestExpectedTestPairUnit:
-    def test_hook_py(self):
-        assert pwg.expected_test_pair("hooks/pre-write-guard.py") == \
-            "hooks/tests/test_pre_write_guard.py"
-
-    def test_hook_py_underscore_preserved(self):
-        assert pwg.expected_test_pair("hooks/already_under.py") == \
-            "hooks/tests/test_already_under.py"
-
-    def test_generator_lib_ts(self):
-        assert pwg.expected_test_pair("generator/lib/foo.ts") == \
-            "generator/lib/foo.test.ts"
-
-    def test_generator_renderer_ts(self):
-        assert pwg.expected_test_pair("generator/renderers/bar.ts") == \
-            "generator/renderers/bar.test.ts"
-
-    def test_generator_lib_nested_ts(self):
-        assert pwg.expected_test_pair("generator/lib/sub/deep.ts") == \
-            "generator/lib/sub/deep.test.ts"
-
-    def test_generator_run_ts(self):
-        assert pwg.expected_test_pair("generator/run.ts") == \
-            "generator/run.test.ts"
 
 
 class TestBuildDenyReasonUnit:
@@ -576,3 +531,21 @@ class TestMainInProcess:
     def test_write_relative_dotdot_still_enforced(self, monkeypatch, repo):
         payload = json.dumps(make_write("docs/../hooks/new_guard.py"))
         assert self._run(monkeypatch, repo, payload) == 2
+
+    def test_unknown_label_passes_through_with_policy_unavailable(
+        self, monkeypatch, repo
+    ):
+        (repo / "policy.yaml").write_text(
+            "lifecycle:\n"
+            "  pre_write:\n"
+            "    enforced_patterns:\n"
+            "      - label: brand_new_label_without_code_branch\n"
+            "        match_glob: 'hooks/*.py'\n",
+            encoding="utf-8",
+        )
+        payload = json.dumps(make_write("hooks/unknown_label_guard.py"))
+        assert self._run(monkeypatch, repo, payload) == 0
+        hook_log = repo / ".claude" / "logs" / "pre-write-guard.jsonl"
+        entries = [json.loads(ln) for ln in hook_log.read_text().splitlines() if ln]
+        assert any(e.get("status") == "policy_unavailable" for e in entries)
+        assert not (repo / ".claude" / "logs" / "phase-gates.jsonl").exists()

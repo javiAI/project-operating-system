@@ -116,6 +116,66 @@ def _read_jsonl(p: Path) -> list[dict]:
     return [json.loads(line) for line in p.read_text().splitlines() if line.strip()]
 
 
+POLICY_YAML_FOR_TESTS = """\
+lifecycle:
+  post_merge:
+    skills_conditional:
+      - skill: "pos:compound"
+        trigger:
+          touched_paths_any_of:
+            - "generator/lib/**"
+            - "generator/renderers/**"
+            - "hooks/**"
+            - "skills/**"
+            - "templates/**/*.hbs"
+          skip_if_only:
+            - "docs/**"
+            - "*.md"
+            - ".claude/patterns/**"
+          min_files_changed: 2
+"""
+
+
+def _write_policy(root: Path) -> None:
+    (root / "policy.yaml").write_text(POLICY_YAML_FOR_TESTS)
+
+
+def _test_trigger():
+    """PostMergeTrigger instance mirroring POLICY_YAML_FOR_TESTS."""
+    sys.path.insert(0, str(REPO_ROOT / "hooks"))
+    from _lib.policy import PostMergeTrigger
+    return PostMergeTrigger(
+        touched_paths_any_of=(
+            "generator/lib/**",
+            "generator/renderers/**",
+            "hooks/**",
+            "skills/**",
+            "templates/**/*.hbs",
+        ),
+        skip_if_only=("docs/**", "*.md", ".claude/patterns/**"),
+        min_files_changed=2,
+    )
+
+
+@pytest.fixture(autouse=True)
+def _reset_policy_cache():
+    hooks_path = str(REPO_ROOT / "hooks")
+    added = hooks_path not in sys.path
+    if added:
+        sys.path.insert(0, hooks_path)
+    from _lib.policy import reset_cache
+    reset_cache()
+    try:
+        yield
+    finally:
+        reset_cache()
+        if added:
+            try:
+                sys.path.remove(hooks_path)
+            except ValueError:
+                pass
+
+
 # ---------------------------------------------------------------------------
 # fixtures — real git repos with controlled reflog state
 # ---------------------------------------------------------------------------
@@ -146,6 +206,7 @@ def repo_after_merge(tmp_path: Path) -> Path:
     _git(tmp_path, "checkout", "-q", "main")
     _git(tmp_path, "merge", "--no-ff", "-q", "-m", "merge feat/x", "feat/x")
     (tmp_path / ".claude" / "logs").mkdir(parents=True, exist_ok=True)
+    _write_policy(tmp_path)
     return tmp_path
 
 
@@ -167,6 +228,7 @@ def repo_after_merge_ff(tmp_path: Path) -> Path:
     _git(tmp_path, "checkout", "-q", "main")
     _git(tmp_path, "merge", "--ff-only", "-q", "feat/x")
     (tmp_path / ".claude" / "logs").mkdir(parents=True, exist_ok=True)
+    _write_policy(tmp_path)
     return tmp_path
 
 
@@ -209,6 +271,7 @@ def repo_after_pull(tmp_path: Path) -> Path:
     # local pulls → reflog "pull: Fast-forward"
     _git(local, "pull", "-q")
     (local / ".claude" / "logs").mkdir(parents=True, exist_ok=True)
+    _write_policy(local)
     return local
 
 
@@ -222,6 +285,7 @@ def repo_clean(tmp_path: Path) -> Path:
     _git(tmp_path, "add", "README.md")
     _git(tmp_path, "commit", "-q", "-m", "init")
     (tmp_path / ".claude" / "logs").mkdir(parents=True, exist_ok=True)
+    _write_policy(tmp_path)
     return tmp_path
 
 
@@ -404,96 +468,79 @@ class TestTouchedPaths:
 
 
 @needs_hook
-class TestPolicyConstants:
-    def test_trigger_globs_mirror_policy(self):
-        assert set(pa.TRIGGER_GLOBS) == {
-            "generator/lib/**",
-            "generator/renderers/**",
-            "hooks/**",
-            "skills/**",
-            "templates/**/*.hbs",
-        }
-
-    def test_skip_if_only_globs_mirror_policy(self):
-        assert set(pa.SKIP_IF_ONLY_GLOBS) == {"docs/**", "*.md", ".claude/patterns/**"}
-
-    def test_min_files_changed_is_two(self):
-        assert pa.MIN_FILES_CHANGED == 2
-
-
-@needs_hook
 class TestMatchTriggers:
     def test_single_file_below_min_returns_empty(self):
-        """1 file < MIN_FILES_CHANGED=2 → no match."""
-        assert pa.match_triggers(["hooks/foo.py"]) == []
+        """1 file < min_files_changed=2 → no match."""
+        assert pa.match_triggers(["hooks/foo.py"], _test_trigger()) == []
 
     def test_two_hooks_files_match_hooks_glob(self):
-        assert pa.match_triggers(["hooks/a.py", "hooks/b.py"]) == ["hooks/**"]
+        assert pa.match_triggers(["hooks/a.py", "hooks/b.py"], _test_trigger()) == ["hooks/**"]
 
     def test_two_files_in_different_triggers_match_both(self):
-        matched = pa.match_triggers(["hooks/a.py", "skills/x/SKILL.md"])
+        matched = pa.match_triggers(["hooks/a.py", "skills/x/SKILL.md"], _test_trigger())
         assert matched == ["hooks/**", "skills/**"]
 
     def test_generator_lib_matches(self):
-        matched = pa.match_triggers(["generator/lib/a.ts", "generator/lib/b.ts"])
+        matched = pa.match_triggers(
+            ["generator/lib/a.ts", "generator/lib/b.ts"], _test_trigger(),
+        )
         assert matched == ["generator/lib/**"]
 
     def test_generator_renderers_matches(self):
-        matched = pa.match_triggers([
-            "generator/renderers/a.ts",
-            "generator/renderers/b.ts",
-        ])
+        matched = pa.match_triggers(
+            ["generator/renderers/a.ts", "generator/renderers/b.ts"], _test_trigger(),
+        )
         assert matched == ["generator/renderers/**"]
 
     def test_templates_hbs_nested_matches(self):
         """Policy glob is `templates/**/*.hbs` — requires subdir."""
-        matched = pa.match_triggers([
-            "templates/profile/a.hbs",
-            "templates/profile/b.hbs",
-        ])
+        matched = pa.match_triggers(
+            ["templates/profile/a.hbs", "templates/profile/b.hbs"], _test_trigger(),
+        )
         assert matched == ["templates/**/*.hbs"]
 
     def test_all_skip_only_returns_empty(self):
         """All paths in skip_if_only → compound should not fire."""
-        assert pa.match_triggers(["docs/X.md", "docs/Y.md"]) == []
+        assert pa.match_triggers(["docs/X.md", "docs/Y.md"], _test_trigger()) == []
 
     def test_only_root_md_files_skip_only(self):
-        assert pa.match_triggers(["ROADMAP.md", "HANDOFF.md"]) == []
+        assert pa.match_triggers(["ROADMAP.md", "HANDOFF.md"], _test_trigger()) == []
 
     def test_only_patterns_skip_only(self):
-        assert pa.match_triggers([
-            ".claude/patterns/a.md",
-            ".claude/patterns/b.md",
-        ]) == []
+        assert pa.match_triggers(
+            [".claude/patterns/a.md", ".claude/patterns/b.md"], _test_trigger(),
+        ) == []
 
     def test_mixed_skip_and_trigger_matches(self):
         """2 files: 1 doc + 1 hook → not all skip_if_only → fires on hooks/**."""
-        matched = pa.match_triggers(["docs/X.md", "hooks/foo.py"])
+        matched = pa.match_triggers(["docs/X.md", "hooks/foo.py"], _test_trigger())
         assert matched == ["hooks/**"]
 
     def test_empty_list_returns_empty(self):
-        assert pa.match_triggers([]) == []
+        assert pa.match_triggers([], _test_trigger()) == []
 
     def test_unrelated_paths_return_empty_even_with_min_met(self):
         """2 files but none match any trigger glob → empty."""
-        assert pa.match_triggers(["scripts/deploy.sh", "Makefile"]) == []
+        assert pa.match_triggers(["scripts/deploy.sh", "Makefile"], _test_trigger()) == []
 
     def test_three_triggers_matched_ordering_follows_policy_list(self):
-        matched = pa.match_triggers([
-            "skills/x.md",
-            "hooks/foo.py",
-            "generator/lib/bar.ts",
-        ])
+        matched = pa.match_triggers(
+            ["skills/x.md", "hooks/foo.py", "generator/lib/bar.ts"], _test_trigger(),
+        )
         assert matched == ["generator/lib/**", "hooks/**", "skills/**"]
 
     def test_matched_list_deduplicated(self):
         """Two hooks/ files → hooks/** appears once."""
-        matched = pa.match_triggers(["hooks/a.py", "hooks/b.py", "hooks/c.py"])
+        matched = pa.match_triggers(
+            ["hooks/a.py", "hooks/b.py", "hooks/c.py"], _test_trigger(),
+        )
         assert matched == ["hooks/**"]
 
     def test_templates_without_subdir_does_not_match(self):
         """`templates/**/*.hbs` requires at least one subdir between templates and file."""
-        matched = pa.match_triggers(["templates/a.hbs", "templates/b.hbs"])
+        matched = pa.match_triggers(
+            ["templates/a.hbs", "templates/b.hbs"], _test_trigger(),
+        )
         assert matched == []
 
 
@@ -641,6 +688,7 @@ class TestIntegrationConfirmedNoTriggers:
         _git(tmp_path, "checkout", "-q", "main")
         _git(tmp_path, "merge", "--no-ff", "-q", "-m", "merge docs", "feat/docs")
         (tmp_path / ".claude" / "logs").mkdir(parents=True, exist_ok=True)
+        _write_policy(tmp_path)
 
         result = run_hook(load_fixture("git_merge.json"), cwd=tmp_path)
         assert result.returncode == 0
@@ -666,6 +714,7 @@ class TestIntegrationConfirmedNoTriggers:
         _git(tmp_path, "checkout", "-q", "main")
         _git(tmp_path, "merge", "--no-ff", "-q", "-m", "merge one", "feat/one")
         (tmp_path / ".claude" / "logs").mkdir(parents=True, exist_ok=True)
+        _write_policy(tmp_path)
 
         result = run_hook(load_fixture("git_merge.json"), cwd=tmp_path)
         assert result.returncode == 0
@@ -858,6 +907,7 @@ class TestAdditionalContextShape:
         _git(tmp_path, "checkout", "-q", "main")
         _git(tmp_path, "merge", "--no-ff", "-q", "-m", "merge many", "feat/many")
         (tmp_path / ".claude" / "logs").mkdir(parents=True, exist_ok=True)
+        _write_policy(tmp_path)
 
         result = run_hook(load_fixture("git_merge.json"), cwd=tmp_path)
         ctx = parse_stdout(result)["hookSpecificOutput"]["additionalContext"]

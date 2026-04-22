@@ -1,32 +1,34 @@
 #!/usr/bin/env python3
 """pre-write-guard: enforce test-pair existence on Writes to enforced paths.
 
-PreToolUse(Write) blocker. Enforces CLAUDE.md regla #3:
+PreToolUse(Write) blocker. Enforces CLAUDE.md regla #3 over paths declared
+in `policy.yaml § lifecycle.pre_write.enforced_patterns` (D5b policy-loader).
 
-- hooks/<name>.py (top-level, not in _lib/ or tests/) must have
-  hooks/tests/test_<name_underscore>.py before the impl is first written.
-- generator/**/*.ts (excluding *.test.ts, __tests__, __fixtures__) must have
-  co-located <path>.test.ts before the impl is first written.
+Test-pair derivation stays in code (_lib/policy.py::derive_test_pair)
+keyed by the pattern's `label` — Fase -1 (b.1) decision.
 
-Edits on files that already exist → always allow (edit flow). D4's
-pre-pr-gate is where missing coverage on existing files is caught.
-
-Pass-through silent (exit 0, zero log) on: non-Write tool, excluded paths
-(bucket 1: tests/docs/templates/meta; bucket 2: hooks/_lib/**), out-of-scope
-paths, paths outside the repo root. Double-log to
-`.claude/logs/pre-write-guard.jsonl` + `.claude/logs/phase-gates.jsonl`
-(event `pre_write`) only on decisions over enforced paths. Blocker
-safe-fail canonical (D1 shape, not D2 informative): malformed stdin /
-JSON / top-level / tool_input → deny exit 2.
+Edits on files that already exist → always allow (edit flow). Pass-through
+silent on: non-Write tool, excluded paths (pattern-level exclude_globs +
+paths outside any enforced pattern), paths outside the repo root. Blocker
+safe-fail canonical (D1): malformed stdin / JSON / top-level / tool_input
+→ deny exit 2. Failure mode (c.2): if `policy.yaml` is missing/corrupt and
+the loader returns None, the hook pass-throughs with `status: policy_unavailable`
+logged — never denies blindly (avoids bricking the repo on a bad YAML edit).
+Same (c.2) behavior when a label matches but `derive_test_pair` has no
+derivation branch for it (policy.yaml label typo or new label added without
+code support): log `status: policy_unavailable` + pass-through, never deny
+with an empty expected-path.
 """
 from __future__ import annotations
 
+import fnmatch
 import json
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from _lib.jsonl import append_jsonl  # noqa: E402
+from _lib.policy import derive_test_pair, pre_write_rules  # noqa: E402
 from _lib.time import now_iso  # noqa: E402
 
 HOOK_EVENT = "PreToolUse"
@@ -35,31 +37,17 @@ HOOK_LOG = ".claude/logs/pre-write-guard.jsonl"
 PHASE_LOG = ".claude/logs/phase-gates.jsonl"
 
 
-def is_enforced(rel_path: str) -> bool:
-    if not rel_path:
-        return False
-    parts = rel_path.split("/")
-    if rel_path.endswith(".py"):
-        return parts[0] == "hooks" and len(parts) == 2
-    if rel_path.endswith(".ts"):
-        if rel_path.endswith(".test.ts"):
-            return False
-        if parts[0] != "generator":
-            return False
-        if len(parts) >= 2 and parts[1] in ("__tests__", "__fixtures__"):
-            return False
-        return True
-    return False
-
-
-def expected_test_pair(rel_path: str) -> str:
-    if rel_path.endswith(".py") and rel_path.startswith("hooks/"):
-        name = rel_path.split("/", 1)[1]
-        stem = name[:-3]
-        return f"hooks/tests/test_{stem.replace('-', '_')}.py"
-    if rel_path.endswith(".ts"):
-        return rel_path[:-3] + ".test.ts"
-    return ""
+def classify(rel_path: str, rules) -> str | None:
+    """Return the matching pattern's `label` if the path is enforced; None otherwise."""
+    if not rel_path or rules is None:
+        return None
+    for pattern in rules.enforced_patterns:
+        if not fnmatch.fnmatchcase(rel_path, pattern.match_glob):
+            continue
+        if any(fnmatch.fnmatchcase(rel_path, ex) for ex in pattern.exclude_globs):
+            return None
+        return pattern.label
+    return None
 
 
 def build_deny_reason(write_path: str, expected_test: str) -> str:
@@ -68,10 +56,7 @@ def build_deny_reason(write_path: str, expected_test: str) -> str:
         f"Expected test file: {expected_test}\n"
         f"To unblock: touch {expected_test} and author a failing test first (RED), "
         "then retry the implementation Write.\n"
-        "Convention enforced by this hook:\n"
-        "  - hooks/<name>.py          → hooks/tests/test_<name_underscore>.py\n"
-        "  - generator/**/*.ts        → co-located *.test.ts "
-        "(excluding *.test.ts, generator/__tests__/, generator/__fixtures__/)\n"
+        "Enforced patterns declared in policy.yaml § lifecycle.pre_write.enforced_patterns.\n"
         f"Blocked write: {write_path}"
     )
 
@@ -85,6 +70,13 @@ def emit_deny(reason: str) -> None:
         }
     }
     print(json.dumps(output, ensure_ascii=False))
+
+
+def _safe_append(path: Path, entry: dict) -> None:
+    try:
+        append_jsonl(path, entry)
+    except OSError:
+        pass
 
 
 def main() -> int:
@@ -119,19 +111,30 @@ def main() -> int:
     except ValueError:
         return 0
 
-    if not is_enforced(rel):
+    rules = pre_write_rules(repo_root)
+    if rules is None:
+        _safe_append(
+            repo_root / HOOK_LOG,
+            {"ts": now_iso(), "hook": HOOK_NAME, "file_path": rel,
+             "status": "policy_unavailable",
+             "reason": "policy.yaml missing or pre_write section absent — pass-through"},
+        )
+        return 0
+
+    label = classify(rel, rules)
+    if label is None:
         return 0
 
     impl_abs = repo_root / rel
     ts = now_iso()
 
     def log(decision: str, reason: str) -> None:
-        append_jsonl(
+        _safe_append(
             repo_root / HOOK_LOG,
             {"ts": ts, "hook": HOOK_NAME, "file_path": rel,
              "decision": decision, "reason": reason},
         )
-        append_jsonl(
+        _safe_append(
             repo_root / PHASE_LOG,
             {"ts": ts, "event": "pre_write", "file_path": rel, "decision": decision},
         )
@@ -140,7 +143,18 @@ def main() -> int:
         log("allow", "impl file already exists (edit flow)")
         return 0
 
-    expected = expected_test_pair(rel)
+    expected = derive_test_pair(rel, label)
+    if expected is None:
+        _safe_append(
+            repo_root / HOOK_LOG,
+            {"ts": ts, "hook": HOOK_NAME, "file_path": rel,
+             "status": "policy_unavailable",
+             "reason": f"no test-pair derivation for label={label!r} "
+                       "(policy.yaml label typo or new label missing code branch) "
+                       "— pass-through (c.2)"},
+        )
+        return 0
+
     if (repo_root / expected).exists():
         log("allow", "test pair present")
         return 0
