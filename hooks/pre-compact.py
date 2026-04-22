@@ -70,14 +70,6 @@ def _safe_append(path: Path, entry: dict) -> None:
         pass
 
 
-def _log_hook(repo_root: Path, entry: dict) -> None:
-    _safe_append(repo_root / HOOK_LOG, entry)
-
-
-def _log_phase(repo_root: Path, entry: dict) -> None:
-    _safe_append(repo_root / PHASE_LOG, entry)
-
-
 def main() -> int:
     raw = sys.stdin.read()
     cwd = Path.cwd()
@@ -98,7 +90,7 @@ def main() -> int:
         error = f"invalid JSON: {exc.msg}"
 
     if error is not None:
-        _log_hook(cwd, {
+        _safe_append(cwd / HOOK_LOG, {
             "ts": ts,
             "hook": HOOK_NAME,
             "trigger": trigger,
@@ -110,7 +102,7 @@ def main() -> int:
 
     rules = pre_compact_rules(cwd)
     if rules is None:
-        _log_hook(cwd, {
+        _safe_append(cwd / HOOK_LOG, {
             "ts": ts,
             "hook": HOOK_NAME,
             "trigger": trigger,
@@ -120,14 +112,14 @@ def main() -> int:
         return 0
 
     emit(build_context(rules.persist))
-    _log_hook(cwd, {
+    _safe_append(cwd / HOOK_LOG, {
         "ts": ts,
         "hook": HOOK_NAME,
         "trigger": trigger,
         "status": "ok",
         "persist_count": len(rules.persist),
     })
-    _log_phase(cwd, {
+    _safe_append(cwd / PHASE_LOG, {
         "ts": ts,
         "event": "pre_compact",
         "trigger": trigger,
