@@ -530,19 +530,48 @@ class TestSkillsAllowedList:
         allowed = policy.skills_allowed_list(tmp_path)
         assert allowed == ()
 
-    def test_wrong_shape_returns_none(self, tmp_path):
+    def test_wrong_shape_returns_invalid_sentinel(self, tmp_path):
+        """Scalar instead of list → SKILLS_ALLOWED_INVALID (NOT None)."""
         from _lib import policy
         (tmp_path / "policy.yaml").write_text(
             "skills_allowed: \"not-a-list\"\n", encoding="utf-8"
         )
-        assert policy.skills_allowed_list(tmp_path) is None
+        assert policy.skills_allowed_list(tmp_path) is policy.SKILLS_ALLOWED_INVALID
 
-    def test_mixed_types_returns_none(self, tmp_path):
+    def test_mixed_types_returns_invalid_sentinel(self, tmp_path):
+        """List with non-string element → SKILLS_ALLOWED_INVALID."""
         from _lib import policy
         (tmp_path / "policy.yaml").write_text(
             "skills_allowed: [\"pos:kickoff\", 42]\n", encoding="utf-8"
         )
-        assert policy.skills_allowed_list(tmp_path) is None
+        assert policy.skills_allowed_list(tmp_path) is policy.SKILLS_ALLOWED_INVALID
+
+    def test_dict_shape_returns_invalid_sentinel(self, tmp_path):
+        from _lib import policy
+        (tmp_path / "policy.yaml").write_text(
+            "skills_allowed:\n  a: 1\n", encoding="utf-8"
+        )
+        assert policy.skills_allowed_list(tmp_path) is policy.SKILLS_ALLOWED_INVALID
+
+    def test_invalid_sentinel_distinct_from_none(self, tmp_path):
+        """Absent and invalid must NOT collapse to the same value.
+
+        Consumers rely on this distinction: absent → deferred (valid state),
+        invalid → misconfigured (observable policy error).
+        """
+        from _lib import policy
+        (tmp_path / "policy.yaml").write_text(
+            "version: \"0.1.0\"\n", encoding="utf-8"
+        )
+        absent = policy.skills_allowed_list(tmp_path)
+        assert absent is None
+        policy.reset_cache()
+        (tmp_path / "policy.yaml").write_text(
+            "skills_allowed: \"bad\"\n", encoding="utf-8"
+        )
+        invalid = policy.skills_allowed_list(tmp_path)
+        assert invalid is policy.SKILLS_ALLOWED_INVALID
+        assert invalid is not None  # belt-and-suspenders
 
     def test_explicit_empty_distinct_from_missing(self, tmp_path):
         """`skills_allowed: []` → `()` (deny-all); absent → None (deferred)."""
@@ -554,6 +583,29 @@ class TestSkillsAllowedList:
         policy.reset_cache()
         (tmp_path / "policy.yaml").write_text("version: \"1.0.0\"\n", encoding="utf-8")
         assert policy.skills_allowed_list(tmp_path) is None
+
+    def test_three_states_are_all_distinct(self, tmp_path):
+        """None (absent) vs SKILLS_ALLOWED_INVALID vs tuple — three states.
+
+        Before this fix, `None` collapsed absent + invalid, which let a typo
+        silently turn enforcement off. The accessor must keep them distinct.
+        """
+        from _lib import policy
+        # absent → None
+        (tmp_path / "policy.yaml").write_text("version: \"0.1.0\"\n", encoding="utf-8")
+        assert policy.skills_allowed_list(tmp_path) is None
+        # invalid → sentinel
+        policy.reset_cache()
+        (tmp_path / "policy.yaml").write_text(
+            "skills_allowed: 42\n", encoding="utf-8"
+        )
+        assert policy.skills_allowed_list(tmp_path) is policy.SKILLS_ALLOWED_INVALID
+        # valid → tuple
+        policy.reset_cache()
+        (tmp_path / "policy.yaml").write_text(
+            "skills_allowed: [\"pos:kickoff\"]\n", encoding="utf-8"
+        )
+        assert policy.skills_allowed_list(tmp_path) == ("pos:kickoff",)
 
 
 # -------------------- failure mode (c.2) ---------------------------------

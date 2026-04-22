@@ -17,12 +17,20 @@ Failure modes:
     policy_unavailable`, pass-through (exit 0).
   - policy.yaml present but no skills_allowed → log `status: deferred`,
     pass-through (exit 0). Prod state today.
-  - skills_allowed declared → read `.claude/logs/skills.jsonl`, compare
+  - policy.yaml `skills_allowed` present but wrong-shape (not list[str]) →
+    log `status: policy_misconfigured`, pass-through (exit 0). Distinct
+    from deferred so a typo doesn't silently turn enforcement off.
+  - Stop payload missing / non-string `session_id` → deny exit 2
+    (canonical safe-fail; we can't scope enforcement to a session).
+  - skills_allowed declared → stream `.claude/logs/skills.jsonl` line-by-line,
+    filter entries whose `session_id` matches the Stop payload, compare
     invoked vs allowed. Deny exit 2 on any violation (first violator in
     decisionReason); allow exit 0 otherwise.
 
 Skill invocation source is `.claude/logs/skills.jsonl` — the canonical
-audit log declared in policy.yaml.audit.required_logs.
+audit log declared in policy.yaml.audit.required_logs. Entries are scoped
+by `session_id`; entries without a matching `session_id` are ignored (the
+log is append-only and accumulates across sessions).
 """
 from __future__ import annotations
 
@@ -32,7 +40,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from _lib.jsonl import append_jsonl  # noqa: E402
-from _lib.policy import load_policy, skills_allowed_list  # noqa: E402
+from _lib.policy import (  # noqa: E402
+    SKILLS_ALLOWED_INVALID,
+    load_policy,
+    skills_allowed_list,
+)
 from _lib.time import now_iso  # noqa: E402
 
 HOOK_EVENT = "Stop"
@@ -42,31 +54,42 @@ PHASE_LOG = ".claude/logs/phase-gates.jsonl"
 SKILLS_LOG = ".claude/logs/skills.jsonl"
 
 
-def _extract_invoked_skills(repo_root: Path) -> list[str]:
-    """Read `.claude/logs/skills.jsonl` and return the list of skill names.
+def _extract_invoked_skills(repo_root: Path, session_id: str) -> list[str]:
+    """Stream `.claude/logs/skills.jsonl` and return skills for `session_id`.
+
+    Only entries whose `session_id` equals the argument are counted. Entries
+    lacking a `session_id` key, or with a non-string / mismatched value, are
+    ignored — the log is append-only and accumulates across sessions, so
+    enforcement must scope to the active Stop payload.
 
     Corrupt lines (non-JSON or non-dict entries) and entries lacking a
     string `skill` key are silently ignored — the hook's job is enforcement
     based on what was reliably recorded, not forensics on the log itself.
+
+    Streams line-by-line (does not load the whole file) to keep memory
+    bounded as the audit log grows.
     """
     log = repo_root / SKILLS_LOG
     if not log.exists():
         return []
     skills: list[str] = []
     try:
-        for line in log.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                entry = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if not isinstance(entry, dict):
-                continue
-            name = entry.get("skill")
-            if isinstance(name, str):
-                skills.append(name)
+        with log.open("r", encoding="utf-8") as f:
+            for raw_line in f:
+                line = raw_line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(entry, dict):
+                    continue
+                if entry.get("session_id") != session_id:
+                    continue
+                name = entry.get("skill")
+                if isinstance(name, str):
+                    skills.append(name)
     except OSError:
         return []
     return skills
@@ -129,6 +152,15 @@ def main() -> int:
             cwd, ts, "malformed payload: top-level not a JSON object"
         )
 
+    # Session scoping — enforcement cannot safely run without a session_id
+    # to attribute invocations to. The Stop payload is documented to include
+    # it, so absence is a malformed payload (safe-fail deny, D1 canonical).
+    session_id = payload.get("session_id")
+    if not isinstance(session_id, str) or not session_id:
+        return _deny_payload(
+            cwd, ts, "malformed payload: missing or non-string session_id"
+        )
+
     # Failure-mode (c.2): policy.yaml missing/malformed → pass-through.
     if load_policy(cwd) is None:
         _safe_append(cwd / HOOK_LOG, {
@@ -138,9 +170,19 @@ def main() -> int:
         })
         return 0
 
-    # Scaffold (c.3): policy.yaml OK but no skills_allowed → deferred.
+    # Scaffold (c.3): tri-state on skills_allowed.
     allowed = skills_allowed_list(cwd)
+    if allowed is SKILLS_ALLOWED_INVALID:
+        # Present but wrong-shape → observable misconfiguration, NOT deferred.
+        _safe_append(cwd / HOOK_LOG, {
+            "ts": ts,
+            "hook": HOOK_NAME,
+            "status": "policy_misconfigured",
+            "reason": "skills_allowed is present in policy.yaml but not a list of strings",
+        })
+        return 0
     if allowed is None:
+        # Section absent → deferred (prod state today).
         _safe_append(cwd / HOOK_LOG, {
             "ts": ts,
             "hook": HOOK_NAME,
@@ -148,8 +190,8 @@ def main() -> int:
         })
         return 0
 
-    # Enforcement live.
-    invoked = _extract_invoked_skills(cwd)
+    # Enforcement live — scope by session_id.
+    invoked = _extract_invoked_skills(cwd, session_id)
     decision, violations = _validate(invoked, allowed)
 
     if decision == "deny":
@@ -162,6 +204,7 @@ def main() -> int:
         _safe_append(cwd / HOOK_LOG, {
             "ts": ts,
             "hook": HOOK_NAME,
+            "session_id": session_id,
             "decision": "deny",
             "violations": violations,
             "reason": reason,
@@ -169,6 +212,7 @@ def main() -> int:
         _safe_append(cwd / PHASE_LOG, {
             "ts": ts,
             "event": "stop",
+            "session_id": session_id,
             "decision": "deny",
             "violations": violations,
         })
@@ -177,12 +221,14 @@ def main() -> int:
     _safe_append(cwd / HOOK_LOG, {
         "ts": ts,
         "hook": HOOK_NAME,
+        "session_id": session_id,
         "decision": "allow",
         "invoked_count": len(invoked),
     })
     _safe_append(cwd / PHASE_LOG, {
         "ts": ts,
         "event": "stop",
+        "session_id": session_id,
         "decision": "allow",
     })
     return 0

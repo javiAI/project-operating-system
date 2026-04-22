@@ -96,13 +96,19 @@ def write_skills_allowed(repo: Path, allowed: list[str]) -> None:
     )
 
 
-def seed_skills_log(repo: Path, skills: list[str]) -> None:
-    """Write `.claude/logs/skills.jsonl` with one entry per skill name."""
+def seed_skills_log(repo: Path, skills: list[str],
+                    session_id: str = "test-session") -> None:
+    """Write `.claude/logs/skills.jsonl` with one entry per skill name.
+
+    Default `session_id` matches `stop.json`'s fixture so existing happy-path
+    tests attribute invocations to the current Stop payload's session.
+    Multi-session tests can override.
+    """
     log = repo / ".claude" / "logs" / "skills.jsonl"
     log.parent.mkdir(parents=True, exist_ok=True)
-    with log.open("w", encoding="utf-8") as f:
+    with log.open("a", encoding="utf-8") as f:
         for name in skills:
-            f.write(json.dumps({"skill": name}) + "\n")
+            f.write(json.dumps({"skill": name, "session_id": session_id}) + "\n")
 
 
 def read_log(repo: Path, name: str) -> list[dict]:
@@ -231,6 +237,127 @@ class TestActivableEnforcement:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Session scoping — enforcement only considers the current session's log entries
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestSessionScoping:
+    """Regression guard for the pre-D6-review bug: a rogue skill invoked in a
+    *previous* session would silently deny the *current* Stop if the
+    allowlist didn't cover it. Enforcement must scope to the current
+    session's `session_id` — entries from other sessions are ignored.
+    """
+
+    def test_rogue_skill_in_other_session_does_not_affect_current(
+        self, repo_full_policy: Path
+    ):
+        write_skills_allowed(repo_full_policy, ["pos:kickoff"])
+        seed_skills_log(repo_full_policy, ["pos:rogue"], session_id="old-session")
+        seed_skills_log(repo_full_policy, ["pos:kickoff"], session_id="test-session")
+        result = run_hook(load_payload("stop.json"), cwd=repo_full_policy)
+        # Current session (test-session) only invoked pos:kickoff → allow.
+        # The old-session rogue invocation must NOT leak into this decision.
+        assert result.returncode == 0
+
+    def test_violation_in_current_session_denies_despite_other_sessions_clean(
+        self, repo_full_policy: Path
+    ):
+        write_skills_allowed(repo_full_policy, ["pos:kickoff"])
+        seed_skills_log(repo_full_policy, ["pos:kickoff"], session_id="old-session")
+        seed_skills_log(repo_full_policy, ["pos:rogue"], session_id="test-session")
+        result = run_hook(load_payload("stop.json"), cwd=repo_full_policy)
+        assert result.returncode == 2
+        out = parse_stdout(result)
+        assert "pos:rogue" in out["hookSpecificOutput"]["decisionReason"]
+
+    def test_entries_without_session_id_are_ignored(self, repo_full_policy: Path):
+        """Entries missing session_id can't be attributed to any session."""
+        write_skills_allowed(repo_full_policy, ["pos:kickoff"])
+        log = repo_full_policy / ".claude" / "logs" / "skills.jsonl"
+        log.parent.mkdir(parents=True, exist_ok=True)
+        log.write_text(
+            json.dumps({"skill": "pos:rogue"}) + "\n", encoding="utf-8"
+        )
+        result = run_hook(load_payload("stop.json"), cwd=repo_full_policy)
+        assert result.returncode == 0
+
+    def test_many_sessions_mixed(self, repo_full_policy: Path):
+        """Dense multi-session log: only the current session counts."""
+        write_skills_allowed(repo_full_policy, ["pos:kickoff", "pos:handoff"])
+        seed_skills_log(repo_full_policy, ["pos:a", "pos:b"], session_id="s1")
+        seed_skills_log(repo_full_policy, ["pos:kickoff"], session_id="test-session")
+        seed_skills_log(repo_full_policy, ["pos:c"], session_id="s2")
+        seed_skills_log(repo_full_policy, ["pos:handoff"], session_id="test-session")
+        seed_skills_log(repo_full_policy, ["pos:d"], session_id="s3")
+        result = run_hook(load_payload("stop.json"), cwd=repo_full_policy)
+        assert result.returncode == 0
+
+    def test_session_id_logged_on_allow(self, repo_full_policy: Path):
+        write_skills_allowed(repo_full_policy, ["pos:kickoff"])
+        seed_skills_log(repo_full_policy, ["pos:kickoff"])
+        run_hook(load_payload("stop.json"), cwd=repo_full_policy)
+        hook_log = read_log(repo_full_policy, "stop-policy-check.jsonl")
+        assert any(e.get("session_id") == "test-session"
+                   and e.get("decision") == "allow" for e in hook_log)
+
+    def test_session_id_logged_on_deny(self, repo_full_policy: Path):
+        write_skills_allowed(repo_full_policy, ["pos:kickoff"])
+        seed_skills_log(repo_full_policy, ["pos:rogue"])
+        run_hook(load_payload("stop.json"), cwd=repo_full_policy)
+        hook_log = read_log(repo_full_policy, "stop-policy-check.jsonl")
+        assert any(e.get("session_id") == "test-session"
+                   and e.get("decision") == "deny" for e in hook_log)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Misconfigured policy — skills_allowed present but wrong-shape
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestMisconfiguredPolicy:
+    """`skills_allowed` present but wrong-shape must be observable, not
+    silently collapsed to deferred (which would turn enforcement off)."""
+
+    def _write_misconfigured(self, repo: Path, value: str) -> None:
+        (repo / "policy.yaml").write_text(
+            f"version: \"0.1.0\"\nskills_allowed: {value}\n", encoding="utf-8"
+        )
+
+    def test_scalar_skills_allowed_is_misconfigured(self, tmp_path: Path):
+        (tmp_path / ".claude" / "logs").mkdir(parents=True)
+        self._write_misconfigured(tmp_path, '"pos:kickoff"')
+        result = run_hook(load_payload("stop.json"), cwd=tmp_path)
+        assert result.returncode == 0
+        entries = read_log(tmp_path, "stop-policy-check.jsonl")
+        assert any(e.get("status") == "policy_misconfigured" for e in entries)
+
+    def test_mixed_list_skills_allowed_is_misconfigured(self, tmp_path: Path):
+        (tmp_path / ".claude" / "logs").mkdir(parents=True)
+        self._write_misconfigured(tmp_path, '["pos:kickoff", 42]')
+        result = run_hook(load_payload("stop.json"), cwd=tmp_path)
+        assert result.returncode == 0
+        entries = read_log(tmp_path, "stop-policy-check.jsonl")
+        assert any(e.get("status") == "policy_misconfigured" for e in entries)
+
+    def test_misconfigured_is_distinct_from_deferred(self, tmp_path: Path):
+        """`policy_misconfigured` status must NOT be reported as `deferred`."""
+        (tmp_path / ".claude" / "logs").mkdir(parents=True)
+        self._write_misconfigured(tmp_path, '"pos:kickoff"')
+        run_hook(load_payload("stop.json"), cwd=tmp_path)
+        mis_entries = read_log(tmp_path, "stop-policy-check.jsonl")
+        mis_statuses = [e.get("status") for e in mis_entries]
+        assert "policy_misconfigured" in mis_statuses
+        assert "deferred" not in mis_statuses
+
+    def test_misconfigured_does_not_cross_phase_gates(self, tmp_path: Path):
+        (tmp_path / ".claude" / "logs").mkdir(parents=True)
+        self._write_misconfigured(tmp_path, '"pos:kickoff"')
+        run_hook(load_payload("stop.json"), cwd=tmp_path)
+        phase_log = read_log(tmp_path, "phase-gates.jsonl")
+        assert phase_log == []
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Safe-fail blocker canonical (D1): malformed payload → deny exit 2
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -252,6 +379,27 @@ class TestSafeFailBlocker:
 
     def test_top_level_scalar_denies(self, repo_no_policy: Path):
         result = run_hook("42", cwd=repo_no_policy)
+        assert result.returncode == 2
+
+    def test_payload_without_session_id_denies(self, repo_no_policy: Path):
+        """Stop payloads from Claude Code always carry session_id; absence
+        is malformed and the hook can't safely scope enforcement."""
+        result = run_hook({"hook_event_name": "Stop"}, cwd=repo_no_policy)
+        assert result.returncode == 2
+        out = parse_stdout(result)
+        assert out["hookSpecificOutput"]["permissionDecision"] == "deny"
+        assert "session_id" in out["hookSpecificOutput"]["decisionReason"]
+
+    def test_payload_with_non_string_session_id_denies(self, repo_no_policy: Path):
+        result = run_hook(
+            {"hook_event_name": "Stop", "session_id": 42}, cwd=repo_no_policy
+        )
+        assert result.returncode == 2
+
+    def test_payload_with_empty_session_id_denies(self, repo_no_policy: Path):
+        result = run_hook(
+            {"hook_event_name": "Stop", "session_id": ""}, cwd=repo_no_policy
+        )
         assert result.returncode == 2
 
 
@@ -306,21 +454,20 @@ class TestMainInProcess:
         rc = sp.main()
         return rc, captured.getvalue()
 
+    _BASE = {"hook_event_name": "Stop", "session_id": "test-session"}
+
     def test_missing_policy_returns_zero(self, repo_no_policy: Path, monkeypatch):
-        rc, _ = self._run(monkeypatch, repo_no_policy,
-                          {"hook_event_name": "Stop"})
+        rc, _ = self._run(monkeypatch, repo_no_policy, dict(self._BASE))
         assert rc == 0
 
     def test_deferred_returns_zero(self, repo_no_skills_section: Path, monkeypatch):
-        rc, _ = self._run(monkeypatch, repo_no_skills_section,
-                          {"hook_event_name": "Stop"})
+        rc, _ = self._run(monkeypatch, repo_no_skills_section, dict(self._BASE))
         assert rc == 0
 
     def test_deny_returns_two(self, repo_full_policy: Path, monkeypatch):
         write_skills_allowed(repo_full_policy, ["pos:kickoff"])
         seed_skills_log(repo_full_policy, ["pos:rogue"])
-        rc, out = self._run(monkeypatch, repo_full_policy,
-                            {"hook_event_name": "Stop"})
+        rc, out = self._run(monkeypatch, repo_full_policy, dict(self._BASE))
         assert rc == 2
         data = json.loads(out)
         assert data["hookSpecificOutput"]["permissionDecision"] == "deny"
@@ -328,8 +475,18 @@ class TestMainInProcess:
     def test_allow_returns_zero(self, repo_full_policy: Path, monkeypatch):
         write_skills_allowed(repo_full_policy, ["pos:kickoff"])
         seed_skills_log(repo_full_policy, ["pos:kickoff"])
-        rc, _ = self._run(monkeypatch, repo_full_policy,
-                          {"hook_event_name": "Stop"})
+        rc, _ = self._run(monkeypatch, repo_full_policy, dict(self._BASE))
+        assert rc == 0
+
+    def test_misconfigured_returns_zero_in_process(
+        self, tmp_path: Path, monkeypatch
+    ):
+        (tmp_path / ".claude" / "logs").mkdir(parents=True)
+        (tmp_path / "policy.yaml").write_text(
+            'version: "0.1.0"\nskills_allowed: "pos:kickoff"\n',
+            encoding="utf-8",
+        )
+        rc, _ = self._run(monkeypatch, tmp_path, dict(self._BASE))
         assert rc == 0
 
     def test_bad_stdin_denies_in_process(self, repo_no_policy: Path, monkeypatch):
@@ -345,39 +502,72 @@ class TestMainInProcess:
 
 
 class TestExtractInvokedSkillsUnit:
+    SID = "test-session"
+
     def test_missing_log_returns_empty(self, tmp_path: Path):
-        assert sp._extract_invoked_skills(tmp_path) == []
+        assert sp._extract_invoked_skills(tmp_path, self.SID) == []
 
     def test_single_skill(self, tmp_path: Path):
         (tmp_path / ".claude" / "logs").mkdir(parents=True)
         (tmp_path / ".claude" / "logs" / "skills.jsonl").write_text(
-            json.dumps({"skill": "pos:kickoff"}) + "\n", encoding="utf-8"
+            json.dumps({"skill": "pos:kickoff", "session_id": self.SID}) + "\n",
+            encoding="utf-8",
         )
-        assert sp._extract_invoked_skills(tmp_path) == ["pos:kickoff"]
+        assert sp._extract_invoked_skills(tmp_path, self.SID) == ["pos:kickoff"]
 
     def test_ignores_lines_without_skill_key(self, tmp_path: Path):
         (tmp_path / ".claude" / "logs").mkdir(parents=True)
         (tmp_path / ".claude" / "logs" / "skills.jsonl").write_text(
-            json.dumps({"other": "x"}) + "\n" +
-            json.dumps({"skill": "pos:kickoff"}) + "\n",
+            json.dumps({"other": "x", "session_id": self.SID}) + "\n" +
+            json.dumps({"skill": "pos:kickoff", "session_id": self.SID}) + "\n",
             encoding="utf-8",
         )
-        assert sp._extract_invoked_skills(tmp_path) == ["pos:kickoff"]
+        assert sp._extract_invoked_skills(tmp_path, self.SID) == ["pos:kickoff"]
 
     def test_ignores_corrupt_lines(self, tmp_path: Path):
         (tmp_path / ".claude" / "logs").mkdir(parents=True)
         (tmp_path / ".claude" / "logs" / "skills.jsonl").write_text(
-            "not-json\n" + json.dumps({"skill": "pos:kickoff"}) + "\n",
+            "not-json\n"
+            + json.dumps({"skill": "pos:kickoff", "session_id": self.SID})
+            + "\n",
             encoding="utf-8",
         )
-        assert sp._extract_invoked_skills(tmp_path) == ["pos:kickoff"]
+        assert sp._extract_invoked_skills(tmp_path, self.SID) == ["pos:kickoff"]
 
     def test_ignores_non_string_skill(self, tmp_path: Path):
         (tmp_path / ".claude" / "logs").mkdir(parents=True)
         (tmp_path / ".claude" / "logs" / "skills.jsonl").write_text(
-            json.dumps({"skill": 42}) + "\n", encoding="utf-8"
+            json.dumps({"skill": 42, "session_id": self.SID}) + "\n",
+            encoding="utf-8",
         )
-        assert sp._extract_invoked_skills(tmp_path) == []
+        assert sp._extract_invoked_skills(tmp_path, self.SID) == []
+
+    def test_ignores_entries_without_session_id(self, tmp_path: Path):
+        """Entries without a session_id can't be attributed to any session."""
+        (tmp_path / ".claude" / "logs").mkdir(parents=True)
+        (tmp_path / ".claude" / "logs" / "skills.jsonl").write_text(
+            json.dumps({"skill": "pos:kickoff"}) + "\n",
+            encoding="utf-8",
+        )
+        assert sp._extract_invoked_skills(tmp_path, self.SID) == []
+
+    def test_ignores_entries_from_other_sessions(self, tmp_path: Path):
+        (tmp_path / ".claude" / "logs").mkdir(parents=True)
+        (tmp_path / ".claude" / "logs" / "skills.jsonl").write_text(
+            json.dumps({"skill": "pos:other", "session_id": "session-a"}) + "\n" +
+            json.dumps({"skill": "pos:kickoff", "session_id": self.SID}) + "\n" +
+            json.dumps({"skill": "pos:another", "session_id": "session-b"}) + "\n",
+            encoding="utf-8",
+        )
+        assert sp._extract_invoked_skills(tmp_path, self.SID) == ["pos:kickoff"]
+
+    def test_ignores_non_string_session_id(self, tmp_path: Path):
+        (tmp_path / ".claude" / "logs").mkdir(parents=True)
+        (tmp_path / ".claude" / "logs" / "skills.jsonl").write_text(
+            json.dumps({"skill": "pos:kickoff", "session_id": 42}) + "\n",
+            encoding="utf-8",
+        )
+        assert sp._extract_invoked_skills(tmp_path, self.SID) == []
 
 
 class TestValidateSkillsUnit:

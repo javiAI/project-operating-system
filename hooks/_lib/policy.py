@@ -65,6 +65,21 @@ class PreCompactRules:
     persist: tuple[str, ...]
 
 
+class _SkillsAllowedInvalid:
+    """Sentinel for `skills_allowed` present but wrong-shape.
+
+    Distinct from `None` (= section absent → deferred) so consumers can
+    surface a misconfigured allowlist as an observable policy error instead
+    of silently degrading to deferred (which would turn enforcement off).
+    """
+
+    def __repr__(self) -> str:  # pragma: no cover - debug aid
+        return "<SKILLS_ALLOWED_INVALID>"
+
+
+SKILLS_ALLOWED_INVALID = _SkillsAllowedInvalid()
+
+
 def _safe_str_list(val: Any) -> list[str] | None:
     """Return `val` as a `list[str]` if and only if every element is a string.
 
@@ -257,12 +272,23 @@ def pre_compact_rules(repo_root: Path) -> PreCompactRules | None:
     return PreCompactRules(tuple(persist))
 
 
-def skills_allowed_list(repo_root: Path) -> tuple[str, ...] | None:
-    """Top-level `skills_allowed` list.
+def skills_allowed_list(
+    repo_root: Path,
+) -> tuple[str, ...] | None | _SkillsAllowedInvalid:
+    """Top-level `skills_allowed` list — tri-state result.
 
-    Contract: `None` = section absent (deferred — consumer passes through).
-    `()` = explicit empty list (deny-all — consumer enforces). Distinguishing
-    these two states is the core of (c.3) scaffold mode for D6's Stop hook.
+    Contract:
+      - `None`                      = section absent (deferred — consumer passes through).
+      - `SKILLS_ALLOWED_INVALID`    = section present but wrong shape (misconfigured —
+                                      consumer should surface this as an observable
+                                      policy error, NOT collapse to deferred).
+      - `()`                        = explicit empty list (deny-all — consumer enforces).
+      - `tuple[str, ...]` non-empty = valid allowlist (consumer enforces).
+
+    The misconfigured state exists so a typo in `policy.yaml` (e.g. a scalar
+    instead of a list) doesn't silently disable enforcement; consumers should
+    log `status: policy_misconfigured` (or equivalent) and keep enforcement
+    off until the policy is fixed.
     """
     data = load_policy(repo_root)
     if data is None:
@@ -271,7 +297,7 @@ def skills_allowed_list(repo_root: Path) -> tuple[str, ...] | None:
         return None
     allowed = _safe_str_list(data.get("skills_allowed"))
     if allowed is None:
-        return None
+        return SKILLS_ALLOWED_INVALID
     return tuple(allowed)
 
 

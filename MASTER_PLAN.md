@@ -383,8 +383,8 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 
 - `hooks/pre-compact.py` — sexto hook, segunda aplicación del patrón **informative** (tras D2). Evento PreCompact; lee `lifecycle.pre_compact.persist` vía `pre_compact_rules()` y emite `hookSpecificOutput.additionalContext` con checklist de items a persistir antes de la truncación. Exit 0 siempre; nunca `permissionDecision`.
 - `hooks/stop-policy-check.py` — séptimo hook, shape **blocker-scaffold** sobre evento Stop. Lee `skills_allowed_list()` + `.claude/logs/skills.jsonl`. Enforcement DEFERRED en prod hoy (meta-repo no declara `skills_allowed`); toda invocación real degrada a `status: deferred` pass-through. La cadena de enforcement vive en código y está ejercida end-to-end por fixtures.
-- `hooks/_lib/policy.py` (extensión) — dos accessors nuevos: `pre_compact_rules(repo_root) → PreCompactRules | None` (dataclass frozen con `persist`) y `skills_allowed_list(repo_root) → tuple[str, ...] | None` (contrato diferenciado: `None` = deferred absent; `()` = explicit deny-all).
-- Tests: `hooks/tests/test_pre_compact.py` (25), `hooks/tests/test_stop_policy_check.py` (35), extensión de `test_lib_policy.py` (+17). Global **555 passed + 1 skipped** en `hooks/**`.
+- `hooks/_lib/policy.py` (extensión) — dos accessors nuevos: `pre_compact_rules(repo_root) → PreCompactRules | None` (dataclass frozen con `persist`) y `skills_allowed_list(repo_root) → tuple[str, ...] | None | SkillsAllowedInvalid` (contrato **tri-estado**: `None` = sección absent → deferred; `SKILLS_ALLOWED_INVALID` sentinel = presente pero mal formada → misconfigured observable; `()` = declarada vacía → deny-all explícito; tupla poblada = enforcement live).
+- Tests: `hooks/tests/test_pre_compact.py` (25), `hooks/tests/test_stop_policy_check.py` (55), extensión de `test_lib_policy.py` (+20). Global **575 passed + 1 skipped** en `hooks/**`.
 - `policy.yaml` sin cambios — `lifecycle.pre_compact.persist` ya existía desde Fase A. `skills_allowed` deliberadamente NO se añade (activaría enforcement antes de que E1a provea el logger `skills.jsonl`).
 - `.claude/settings.json` no modificado: ya referenciaba los dos hooks desde Fase A; D6 sólo materializa los binarios.
 
@@ -403,26 +403,29 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 - **both-together** (vs D6a/D6b split). Razón: los dos hooks comparten loader (dos accessors nuevos), patrón de tests, y docs-sync. Splitear multiplicaría overhead sin aislamiento de riesgo real.
 - **Framing anti-sobrerrepresentación de `stop-policy-check`**. El hook NO se presenta como enforcement útil en prod hoy — es scaffold activable. Kickoff commit, module docstring, docs y body del PR deben reiterarlo explícitamente. Los tests que ejercen deny-path existen para lock-down del contrato, no como guardias operativos.
 - **Skill invocation source = `.claude/logs/skills.jsonl`**. Alineado con `policy.yaml.audit.required_logs`. Cuando E1a entregue el logger (la primera skill que escriba ahí será `/pos:kickoff`), Stop enforza end-to-end sin refactor de hook.
-- **Contrato diferenciado `None` vs `()` en `skills_allowed_list`**. Pinpointed por `test_real_skills_allowed_is_none_today` (prod) y `test_explicit_empty_distinct_from_missing` (loader unit). Sin esta distinción no se puede expresar "allowlist declarada-vacía = deny-all" separado de "campo absent = deferred".
+- **Contrato tri-estado de `skills_allowed_list`** (post-review PR #18). Absent (`None`), invalid (sentinel `SKILLS_ALLOWED_INVALID`) y declarada-vacía (`()`) son **tres estados distintos**, no dos. Razón: colapsar "ausente" y "mal formada" en `None` hace que un typo en la policy apague enforcement silenciosamente como si fuera deferred legítimo. El sentinel explícito obliga al consumidor a distinguir y emitir `status: policy_misconfigured` observable. Fijado por tests: `test_real_skills_allowed_is_none_today` (prod absent), `test_explicit_empty_distinct_from_missing` (deny-all vs absent), `test_three_states_are_all_distinct` y `test_invalid_sentinel_distinct_from_none` (loader unit).
 
 **Contrato fijado por la suite — PreCompact informative**:
 
 - `additionalContext` contiene los 3 persist items del meta-repo hoy (`decisions_in_flight`, `phase_minus_one_state`, `unsaved_pattern_candidates`) + palabra `persist` en el texto.
 - `auto` y `manual` triggers producen output idéntico (sólo cambia el log).
-- Failure mode c.2: policy missing / malformed / sin `pre_compact` → log `status: policy_unavailable` + `additionalContext` mínimo `pos pre-compact: policy unavailable (...)`. Nunca deny.
-- Safe-fail informative (excepción canónica D2): stdin vacío / JSON inválido / top-level no-dict / lista / escalar → exit 0 + `additionalContext` `"(error reading payload: ...)"` + log `status: payload_error`. Nunca `permissionDecision`.
+- Failure mode c.2: policy missing / malformed / sin `pre_compact` → log `status: policy_unavailable` + `additionalContext` mínimo advisory señalando que la policy no está disponible. Nunca deny. El wording exacto del advisory **no es contrato** — la suite valida presencia + shape, no string literal.
+- Safe-fail informative (excepción canónica D2): stdin vacío / JSON inválido / top-level no-dict / lista / escalar → exit 0 + `additionalContext` mínimo describiendo el error de payload + log `status: payload_error`. Nunca `permissionDecision`. Wording exacto **no es contrato** (idem).
 - Double log: `pre-compact.jsonl` siempre; `phase-gates.jsonl` evento `pre_compact` **sólo en happy path** (no se cruza la puerta sin checklist emitido).
 
 **Contrato fijado por la suite — Stop blocker-scaffold**:
 
-- Safe-fail blocker canonical (D1/D3/D4): malformación (empty stdin, JSON inválido, top-level no-dict) → deny exit 2 con reason explicando la malformación. El hook no puede dejar pasar lo que no puede validar.
-- Tres caminos de decisión real:
+- Safe-fail blocker canonical (D1/D3/D4): malformación (empty stdin, JSON inválido, top-level no-dict, `session_id` ausente / no-string / vacío) → deny exit 2 con reason explicando la malformación. El hook no puede dejar pasar lo que no puede validar ni scopiar.
+- Cuatro caminos de decisión real (tri-estado del loader + live enforcement):
   1. `policy.yaml` missing/malformed → log `status: policy_unavailable`, pass-through exit 0 (cero stdout).
   2. `policy.yaml` OK sin `skills_allowed` → log `status: deferred`, pass-through exit 0. **Estado actual de prod**.
-  3. `skills_allowed` declarado → lee `.claude/logs/skills.jsonl`, `_extract_invoked_skills(root) → list[str]`, `_validate(invoked, allowed) → (decision, violations)`. Violación → deny exit 2 con primer violador en `decisionReason` + guía literal `"Add it to the allowlist or revert the invocation."`. Sin violaciones → allow exit 0.
-- Double log **sólo en decisiones reales**: `stop-policy-check.jsonl` (allow/deny) + `phase-gates.jsonl` evento `stop`. Los status advisory (`deferred`, `policy_unavailable`) quedan sólo en el hook log.
-- Corrupt `skills.jsonl` (líneas no-JSON, entries sin `skill`, `skill` no-string) → ignoradas silenciosamente. El hook es enforcer, no forense.
-- `skills_allowed: []` + invocación → deny (deny-all explícito es política válida). `skills_allowed: []` + cero invocaciones → allow.
+  3. `skills_allowed` presente pero mal formada (escalar, lista con no-strings, dict) → loader devuelve `SKILLS_ALLOWED_INVALID`; log `status: policy_misconfigured` con razón literal `"skills_allowed is present in policy.yaml but not a list of strings"`, pass-through exit 0. **Distinto de deferred** — un typo no apaga enforcement silenciosamente.
+  4. `skills_allowed` declarado como lista válida → lee `.claude/logs/skills.jsonl`, `_extract_invoked_skills(root, session_id) → list[str]`, `_validate(invoked, allowed) → (decision, violations)`. Violación → deny exit 2 con primer violador en `decisionReason` + guía literal `"Add it to the allowlist or revert the invocation."`. Sin violaciones → allow exit 0.
+- **Session scoping** (post-review PR #18): el extractor filtra `skills.jsonl` por `session_id` del payload Stop. Entradas sin `session_id`, con `session_id` no-string, o pertenecientes a sesiones anteriores → ignoradas. El log es append-only y se contamina entre sesiones; sin scope, una skill rogue de ayer bloquearía el Stop de hoy. Cubierto por `TestSessionScoping` (6 casos, incluye `test_many_sessions_mixed` con 5 sesiones en el mismo log).
+- Stream-parse línea a línea (`with log.open("r") as f: for raw_line in f:`) — memoria acotada frente a un audit log que crece indefinidamente; no `read_text().splitlines()`.
+- Double log **sólo en decisiones reales**: `stop-policy-check.jsonl` (`{ts, hook, session_id, decision, ...}`) + `phase-gates.jsonl` evento `stop` (con `session_id` + `decision`). Los status advisory (`deferred`, `policy_misconfigured`, `policy_unavailable`) quedan sólo en el hook log.
+- Corrupt `skills.jsonl` (líneas no-JSON, entries sin `skill`, `skill` no-string, `session_id` mal tipado) → ignoradas silenciosamente. El hook es enforcer, no forense.
+- `skills_allowed: []` + invocación en la sesión → deny (deny-all explícito es política válida). `skills_allowed: []` + cero invocaciones scopiadas → allow.
 
 **Ajustes vs plan original**:
 
@@ -430,7 +433,7 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 - **`pre_compact_rules` y `skills_allowed_list` añadidos al loader** en el mismo PR. No hay mirror hardcoded; cualquier hook futuro que consuma secciones nuevas de `policy.yaml` debe añadir un accessor antes que reparsear (regla canonical post-D5b).
 - **Simplify pass pre-PR** (preferencia persistente del usuario): ninguna simplification requerida en esta rama. Los hooks D6 usan el mismo shape de los 5 previos; no hay helpers privados triviales que inlinear ni duplicación entre pre-compact y stop (sus lógicas son ortogonales — checklist emission vs allowlist enforcement).
 
-**Criterio de salida**: 555 tests verdes + 1 skip intencional en `hooks/**`, coverage loader extendido sin regresión (`_lib/policy.py` ≥95%), los dos hooks consumen el loader vía accessors nuevos sin hardcode residual, docs-sync en el propio PR (ROADMAP + HANDOFF + MASTER_PLAN + ARCHITECTURE + `.claude/rules/hooks.md`), framing anti-sobrerrepresentación explícito en kickoff + body del PR + docstring del hook Stop, `pre-pr-gate` aprueba este mismo PR (dogfooding). Cumplido.
+**Criterio de salida**: 575 tests verdes + 1 skip intencional en `hooks/**` (tras integrar review PR #18), coverage loader extendido sin regresión (`_lib/policy.py` ≥95%), los dos hooks consumen el loader vía accessors nuevos sin hardcode residual, docs-sync en el propio PR (ROADMAP + HANDOFF + MASTER_PLAN + ARCHITECTURE + `.claude/rules/hooks.md`), framing anti-sobrerrepresentación explícito en kickoff + body del PR + docstring del hook Stop, `pre-pr-gate` aprueba este mismo PR (dogfooding). Cumplido.
 
 ---
 
