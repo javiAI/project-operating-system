@@ -60,6 +60,11 @@ class PreWriteRules:
     enforced_patterns: tuple[EnforcedPattern, ...]
 
 
+@dataclass(frozen=True)
+class PreCompactRules:
+    persist: tuple[str, ...]
+
+
 def _safe_str_list(val: Any) -> list[str] | None:
     """Return `val` as a `list[str]` if and only if every element is a string.
 
@@ -237,6 +242,37 @@ def pre_write_rules(repo_root: Path) -> PreWriteRules | None:
             continue
         patterns.append(EnforcedPattern(label, match_glob, tuple(exclude_globs)))
     return PreWriteRules(tuple(patterns))
+
+
+def pre_compact_rules(repo_root: Path) -> PreCompactRules | None:
+    data = load_policy(repo_root)
+    if data is None:
+        return None
+    pc = _lifecycle_section(data, "pre_compact")
+    if pc is None or not pc:
+        return None
+    persist = _safe_str_list(pc.get("persist"))
+    if persist is None:
+        return None
+    return PreCompactRules(tuple(persist))
+
+
+def skills_allowed_list(repo_root: Path) -> tuple[str, ...] | None:
+    """Top-level `skills_allowed` list.
+
+    Contract: `None` = section absent (deferred — consumer passes through).
+    `()` = explicit empty list (deny-all — consumer enforces). Distinguishing
+    these two states is the core of (c.3) scaffold mode for D6's Stop hook.
+    """
+    data = load_policy(repo_root)
+    if data is None:
+        return None
+    if "skills_allowed" not in data:
+        return None
+    allowed = _safe_str_list(data.get("skills_allowed"))
+    if allowed is None:
+        return None
+    return tuple(allowed)
 
 
 def derive_test_pair(rel_path: str, label: str) -> str | None:
