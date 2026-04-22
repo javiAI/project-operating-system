@@ -5,7 +5,7 @@
 ## 1. Snapshot
 
 - Repo: `project-operating-system` (plugin `pos`).
-- Fase actual: **D3 ✅ cerrada en rama** (`feat/d3-hook-pre-write-guard`, PR pendiente de abrir). Anterior: **D2 ✅ PR #12** (`1346178`). Siguiente: **D4 — `feat/d4-hook-pre-pr-gate`**.
+- Fase actual: **D4 ✅ cerrada en rama** (`feat/d4-hook-pre-pr-gate`, PR pendiente de abrir). Anterior: **D3 ✅ PR #13** (`9aed1ee`). Siguiente: **D5 — `feat/d5-hook-post-action-compound`**.
 - Fuente de verdad ejecutable: [MASTER_PLAN.md](MASTER_PLAN.md).
 - Estado vivo: [ROADMAP.md](ROADMAP.md).
 - Arquitectura canonical: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -96,8 +96,9 @@ Ejecuta §2.1 Fase -1 completo. Espera aprobación explícita antes de `git chec
 - El hook `pre-branch-gate.py` **ya está vivo** desde D1: `git checkout -b`, `git switch -c` y `git worktree add -b` sin marker quedan bloqueados por exit 2 + `permissionDecision: deny`. El bypass legítimo es crear marker explícito.
 - El hook `session-start.py` **ya está vivo** desde D2: imprime snapshot (branch, phase, last merge, warnings) como `additionalContext` en cada SessionStart (`startup` / `resume` / `clear` / `compact`). Informativo, nunca bloquea — errores de payload o git degradan a snapshot mínimo + log de error (exit 0 siempre).
 - El hook `pre-write-guard.py` **ya está vivo** desde D3: PreToolUse(Write) blocker. Bloquea con exit 2 la creación de archivos en paths enforced (`hooks/*.py` top-level + `generator/**/*.ts` excluyendo tests/fixtures) sin test pair co-located. Los writes sobre archivos existentes en esos paths enforced sí pasan, pero siguen logueándose (allow / audit trail del flujo de edición). El pass-through silencioso (sin log) aplica solo a `hooks/_lib/**`, tests/docs/templates/meta y paths fuera del repo. Bypass legítimo: crear primero `hooks/tests/test_<x>.py` o `<path>.test.ts` con un test que falle (RED), luego escribir la implementación.
-- Otros hooks referenciados en `.claude/settings.json` (`post-action.py`, `pre-compact.py`, `stop-policy-check.py`) siguen ausentes — tolerados por Claude Code como no-op. Entregados en D4..D6.
-- `policy.yaml` declarado pero no enforced todavía (Fase D4). Hasta entonces, docs-sync requiere disciplina manual.
+- El hook `pre-pr-gate.py` **ya está vivo** desde D4: PreToolUse(Bash) blocker sobre `gh pr create` únicamente. Resuelve base con `git merge-base HEAD main` y calcula archivos tocados con `git diff --name-only <base> HEAD`. Bloquea con exit 2 cuando ese diff no contiene los docs exigidos (required `ROADMAP.md` + `HANDOFF.md`; conditional por prefijo: `generator/**` | `hooks/**` excl. `hooks/tests/` | `.claude/patterns/**` → `docs/ARCHITECTURE.md`; `skills/**` → `.claude/rules/skills-map.md`). Skip advisory (pass-through + log explícito en hook log, no en phase-gates) en `main` / `master` / HEAD detached / cwd no-git / main borrada localmente / `git diff` subprocess falla (`diff_files() is None`). Empty diff (`[]`) → deny dedicado con reason `empty PR`, separado textualmente del reason docs-sync. 3 entradas advisory `deferred` (skills_required / ci_dry_run_required / invariants_check) se loguean en cada decisión real como scaffold activable sin cambio de shape cuando sus ramas dedicadas aporten sustrato. Reglas hardcoded (mirror de `policy.yaml.lifecycle.pre_pr.docs_sync_required` + `docs_sync_conditional`); divergencia deliberada D4: la lista `hooks/**` de la policy es uniforme, el hook excluye `hooks/tests/` — convergencia diferida a la rama policy-loader. Migración a parser declarativo en esa misma rama (junto con los paths hardcoded de D3).
+- Otros hooks referenciados en `.claude/settings.json` (`post-action.py`, `pre-compact.py`, `stop-policy-check.py`) siguen ausentes — tolerados por Claude Code como no-op. Entregados en D5..D6.
+- `policy.yaml` declarado pero no enforced todavía (un-parseado). D4 mirror sus reglas de docs-sync de forma hardcoded; parser declarativo diferido a rama dedicada.
 - `/pos:*` skills no existen aún (Fase E*). Invocaciones fallarán silenciosas. Usar comportamiento manual equivalente.
 
 ### Deuda técnica abierta — schema defaults no materializados en `buildProfile`
@@ -125,24 +126,24 @@ Hasta que `pos` tenga sus propias skills:
 
 ## 9. Próxima rama
 
-**D4 — `feat/d4-hook-pre-pr-gate`**
+**D5 — `feat/d5-hook-post-action-compound`**
 
-Scope (ver [MASTER_PLAN.md § Rama D4](MASTER_PLAN.md)):
+Scope (ver [MASTER_PLAN.md § Rama D5](MASTER_PLAN.md)):
 
-- Cuarto hook Python: `hooks/pre-pr-gate.py` — valida `policy.yaml` contra logs reales antes de abrir PR. Chequeos incluidos en el scope textual del plan: docs-sync (`ROADMAP.md` + `HANDOFF.md` + condicionales según `lifecycle.pre_pr.docs_sync_conditional`), skills required (qué skills deberían haber corrido según el lifecycle), CI dry-run, invariants. Shape blocker (PreToolUse(Bash) matcher `gh pr create` / `git push`).
+- Quinto hook Python: `hooks/post-action.py` — PostToolUse(Bash) hook que detecta merges, lee `policy.yaml.lifecycle.post_merge.skills_conditional` y dispara `/pos:compound` cuando el `touched_paths` del diff hace match. Trigger por convención: comando como `git merge`, o presencia de merge commit reciente. Patrón: blocker-like pero en PostToolUse (no bloquea la acción, pero puede emitir contexto adicional).
 
 Lectura mínima al arrancar:
 
-- [MASTER_PLAN.md § Rama D4](MASTER_PLAN.md)
-- [policy.yaml](policy.yaml) — esquema ya declarado en Fase A; D4 es el primer enforzador real.
-- [.claude/rules/hooks.md](.claude/rules/hooks.md)
-- [docs/ARCHITECTURE.md § 7 Determinismo](docs/ARCHITECTURE.md)
-- [hooks/pre-branch-gate.py](hooks/pre-branch-gate.py) + [hooks/pre-write-guard.py](hooks/pre-write-guard.py) como patrones de referencia blocker (2 aplicaciones; reglas específicas distintas pero shape idéntico).
+- [MASTER_PLAN.md § Rama D5](MASTER_PLAN.md)
+- [policy.yaml](policy.yaml) — sección `lifecycle.post_merge.skills_conditional`. Aún sin parseador declarativo (D4 hardcoded; D5 puede ser el segundo caso de hardcode, o abrir ya la rama policy-loader antes de D5 — decisión en Fase -1).
+- [.claude/rules/hooks.md](.claude/rules/hooks.md) — ahora con 4 hook references (D1..D4).
+- [docs/ARCHITECTURE.md § 7 Determinismo](docs/ARCHITECTURE.md) — 4 hook blocks canónicos documentados.
+- [hooks/pre-branch-gate.py](hooks/pre-branch-gate.py) + [hooks/pre-write-guard.py](hooks/pre-write-guard.py) + [hooks/pre-pr-gate.py](hooks/pre-pr-gate.py) como patrones de referencia blocker (3 aplicaciones; D5 es PostToolUse — shape emparentado pero no idéntico al blocker canonical).
 - [hooks/_lib/](hooks/_lib/) — `append_jsonl` + `now_iso` disponibles. Añadir al `_lib/` sólo si ≥2 hooks consumen el nuevo helper (regla #7).
-- [.claude/logs/phase-gates.jsonl](.claude/logs/) — D4 lee este archivo para validar policy-vs-logs; eventos ya presentes: `branch_creation` (D1), `session_start` (D2), `pre_write` (D3). D4 añadirá `pre_pr` (o equivalente).
+- [.claude/logs/phase-gates.jsonl](.claude/logs/) — eventos ya presentes: `branch_creation` (D1), `session_start` (D2), `pre_write` (D3), `pre_pr` (D4). D5 añadirá `post_action` (o equivalente).
 
-## 10. Estado D3 (cerrada en rama)
+## 10. Estado D4 (cerrada en rama)
 
-`pre-write-guard` vivo: en cada `PreToolUse(Write)` clasifica `tool_input.file_path` (normalizado contra `Path.cwd()`), aplica los 2 buckets de exclusión (tests/docs/templates/meta + `hooks/_lib/**`) y enforza el contrato crystal-clear (enforced+new+no-pair → deny; enforced+new+pair → allow; enforced+existing → allow edit-flow; excluded/out-of-scope → pass-through silencioso). Enforced: `hooks/*.py` top-level + `generator/**/*.ts` (incluido `generator/run.ts`). Safe-fail blocker canonical D1. Double log: `pre-write-guard.jsonl` + `phase-gates.jsonl` (evento `pre_write`). 83 tests D3, 221 totales en `hooks/**`, 95% coverage; D1/D2 intactos.
+`pre-pr-gate` vivo: en cada `PreToolUse(Bash)` detecta `gh pr create` (shlex + `tokens[:3] == ["gh","pr","create"]`). Base resuelta con `git merge-base HEAD main`; archivos tocados con `git diff --name-only <base> HEAD`. Skip advisory + log explícito en main/master/HEAD/git-unavailable/merge-base-unresolved y cuando `diff_files()` devuelve `None` (subprocess de `git diff` fallido). Empty diff real (`[]`) → deny dedicado con reason `empty PR`. Docs-sync check con reglas hardcoded (mirror de `policy.yaml.lifecycle.pre_pr.docs_sync_required` + `docs_sync_conditional`): required ROADMAP+HANDOFF + conditional por prefijo (`generator/**`, `hooks/**` excl. `hooks/tests/` — divergencia deliberada vs policy uniforme, convergencia diferida a policy-loader; `.claude/patterns/**` → `docs/ARCHITECTURE.md`; `skills/**` → `.claude/rules/skills-map.md`). Triggering paths capeados a 3 por doc con `... (+N more)`. 3 entradas advisory `deferred` (skills_required / ci_dry_run_required / invariants_check) emitidas sólo en decisiones reales. Safe-fail blocker canonical D1. Double log: `pre-pr-gate.jsonl` + `phase-gates.jsonl` (evento `pre_pr`). 101 tests D4 (incluye `TestDiffUnavailable` × 5), 322 totales en `hooks/**`, ≥94% coverage sobre `pre-pr-gate.py`; D1/D2/D3 intactos.
 
-**Detalle + "Lo que D3 NO hace" + apuntes D4**: ver [ROADMAP.md § feat/d3](ROADMAP.md), [MASTER_PLAN.md § Rama D3](MASTER_PLAN.md) y [.claude/rules/hooks.md § Tercer hook](.claude/rules/hooks.md).
+**Detalle + deferrals + ajustes**: ver [ROADMAP.md § feat/d4](ROADMAP.md), [MASTER_PLAN.md § Rama D4](MASTER_PLAN.md) y [.claude/rules/hooks.md § Cuarto hook](.claude/rules/hooks.md).
