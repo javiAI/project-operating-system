@@ -75,6 +75,48 @@ def _safe_str_list(val: Any) -> list[str] | None:
     return list(val)
 
 
+def _optional_str_list(raw: Any, key_present: bool) -> list[str] | None:
+    """List-shape validator for optional fields (e.g. `excludes`, `skip_if_only`).
+
+    Distinguishes "missing key" from "present but wrong shape":
+      - key absent (`key_present=False`)           → `[]` (sensible default)
+      - key present, value is `list[str]`          → `list(val)`
+      - key present, value is anything else        → `None` (signal wrong shape)
+
+    Callers use the `None` signal to skip the rule/pattern or propagate it up
+    to the accessor, keeping the "wrong-shape → None" contract strict for
+    optional fields too. Previously `_safe_str_list(...) or []` coerced
+    wrong-shape silently to empty, which could disable a declared exclusion.
+    """
+    if not key_present:
+        return []
+    return _safe_str_list(raw)
+
+
+def _lifecycle_section(data: dict, section: str) -> dict | None:
+    """Return `data["lifecycle"][section]` if the shape is well-formed, else None.
+
+    Strict guard for the three accessors: a string/list in place of a
+    mapping anywhere along the path must propagate as "wrong-shape → None",
+    not an unhandled AttributeError that would escape the loader.
+
+    A missing key (absent or `None`) at either level is treated as "section
+    not declared" and returns an empty dict — caller decides whether that
+    maps to a legitimate empty section or to `None` for its own contract.
+    """
+    lifecycle = data.get("lifecycle")
+    if lifecycle is None:
+        return {}
+    if not isinstance(lifecycle, dict):
+        return None
+    section_val = lifecycle.get(section)
+    if section_val is None:
+        return {}
+    if not isinstance(section_val, dict):
+        return None
+    return section_val
+
+
 def _load_yaml(policy_path: Path) -> dict | None:
     if yaml is None:
         return None
@@ -119,7 +161,9 @@ def docs_sync_rules(repo_root: Path) -> DocsSyncRules | None:
     data = load_policy(repo_root)
     if data is None:
         return None
-    pr = (data.get("lifecycle") or {}).get("pre_pr") or {}
+    pr = _lifecycle_section(data, "pre_pr")
+    if pr is None:
+        return None
     baseline = _safe_str_list(pr.get("docs_sync_required"))
     cond_raw = pr.get("docs_sync_conditional")
     if baseline is None or not isinstance(cond_raw, list):
@@ -130,7 +174,9 @@ def docs_sync_rules(repo_root: Path) -> DocsSyncRules | None:
             continue
         if_touched = _safe_str_list(rule.get("if_touched")) or []
         then_required = _safe_str_list(rule.get("then_required")) or []
-        excludes = _safe_str_list(rule.get("excludes")) or []
+        excludes = _optional_str_list(rule.get("excludes"), "excludes" in rule)
+        if excludes is None:
+            continue
         if not if_touched or not then_required:
             continue
         conditional.append(
@@ -147,7 +193,9 @@ def post_merge_trigger(repo_root: Path) -> PostMergeTrigger | None:
     data = load_policy(repo_root)
     if data is None:
         return None
-    pm = (data.get("lifecycle") or {}).get("post_merge") or {}
+    pm = _lifecycle_section(data, "post_merge")
+    if pm is None:
+        return None
     skills = pm.get("skills_conditional")
     if not isinstance(skills, list) or not skills:
         return None
@@ -158,9 +206,10 @@ def post_merge_trigger(repo_root: Path) -> PostMergeTrigger | None:
     if not isinstance(trigger, dict):
         return None
     any_of = _safe_str_list(trigger.get("touched_paths_any_of"))
-    skip_only = _safe_str_list(trigger.get("skip_if_only")) or []
+    skip_only = _optional_str_list(trigger.get("skip_if_only"), "skip_if_only" in trigger)
     min_files = trigger.get("min_files_changed")
-    if any_of is None or not isinstance(min_files, int) or isinstance(min_files, bool):
+    if (any_of is None or skip_only is None
+            or not isinstance(min_files, int) or isinstance(min_files, bool)):
         return None
     return PostMergeTrigger(tuple(any_of), tuple(skip_only), min_files)
 
@@ -169,7 +218,9 @@ def pre_write_rules(repo_root: Path) -> PreWriteRules | None:
     data = load_policy(repo_root)
     if data is None:
         return None
-    pw = (data.get("lifecycle") or {}).get("pre_write") or {}
+    pw = _lifecycle_section(data, "pre_write")
+    if pw is None:
+        return None
     patterns_raw = pw.get("enforced_patterns")
     if not isinstance(patterns_raw, list):
         return None
@@ -179,7 +230,9 @@ def pre_write_rules(repo_root: Path) -> PreWriteRules | None:
             continue
         label = p.get("label")
         match_glob = p.get("match_glob")
-        exclude_globs = _safe_str_list(p.get("exclude_globs")) or []
+        exclude_globs = _optional_str_list(p.get("exclude_globs"), "exclude_globs" in p)
+        if exclude_globs is None:
+            continue
         if not isinstance(label, str) or not isinstance(match_glob, str):
             continue
         patterns.append(EnforcedPattern(label, match_glob, tuple(exclude_globs)))

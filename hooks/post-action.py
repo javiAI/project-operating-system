@@ -12,9 +12,13 @@ Tier 2 (post-hoc reflog confirmation):
     C expects "pull:" or "pull " (and NOT "pull --rebase").
 
 When both tiers confirm and `git diff --name-only HEAD@{1} HEAD` yields paths
-that match the hardcoded mirror of
-policy.yaml.lifecycle.post_merge.skills_conditional[0].trigger, emits
-additionalContext suggesting `/pos:compound`. Never dispatches the skill.
+that match the trigger declared in
+`policy.yaml.lifecycle.post_merge.skills_conditional[0].trigger` (consumed
+via `_lib.policy.post_merge_trigger()` — D5b loader, no hardcoded mirror),
+emits additionalContext suggesting `/pos:compound`. Never dispatches the
+skill. Failure mode (c.2): if `policy.yaml` is missing/corrupt and the
+loader returns `None`, the hook logs `status: policy_unavailable` and
+pass-throughs silently (exit 0) — never denies.
 
 Shape emparentado con D1 blocker (shlex + double log + importlib-friendly)
 but PostToolUse non-blocking — nunca emite permissionDecision ni exit 2.

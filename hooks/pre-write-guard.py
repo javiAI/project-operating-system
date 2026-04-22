@@ -14,6 +14,10 @@ safe-fail canonical (D1): malformed stdin / JSON / top-level / tool_input
 → deny exit 2. Failure mode (c.2): if `policy.yaml` is missing/corrupt and
 the loader returns None, the hook pass-throughs with `status: policy_unavailable`
 logged — never denies blindly (avoids bricking the repo on a bad YAML edit).
+Same (c.2) behavior when a label matches but `derive_test_pair` has no
+derivation branch for it (policy.yaml label typo or new label added without
+code support): log `status: policy_unavailable` + pass-through, never deny
+with an empty expected-path.
 """
 from __future__ import annotations
 
@@ -139,8 +143,19 @@ def main() -> int:
         log("allow", "impl file already exists (edit flow)")
         return 0
 
-    expected = derive_test_pair(rel, label) or ""
-    if expected and (repo_root / expected).exists():
+    expected = derive_test_pair(rel, label)
+    if expected is None:
+        _safe_append(
+            repo_root / HOOK_LOG,
+            {"ts": ts, "hook": HOOK_NAME, "file_path": rel,
+             "status": "policy_unavailable",
+             "reason": f"no test-pair derivation for label={label!r} "
+                       "(policy.yaml label typo or new label missing code branch) "
+                       "— pass-through (c.2)"},
+        )
+        return 0
+
+    if (repo_root / expected).exists():
         log("allow", "test pair present")
         return 0
 

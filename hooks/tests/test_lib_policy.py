@@ -464,6 +464,120 @@ class TestFailureMode:
             pytest.fail(f"load_policy raised: {e!r}")
 
 
+# -------------------- wrong-shape guards (round 2) -----------------------
+
+
+class TestWrongShapeGuards:
+    """Accessors must return None (never AttributeError) on wrong-shape YAML."""
+
+    def test_lifecycle_string_docs_sync(self, tmp_path):
+        from _lib import policy
+        (tmp_path / "policy.yaml").write_text("lifecycle: not_a_mapping\n", encoding="utf-8")
+        assert policy.docs_sync_rules(tmp_path) is None
+
+    def test_lifecycle_string_post_merge(self, tmp_path):
+        from _lib import policy
+        (tmp_path / "policy.yaml").write_text("lifecycle: not_a_mapping\n", encoding="utf-8")
+        assert policy.post_merge_trigger(tmp_path) is None
+
+    def test_lifecycle_string_pre_write(self, tmp_path):
+        from _lib import policy
+        (tmp_path / "policy.yaml").write_text("lifecycle: not_a_mapping\n", encoding="utf-8")
+        assert policy.pre_write_rules(tmp_path) is None
+
+    def test_lifecycle_list_docs_sync(self, tmp_path):
+        from _lib import policy
+        (tmp_path / "policy.yaml").write_text("lifecycle: [a, b]\n", encoding="utf-8")
+        assert policy.docs_sync_rules(tmp_path) is None
+
+    def test_pre_pr_non_mapping(self, tmp_path):
+        from _lib import policy
+        (tmp_path / "policy.yaml").write_text(
+            "lifecycle:\n  pre_pr: just_a_string\n", encoding="utf-8"
+        )
+        assert policy.docs_sync_rules(tmp_path) is None
+
+    def test_post_merge_non_mapping(self, tmp_path):
+        from _lib import policy
+        (tmp_path / "policy.yaml").write_text(
+            "lifecycle:\n  post_merge: 42\n", encoding="utf-8"
+        )
+        assert policy.post_merge_trigger(tmp_path) is None
+
+    def test_pre_write_non_mapping(self, tmp_path):
+        from _lib import policy
+        (tmp_path / "policy.yaml").write_text(
+            "lifecycle:\n  pre_write: [wrong]\n", encoding="utf-8"
+        )
+        assert policy.pre_write_rules(tmp_path) is None
+
+
+class TestOptionalListShape:
+    """`excludes`/`skip_if_only`/`exclude_globs` distinguish missing vs wrong-type."""
+
+    def test_conditional_excludes_wrong_type_skips_rule(self, tmp_path):
+        from _lib import policy
+        (tmp_path / "policy.yaml").write_text(
+            "lifecycle:\n"
+            "  pre_pr:\n"
+            "    docs_sync_required: [ROADMAP.md]\n"
+            "    docs_sync_conditional:\n"
+            "      - if_touched: [generator/]\n"
+            "        then_required: [docs/ARCHITECTURE.md]\n"
+            "        excludes: not_a_list\n"
+            "      - if_touched: [hooks/]\n"
+            "        then_required: [docs/ARCHITECTURE.md]\n",
+            encoding="utf-8",
+        )
+        rules = policy.docs_sync_rules(tmp_path)
+        assert rules is not None
+        assert len(rules.conditional) == 1
+        assert rules.conditional[0].if_touched == ("hooks/",)
+
+    def test_skip_if_only_wrong_type_returns_none(self, tmp_path):
+        from _lib import policy
+        (tmp_path / "policy.yaml").write_text(
+            "lifecycle:\n"
+            "  post_merge:\n"
+            "    skills_conditional:\n"
+            "      - skill: /pos:compound\n"
+            "        trigger:\n"
+            "          touched_paths_any_of: [hooks/**]\n"
+            "          skip_if_only: 'docs/**'\n"
+            "          min_files_changed: 1\n",
+            encoding="utf-8",
+        )
+        assert policy.post_merge_trigger(tmp_path) is None
+
+    def test_exclude_globs_wrong_type_skips_pattern(self, tmp_path):
+        from _lib import policy
+        (tmp_path / "policy.yaml").write_text(
+            "lifecycle:\n"
+            "  pre_write:\n"
+            "    enforced_patterns:\n"
+            "      - label: a\n"
+            "        match_glob: hooks/*.py\n"
+            "        exclude_globs: not_a_list\n"
+            "      - label: b\n"
+            "        match_glob: generator/*.ts\n",
+            encoding="utf-8",
+        )
+        rules = policy.pre_write_rules(tmp_path)
+        assert rules is not None
+        assert [p.label for p in rules.enforced_patterns] == ["b"]
+
+    def test_safe_str_list_mixed_types_returns_none_propagates_to_accessor(self, tmp_path):
+        from _lib import policy
+        (tmp_path / "policy.yaml").write_text(
+            "lifecycle:\n"
+            "  pre_pr:\n"
+            "    docs_sync_required: [ROADMAP.md, 42]\n"
+            "    docs_sync_conditional: []\n",
+            encoding="utf-8",
+        )
+        assert policy.docs_sync_rules(tmp_path) is None
+
+
 # -------------------- real repo policy -----------------------------------
 
 

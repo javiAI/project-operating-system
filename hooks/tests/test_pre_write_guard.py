@@ -531,3 +531,21 @@ class TestMainInProcess:
     def test_write_relative_dotdot_still_enforced(self, monkeypatch, repo):
         payload = json.dumps(make_write("docs/../hooks/new_guard.py"))
         assert self._run(monkeypatch, repo, payload) == 2
+
+    def test_unknown_label_passes_through_with_policy_unavailable(
+        self, monkeypatch, repo
+    ):
+        (repo / "policy.yaml").write_text(
+            "lifecycle:\n"
+            "  pre_write:\n"
+            "    enforced_patterns:\n"
+            "      - label: brand_new_label_without_code_branch\n"
+            "        match_glob: 'hooks/*.py'\n",
+            encoding="utf-8",
+        )
+        payload = json.dumps(make_write("hooks/unknown_label_guard.py"))
+        assert self._run(monkeypatch, repo, payload) == 0
+        hook_log = repo / ".claude" / "logs" / "pre-write-guard.jsonl"
+        entries = [json.loads(ln) for ln in hook_log.read_text().splitlines() if ln]
+        assert any(e.get("status") == "policy_unavailable" for e in entries)
+        assert not (repo / ".claude" / "logs" / "phase-gates.jsonl").exists()
