@@ -27,6 +27,9 @@ PHASE_LOG = ".claude/logs/phase-gates.jsonl"
 DOCS_BASELINE = ["ROADMAP.md", "HANDOFF.md"]
 
 # (path_prefix, required_doc, excluded_prefix_or_None)
+# NOTE: `hooks/tests/` exclusion is a deliberate D4 divergence — policy.yaml
+# currently lists `hooks/**` uniformly. Convergence (hook ↔ policy parity)
+# deferred to the policy-loader rama; see MASTER_PLAN.md § Rama D4.
 CONDITIONAL_RULES = [
     ("generator/", "docs/ARCHITECTURE.md", None),
     ("hooks/", "docs/ARCHITECTURE.md", "hooks/tests/"),
@@ -113,10 +116,16 @@ def resolve_base(repo_root: Path) -> str | None:
     return out.strip() or None
 
 
-def diff_files(repo_root: Path, base: str) -> list[str]:
+def diff_files(repo_root: Path, base: str) -> list[str] | None:
+    """Return file list touched between `base` and HEAD.
+
+    Returns `None` when git is unavailable — distinct from `[]` (truly empty
+    diff) so callers can skip with an explicit reason instead of denying as
+    empty PR.
+    """
     out = _run_git(repo_root, "diff", "--name-only", base, "HEAD")
     if out is None:
-        return []
+        return None
     return [line for line in out.splitlines() if line.strip()]
 
 
@@ -244,6 +253,10 @@ def main() -> int:
         return 0
 
     files = diff_files(repo_root, base)
+    if files is None:
+        _log_skip(repo_root, ts, command,
+                  "skipped: git diff unavailable")
+        return 0
     if not files:
         reason = build_empty_diff_reason(base)
         _log_decision(repo_root, ts, command, "deny", reason)

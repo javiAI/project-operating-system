@@ -256,6 +256,71 @@ class TestMergeBaseUnresolved:
 
 
 # ---------------------------------------------------------------------------
+# TestDiffUnavailable — merge-base OK pero git diff falla → skip (no empty-PR)
+# ---------------------------------------------------------------------------
+
+
+@needs_hook
+class TestDiffUnavailable:
+    def _run(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        repo: Path,
+        stdin_text: str,
+    ) -> int:
+        monkeypatch.chdir(repo)
+        monkeypatch.setattr("sys.stdin", io.StringIO(stdin_text))
+        return ppg.main()
+
+    def test_diff_files_returns_none_when_git_fails(self, monkeypatch):
+        monkeypatch.setattr(ppg, "_run_git", lambda *a, **kw: None)
+        assert ppg.diff_files(Path("/tmp"), "abc123") is None
+
+    def test_diff_files_returns_empty_list_when_git_empty(self, monkeypatch):
+        monkeypatch.setattr(ppg, "_run_git", lambda *a, **kw: "")
+        assert ppg.diff_files(Path("/tmp"), "abc123") == []
+
+    def test_diff_unavailable_skips_not_empty_pr(self, monkeypatch, repo):
+        checkout(repo, "feat/x")
+        commit(repo, "impl", **{"hooks/foo.py": "x\n"})
+        monkeypatch.setattr(ppg, "diff_files", lambda *a, **kw: None)
+        payload = json.dumps(make_bash("gh pr create"))
+        rc = self._run(monkeypatch, repo, payload)
+        assert rc == 0, "git-diff failure must skip, not deny as empty PR"
+
+    def test_diff_unavailable_log_reason_mentions_diff(
+        self, monkeypatch, repo
+    ):
+        checkout(repo, "feat/x")
+        commit(repo, "impl", **{"hooks/foo.py": "x\n"})
+        monkeypatch.setattr(ppg, "diff_files", lambda *a, **kw: None)
+        payload = json.dumps(make_bash("gh pr create"))
+        self._run(monkeypatch, repo, payload)
+        hook_log = repo / ".claude" / "logs" / "pre-pr-gate.jsonl"
+        entries = _read_jsonl(hook_log)
+        skipped = [e for e in entries if e.get("status") == "skipped"]
+        assert any("diff" in e.get("reason", "").lower() for e in skipped)
+        # must NOT log an "empty PR" decision (would be a false-deny)
+        assert not any(
+            "empty pr" in e.get("reason", "").lower()
+            for e in entries
+            if e.get("decision")
+        )
+
+    def test_diff_unavailable_writes_no_phase_gate_entry(
+        self, monkeypatch, repo
+    ):
+        checkout(repo, "feat/x")
+        commit(repo, "impl", **{"hooks/foo.py": "x\n"})
+        monkeypatch.setattr(ppg, "diff_files", lambda *a, **kw: None)
+        payload = json.dumps(make_bash("gh pr create"))
+        self._run(monkeypatch, repo, payload)
+        phase_log = repo / ".claude" / "logs" / "phase-gates.jsonl"
+        # skip path is hook-log-only (replica de merge-base skip)
+        assert not phase_log.exists() or _read_jsonl(phase_log) == []
+
+
+# ---------------------------------------------------------------------------
 # TestEmptyDiff — diff vacío vs merge-base
 # ---------------------------------------------------------------------------
 
