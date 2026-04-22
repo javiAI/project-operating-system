@@ -133,11 +133,11 @@ def touched_paths(repo_root: Path) -> list[str] | None:
 def match_triggers(paths: list[str]) -> list[str]:
     if len(paths) < MIN_FILES_CHANGED:
         return []
-    if all(any(fnmatch.fnmatch(p, g) for g in SKIP_IF_ONLY_GLOBS) for p in paths):
+    if all(any(fnmatch.fnmatchcase(p, g) for g in SKIP_IF_ONLY_GLOBS) for p in paths):
         return []
     return [
         glob for glob in TRIGGER_GLOBS
-        if any(fnmatch.fnmatch(p, glob) for p in paths)
+        if any(fnmatch.fnmatchcase(p, glob) for p in paths)
     ]
 
 
@@ -170,12 +170,19 @@ def emit_additional_context(ctx: str) -> None:
 # --- logging ------------------------------------------------------------
 
 
+def _safe_append(path: Path, entry: dict) -> None:
+    try:
+        append_jsonl(path, entry)
+    except OSError:
+        pass
+
+
 def _log_hook(repo_root: Path, entry: dict) -> None:
-    append_jsonl(repo_root / HOOK_LOG, entry)
+    _safe_append(repo_root / HOOK_LOG, entry)
 
 
 def _log_phase(repo_root: Path, ts: str) -> None:
-    append_jsonl(repo_root / PHASE_LOG, {"ts": ts, "event": PHASE_EVENT})
+    _safe_append(repo_root / PHASE_LOG, {"ts": ts, "event": PHASE_EVENT})
 
 
 # --- main ---------------------------------------------------------------
