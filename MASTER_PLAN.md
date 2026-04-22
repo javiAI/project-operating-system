@@ -324,6 +324,57 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 
 **Criterio de salida**: 111 tests verdes (110 + 1 skip intencional) en `hooks/tests/test_post_action.py`, 432 totales en `hooks/**` (D1+D2+D3+D4+D5), coverage ≥80% lines / ≥75% branches (alcanzado 97% lines sobre `hooks/post-action.py`, 99% sobre test_post_action.py), `_lib/` consumido (regla #7 intacta), docs-sync en el propio PR (ROADMAP + HANDOFF + MASTER_PLAN + ARCHITECTURE + `.claude/rules/hooks.md`), hook instalado (el propio `pre-pr-gate` aprueba este PR al correr sobre esta rama — dogfooding D4 sobre D5). Cumplido.
 
+### Rama D5b — `refactor/d5-policy-loader` — ✅
+
+**Status**: cerrada en rama (PR pendiente de abrir; docs-sync en curso). Sub-rama refactor insertada entre D5 y D6 para cumplir la precondición regla #7 CLAUDE.md abierta tras la **segunda repetición hardcoded de `policy.yaml`** en D4 + D5. Cierra la deuda antes de que D6 la triplique.
+
+**Scope entregado**:
+
+- `hooks/_lib/policy.py` — loader tipado con 5 dataclasses congeladas (`ConditionalRule`, `DocsSyncRules`, `PostMergeTrigger`, `EnforcedPattern`, `PreWriteRules`) + cache keyed por path abs + mtime + size (con `reset_cache()` para test isolation) + 3 accessors (`docs_sync_rules`, `post_merge_trigger`, `pre_write_rules`) + `derive_test_pair(rel_path, label)` (2 ramas label-driven).
+- `policy.yaml` — bloque nuevo `pre_write.enforced_patterns` (3 entries); `lifecycle.pre_pr.docs_sync_conditional.hooks/**` con `excludes: ["hooks/tests/**"]` (convergencia hook↔policy).
+- Migración de los 3 hooks D3 / D4 / D5 a consumir el loader en el mismo PR: D3 `pre-write-guard.py` (`classify` + `derive_test_pair`), D4 `pre-pr-gate.py` (`check_docs_sync` + `_conditional_triggers`), D5 `post-action.py` (`match_triggers`).
+- `requirements-dev.txt` — `pyyaml==6.0.2` (pin exacto). Primera línea no-stdlib en `hooks/_lib/`; justificada en kickoff (no hay parser YAML en stdlib; escribirlo a mano sería código muerto).
+- Tests: `hooks/tests/test_lib_policy.py` nuevo (57 casos); tests de los 3 hooks actualizados (fixture escribe `policy.yaml` + autouse `_reset_policy_cache`; `TestIsEnforcedUnit`/`TestExpectedTestPairUnit` eliminadas en D3 por redundantes con loader test; `TestPolicyConstants` eliminada en D5 por mismo motivo). Global: **462 passed + 1 skipped**.
+
+**Contexto a leer**:
+
+- `policy.yaml` L24-45 (`lifecycle.pre_pr.docs_sync_*`), L80-120 (`lifecycle.post_merge.skills_conditional[0]`) + el nuevo bloque `pre_write.enforced_patterns`.
+- `hooks/pre-write-guard.py`, `hooks/pre-pr-gate.py`, `hooks/post-action.py` pre-migración (referencia del hardcode que se elimina) + post-migración (consumo del loader).
+- `.claude/rules/hooks.md § Tercer/Cuarto/Quinto hook` — documentación del hardcode que se reemplaza.
+- `docs/ARCHITECTURE.md § 7` — Capa 1 (Hooks); el loader se integra aquí.
+
+**Decisiones clave (Fase -1 aprobada)**:
+
+- **Alternativa γ**: loader creado + migración completa de D3 + D4 + D5 en el mismo PR. Descartadas α (crear loader + que sólo D6 lo use; deja D3/D4/D5 con hardcode congelado — drift inmediato) y β (migrar sólo D4 o sólo D5; asimetría arbitraria).
+- **(b.1) Strings/globs en YAML, derivación en Python keyed por `label`**. Descartado (b.2) YAML DSL (`derive: "replace_ext(.ts → .test.ts, co-locate)"`): abstracción prematura con una sola derivación real, endurecería el contrato antes de tiempo, difícil de testear aisladamente.
+- **(c.2) Failure mode `None` + pass-through advisory `status: policy_unavailable`**. Descartado (c.1) deny defensivo (brickearía PRs ante un typo YAML — efecto bomba) y (c.3) fallback hardcoded a defaults (rompería el propósito de tener el loader como single-source-of-truth).
+- **Slug `refactor/d5-policy-loader`, position "Rama D5b"**. Descartado insertarlo como Rama D6 propiamente dicha (D6 ya tiene scope propio: pre-compact + stop).
+- **`pyyaml==6.0.2` pin exacto** (no `>=6.0,<7`). Razones: superficie pequeña, dependencia en módulo compartido — un upgrade semver-minor que cambie semántica de `yaml.safe_load` rompería todos los hooks silenciosamente; preferimos upgrade explícito.
+- **Templates no se tocan en esta rama — drift temporal documentado**. Decisión explícita del usuario: *"No tocar `templates/policy.yaml.hbs` en esta rama me parece correcto, PERO: deja explícito en docs/plan/PR que existe un drift temporal meta-repo vs template — no quiero que nadie lea esta rama como 'el template ya refleja el nuevo shape'."* El drift se documenta en ROADMAP D5b, HANDOFF §11, ARCHITECTURE §7 y el propio cuerpo del PR. Rama reconciliadora (update template + renderer + snapshots + `pyyaml` en requirements-dev de proyectos Python generados) queda deferida a una rama propia post-D6.
+
+**Contrato fijado por la suite**:
+
+- `load_policy(None-dir)` → `None`. `load_policy(repo con policy.yaml corrupto)` → `None`. `load_policy(repo OK)` → dict parseado, cacheado.
+- `docs_sync_rules(repo)` / `post_merge_trigger(repo)` / `pre_write_rules(repo)` cada uno devuelve `None` si el policy falta o la sección relevante está ausente. En happy path devuelven la dataclass tipada.
+- `derive_test_pair("hooks/foo.py", "hooks_top_level_py")` → `"hooks/tests/test_foo.py"` (guiones → underscores). `derive_test_pair("generator/lib/bar.ts", "generator_ts")` → `"generator/lib/bar.test.ts"` (co-located, mismo dir).
+- Los 3 hooks migrados: `policy_unavailable` logged + pass-through (no deny, no emisión de `additionalContext`) cuando el loader devuelve `None`.
+- Cache invalidation: `reset_cache()` + mtime+size keying — segundo `load_policy()` tras `reset_cache` releer el file. Tests cubren este camino (ver `test_lib_policy.py::TestLoadPolicy::test_cache_invalidation`).
+
+**Ajustes vs plan original (Fase -1 aprobada)**:
+
+- **Workaround fnmatch en `pre_write.enforced_patterns`**: `fnmatch.fnmatchcase("generator/run.ts", "generator/**/*.ts")` NO matchea — el middle `/` de `**` es literal, no recursivo. Solución: dos entries YAML con la misma `label: "generator_ts"` — una con `match_glob: "generator/*.ts"` (top-level), otra con `match_glob: "generator/**/*.ts"` (subdirs). El loader los carga como pattern-list y la derivación es label-driven, no pattern-driven. No aparecía en el plan original porque asumíamos `**` recursivo estilo git.
+- **Divergencia D4 `hooks/tests/**` cerrada como side-effect**: al migrar D4 a consumir el loader, la forma natural de expresar la excepción es un campo `excludes` en la rule condicional. Se aplicó a `policy.yaml` en el mismo commit. La documentación D4 previa marcaba esto como "deferido a rama policy-loader" — cumplido.
+- **Simplify pass pre-PR**: pendiente (paso 5 del sequence acordado "1. kickoff, 2. tests rojos, 3. implementación, 4. docs-sync, 5. simplify, 6. review").
+
+**Drift documentado — meta-repo ↔ template** (reproducido en todas las docs y requerirá mención en el PR body):
+
+- `policy.yaml` (meta-repo) ya con shape nuevo (`pre_write.enforced_patterns` + `excludes` en `hooks/**`).
+- `templates/policy.yaml.hbs` + `generator/renderers/policy.ts` + snapshots `generator/__snapshots__/<profile>/policy.yaml.snap` **NO tocados** — siguen con el shape pre-D5b.
+- Proyectos generados con `pos` hoy emiten un `policy.yaml` **desactualizado** respecto al del meta-repo. No es un bug del generador — es drift intencional para no saturar D5b.
+- Rama reconciliadora: actualizar template + renderer + snapshots + añadir `pyyaml` al requirements-dev emitido para stacks Python. Diferida a post-D6.
+
+**Criterio de salida**: 462 tests + 1 skipped verdes en `hooks/**`, coverage `_lib/policy.py` ≥95% (alcanzado 97%), D3/D4/D5 coverage sin regresión (93%/93%/94%), los 3 hooks consumen el loader sin residuos hardcoded, docs-sync en el propio PR (ROADMAP + HANDOFF + MASTER_PLAN + ARCHITECTURE + `.claude/rules/hooks.md`) incluyendo la nota drift meta↔template, hook `pre-pr-gate` aprueba este mismo PR (dogfooding D4 sobre D5b: los 5 docs obligatorios del loader están en el diff). En curso (paso 4 de 6 completado).
+
 ### Rama D6 — `feat/d6-hook-pre-compact-stop`
 
 **Scope**: `hooks/pre-compact.py` (persist decisions) + `hooks/stop-policy-check.py` (valida skill invocations vs policy).

@@ -231,3 +231,67 @@ Enforza trigger advisory de `/pos:compound` (CLAUDE.md § Flujo de rama Fase N+6
 Helper privado `_match(path, glob)` inlineado en `match_triggers` — era wrapper trivial sobre `fnmatch.fnmatch` con un solo caller. Reduce 4 líneas sin perder legibilidad; no afecta contrato de tests (el helper era privado).
 
 Ver también [MASTER_PLAN.md § Rama D5](../../MASTER_PLAN.md), [docs/ARCHITECTURE.md §7](../../docs/ARCHITECTURE.md#capa-1-hooks).
+
+## Policy loader — `hooks/_lib/policy.py` (extraído en D5b)
+
+Fuente única de verdad para los hooks frente a `policy.yaml`. Cumple la precondición regla #7 CLAUDE.md abierta por D4 + D5 (dos repeticiones hardcoded de `policy.yaml` dentro del código de los hooks). D3/D4/D5 consumen el loader desde D5b; todo hook futuro debe hacerlo igual.
+
+### Contrato del consumidor
+
+```python
+sys.path.insert(0, str(Path(__file__).parent))
+from _lib.policy import DocsSyncRules, docs_sync_rules  # noqa: E402
+# o: PostMergeTrigger, post_merge_trigger / PreWriteRules, pre_write_rules
+
+def main() -> int:
+    # ... validar payload, classify command/tool, etc. ...
+    rules = docs_sync_rules(Path.cwd())          # accessor tipado
+    if rules is None:                             # failure mode (c.2)
+        _log_skip(repo_root, ts, command,
+                  "skipped: policy.yaml missing or pre_pr section absent")
+        return 0                                  # pass-through advisory, NO deny
+    # ... consumir rules.baseline / rules.conditional / ...
+```
+
+**Regla dura**: ningún hook debe reparsear `policy.yaml` directamente (`yaml.safe_load(...)`) ni redefinir un mirror hardcoded. Si la sección que el hook necesita todavía no tiene accessor, **añade un accessor nuevo** en `_lib/policy.py` (dataclass frozen + función cacheada + test unitario) — no rompas la capa.
+
+### Failure mode canónico — (c.2) pass-through advisory
+
+| Situación                                       | Accessor devuelve | Hook hace                                               |
+|-------------------------------------------------|-------------------|---------------------------------------------------------|
+| `policy.yaml` no existe                         | `None`            | log `status: policy_unavailable` + pass-through exit 0  |
+| `policy.yaml` YAML inválido (parse falla)       | `None`            | idem                                                    |
+| `policy.yaml` OK pero sección relevante ausente | `None`            | idem                                                    |
+| Happy path                                      | dataclass tipado  | consumir normalmente                                    |
+
+**Prohibido**: `deny` defensivo cuando loader devuelve `None` (brickea PRs ante un typo YAML); fallback hardcoded a defaults (rompe el propósito de tener loader único). Descartadas explícitamente en Fase -1 de D5b.
+
+Esta política es la **tercera variante de safe-fail** en la capa 1 (junto con blocker estricto e informative graceful). Aplica a cualquier hook que lea `policy.yaml`.
+
+### Shape del loader
+
+- `load_policy(repo_root)` — cacheado, clave = path abs + mtime + size. `reset_cache()` para test isolation (autouse fixture).
+- 5 dataclasses frozen: `ConditionalRule`, `DocsSyncRules`, `PostMergeTrigger`, `EnforcedPattern`, `PreWriteRules`.
+- 3 accessors: `docs_sync_rules(repo_root)` / `post_merge_trigger(repo_root)` / `pre_write_rules(repo_root)`. Cada uno encapsula un lookup de sección concreto en `policy.yaml` + construcción de las dataclasses. Cuando D6 consuma `lifecycle.pre_compact` o `skills_allowed`, añadir `pre_compact_rules` / `skills_allowed_list` siguiendo el mismo patrón.
+- `derive_test_pair(rel_path, label)` — derivación procedural keyed por `label` (decisión b.1 Fase -1: strings y globs en YAML, derivación en Python). Dos ramas activas hoy: `hooks_top_level_py` (`hooks/<name>.py` → `hooks/tests/test_<name_underscore>.py`) y `generator_ts` (`generator/**/<name>.ts` → co-located `<dir>/<name>.test.ts`). Añadir rama nueva sólo si ≥2 enforced patterns reales la necesitan.
+
+### Dependencia — `pyyaml==6.0.2`
+
+Primera línea no-stdlib en `hooks/_lib/`. Pin exacto (no `>=6.0,<7`) por contrato: un upgrade semver-minor que cambiara semántica de `yaml.safe_load` rompería todos los hooks silenciosamente; preferimos upgrade explícito. Declarado en `requirements-dev.txt` + justificación permanente en kickoff commit de D5b.
+
+Si un hook futuro necesita otra dep no-stdlib, abrir un commit propio que la justifique en kickoff (mismo patrón).
+
+### Nota fnmatch — middle `/` no es recursivo
+
+`fnmatch.fnmatchcase("generator/run.ts", "generator/**/*.ts")` **NO matchea**. Razón: el middle `/` del `**` es literal en `fnmatch`, no recursivo estilo git. Solución adoptada en `pre_write.enforced_patterns`: dos entries con la misma `label: "generator_ts"` — uno con `match_glob: "generator/*.ts"` (top-level), otro con `match_glob: "generator/**/*.ts"` (subdirs). El loader trata entries como pattern-list; la derivación es label-driven. Aplicar el mismo pattern a cualquier enforced_pattern que quiera cubrir paths top-level + recursivos simultáneamente.
+
+### Tests del loader
+
+- Loader con suite propia: `hooks/tests/test_lib_policy.py` (57 casos — cache behavior, los 3 accessors con happy path + missing section + missing file, `derive_test_pair` por label, invalidación del cache via `reset_cache()`, precedencia del first-match-wins en conditional rules).
+- Tests de los 3 hooks consumidores: fixture de repo escribe `policy.yaml` a disco + autouse `_reset_policy_cache` para isolation. Tests unitarios de los consumidores aceptan la dataclass tipada como argumento (`check_docs_sync(files, rules)`, `match_triggers(paths, trigger)`). Constantes hardcoded que eran mirror de `policy.yaml` (`TestIsEnforcedUnit`, `TestExpectedTestPairUnit`, `TestPolicyConstants`) eliminadas por redundantes con el loader test.
+
+### Drift temporal meta-repo ↔ template (abierto tras D5b)
+
+Tras D5b, `policy.yaml` del meta-repo tiene el shape nuevo (`pre_write.enforced_patterns` + `docs_sync_conditional.hooks/**` con `excludes: ["hooks/tests/**"]`). **`templates/policy.yaml.hbs` + `generator/renderers/policy.ts` + snapshots NO fueron tocados** en esta rama. Proyectos generados con `pos` hoy emiten un `policy.yaml` con el shape anterior. Reconciliar (template + renderer + snapshots + `pyyaml` en requirements-dev de stacks Python generados) queda diferido a una rama propia post-D6.
+
+**No leer esta rule como "el template ya consume el loader"** — explícitamente no lo hace. Ver [MASTER_PLAN.md § Rama D5b](../../MASTER_PLAN.md), [ROADMAP.md § refactor/d5-policy-loader](../../ROADMAP.md), [HANDOFF.md §11](../../HANDOFF.md), [docs/ARCHITECTURE.md § 7](../../docs/ARCHITECTURE.md#capa-1-hooks).
