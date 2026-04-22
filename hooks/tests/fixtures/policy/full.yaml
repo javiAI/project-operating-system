@@ -47,3 +47,14 @@ lifecycle:
           - "**/*.test.ts"
           - "generator/__tests__/**"
           - "generator/__fixtures__/**"
+
+  pre_compact:
+    persist:
+      - "decisions_in_flight"
+      - "phase_minus_one_state"
+      - "unsaved_pattern_candidates"
+
+skills_allowed:
+  - "pos:kickoff"
+  - "pos:branch-plan"
+  - "pos:handoff-write"
