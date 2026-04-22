@@ -117,11 +117,21 @@ def repo(tmp_path: Path) -> Path:
 @pytest.fixture(autouse=True)
 def _reset_policy_cache():
     """Isolate loader cache between tests (different tmp_path each test)."""
-    sys.path.insert(0, str(REPO_ROOT / "hooks"))
+    hooks_path = str(REPO_ROOT / "hooks")
+    added = hooks_path not in sys.path
+    if added:
+        sys.path.insert(0, hooks_path)
     from _lib.policy import reset_cache
     reset_cache()
-    yield
-    reset_cache()
+    try:
+        yield
+    finally:
+        reset_cache()
+        if added:
+            try:
+                sys.path.remove(hooks_path)
+            except ValueError:
+                pass
 
 
 def checkout(repo: Path, branch: str) -> None:
@@ -254,6 +264,7 @@ class TestBranchSkip:
 class TestGitUnavailable:
     def test_not_a_git_repo_passes_through_with_advisory(self, tmp_path: Path):
         (tmp_path / ".claude" / "logs").mkdir(parents=True)
+        (tmp_path / "policy.yaml").write_text(POLICY_YAML_FOR_TESTS)
         result = run_hook(load_fixture("gh_pr_create.json"), cwd=tmp_path)
         assert result.returncode == 0
         hook_log = tmp_path / ".claude" / "logs" / "pre-pr-gate.jsonl"

@@ -4,9 +4,10 @@ Parses `policy.yaml` at the repo root into typed dataclasses. Failure mode
 (c.2): malformed / missing / wrong-shape policy.yaml → `None`. Callers
 degrade to pass-through advisory; never propagates exception.
 
-In-process cache keyed by policy path. Hooks are ephemeral processes so
-cache amortizes only within a single hook invocation (cheap anyway: ~2ms
-for the current 250-line policy).
+In-process cache keyed by policy path **only** (no mtime/size component —
+no implicit invalidation on file edits). Hooks are ephemeral processes so
+cache amortizes only within a single invocation; long-lived callers (tests,
+future reuse) must call `reset_cache()` explicitly after editing the file.
 
 See .claude/rules/hooks.md § Policy loader for consumer contract.
 """
@@ -60,9 +61,18 @@ class PreWriteRules:
 
 
 def _safe_str_list(val: Any) -> list[str] | None:
+    """Return `val` as a `list[str]` if and only if every element is a string.
+
+    Returns `None` if `val` is not a list, or if any element is not a string.
+    The all-or-nothing shape preserves the loader's "wrong-shape → None"
+    contract: silently dropping non-string entries would produce partial
+    under-enforcement while still treating the policy as valid.
+    """
     if not isinstance(val, list):
         return None
-    return [x for x in val if isinstance(x, str)]
+    if not all(isinstance(x, str) for x in val):
+        return None
+    return list(val)
 
 
 def _load_yaml(policy_path: Path) -> dict | None:
@@ -83,8 +93,10 @@ def _load_yaml(policy_path: Path) -> dict | None:
 def load_policy(repo_root: Path) -> dict | None:
     """Return the parsed policy dict for `repo_root/policy.yaml`, or None.
 
-    Caches the parsed result keyed by absolute path. Call `reset_cache()`
-    between tests that want independent reads.
+    Caches the parsed result keyed by absolute path only — edits to the
+    file are NOT picked up until `reset_cache()` is called or the process
+    restarts. Tests (and any long-lived caller) that mutate policy.yaml
+    must call `reset_cache()` between reads.
     """
     global _cache, _cache_key
     policy_path = repo_root / POLICY_FILENAME

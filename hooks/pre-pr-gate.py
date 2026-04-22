@@ -178,11 +178,12 @@ def emit_deny(reason: str) -> None:
     }, ensure_ascii=False))
 
 
-def _log_skip(repo_root: Path, ts: str, command: str, reason: str) -> None:
+def _log_skip(repo_root: Path, ts: str, command: str, reason: str,
+              status: str = "skipped") -> None:
     append_jsonl(
         repo_root / HOOK_LOG,
         {"ts": ts, "hook": HOOK_NAME, "command": command,
-         "status": "skipped", "reason": reason},
+         "status": status, "reason": reason},
     )
 
 
@@ -240,7 +241,8 @@ def main() -> int:
     rules = docs_sync_rules(repo_root)
     if rules is None:
         _log_skip(repo_root, ts, command,
-                  "skipped: policy.yaml missing or pre_pr section absent")
+                  reason="policy.yaml missing or pre_pr section absent",
+                  status="policy_unavailable")
         return 0
 
     branch = current_branch(repo_root)

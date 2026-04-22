@@ -248,7 +248,8 @@ def main() -> int:
     rules = docs_sync_rules(Path.cwd())          # accessor tipado
     if rules is None:                             # failure mode (c.2)
         _log_skip(repo_root, ts, command,
-                  "skipped: policy.yaml missing or pre_pr section absent")
+                  status="policy_unavailable",
+                  reason="policy.yaml missing or pre_pr section absent")
         return 0                                  # pass-through advisory, NO deny
     # ... consumir rules.baseline / rules.conditional / ...
 ```
@@ -270,7 +271,7 @@ Esta política es la **tercera variante de safe-fail** en la capa 1 (junto con b
 
 ### Shape del loader
 
-- `load_policy(repo_root)` — cacheado, clave = path abs + mtime + size. `reset_cache()` para test isolation (autouse fixture).
+- `load_policy(repo_root)` — cacheado, clave = path abs **únicamente** (sin mtime/size, sin invalidación implícita por edits al archivo dentro del mismo proceso). `reset_cache()` para test isolation (autouse fixture) o para forzar relectura controlada.
 - 5 dataclasses frozen: `ConditionalRule`, `DocsSyncRules`, `PostMergeTrigger`, `EnforcedPattern`, `PreWriteRules`.
 - 3 accessors: `docs_sync_rules(repo_root)` / `post_merge_trigger(repo_root)` / `pre_write_rules(repo_root)`. Cada uno encapsula un lookup de sección concreto en `policy.yaml` + construcción de las dataclasses. Cuando D6 consuma `lifecycle.pre_compact` o `skills_allowed`, añadir `pre_compact_rules` / `skills_allowed_list` siguiendo el mismo patrón.
 - `derive_test_pair(rel_path, label)` — derivación procedural keyed por `label` (decisión b.1 Fase -1: strings y globs en YAML, derivación en Python). Dos ramas activas hoy: `hooks_top_level_py` (`hooks/<name>.py` → `hooks/tests/test_<name_underscore>.py`) y `generator_ts` (`generator/**/<name>.ts` → co-located `<dir>/<name>.test.ts`). Añadir rama nueva sólo si ≥2 enforced patterns reales la necesitan.

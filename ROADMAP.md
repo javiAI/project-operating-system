@@ -353,7 +353,7 @@ dentro de los hooks consumiendo un loader declarativo único. Mismo PR no tocar 
 Entregables:
 
 - `hooks/_lib/policy.py` (stdlib + `pyyaml==6.0.2`) — loader tipado con `@dataclass(frozen=True)` para los 5 tipos consumidos por hooks: `ConditionalRule`, `DocsSyncRules`,
-  `PostMergeTrigger`, `EnforcedPattern`, `PreWriteRules`. API pública: `load_policy(repo_root)` cached (clave = path abs + mtime + size, `reset_cache()` para tests), tres
+  `PostMergeTrigger`, `EnforcedPattern`, `PreWriteRules`. API pública: `load_policy(repo_root)` cached (clave = path abs únicamente — sin componente mtime/size, sin invalidación implícita por edits; `reset_cache()` para tests o para forzar recarga), tres
   accessors `docs_sync_rules(repo_root)` / `post_merge_trigger(repo_root)` / `pre_write_rules(repo_root)` (cada uno devuelve `None` si policy.yaml falta o la sección relevante
   no existe), y `derive_test_pair(rel_path, label)` con dos ramas (`hooks_top_level_py` + `generator_ts`) — la derivación queda **en código Python**, no en YAML, keyed por el
   campo `label` de cada `enforced_patterns` entry. Decisión (b.1) Fase -1: strings/globs declarativos, derivación procedural.

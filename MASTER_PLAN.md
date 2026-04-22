@@ -330,7 +330,7 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 
 **Scope entregado**:
 
-- `hooks/_lib/policy.py` — loader tipado con 5 dataclasses congeladas (`ConditionalRule`, `DocsSyncRules`, `PostMergeTrigger`, `EnforcedPattern`, `PreWriteRules`) + cache keyed por path abs + mtime + size (con `reset_cache()` para test isolation) + 3 accessors (`docs_sync_rules`, `post_merge_trigger`, `pre_write_rules`) + `derive_test_pair(rel_path, label)` (2 ramas label-driven).
+- `hooks/_lib/policy.py` — loader tipado con 5 dataclasses congeladas (`ConditionalRule`, `DocsSyncRules`, `PostMergeTrigger`, `EnforcedPattern`, `PreWriteRules`) + cache keyed por path abs únicamente (sin mtime/size, sin invalidación implícita por edits; `reset_cache()` para test isolation / relectura controlada) + 3 accessors (`docs_sync_rules`, `post_merge_trigger`, `pre_write_rules`) + `derive_test_pair(rel_path, label)` (2 ramas label-driven).
 - `policy.yaml` — bloque nuevo `pre_write.enforced_patterns` (3 entries); `lifecycle.pre_pr.docs_sync_conditional.hooks/**` con `excludes: ["hooks/tests/**"]` (convergencia hook↔policy).
 - Migración de los 3 hooks D3 / D4 / D5 a consumir el loader en el mismo PR: D3 `pre-write-guard.py` (`classify` + `derive_test_pair`), D4 `pre-pr-gate.py` (`check_docs_sync` + `_conditional_triggers`), D5 `post-action.py` (`match_triggers`).
 - `requirements-dev.txt` — `pyyaml==6.0.2` (pin exacto). Primera línea no-stdlib en `hooks/_lib/`; justificada en kickoff (no hay parser YAML en stdlib; escribirlo a mano sería código muerto).

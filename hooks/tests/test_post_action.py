@@ -159,11 +159,21 @@ def _test_trigger():
 
 @pytest.fixture(autouse=True)
 def _reset_policy_cache():
-    sys.path.insert(0, str(REPO_ROOT / "hooks"))
+    hooks_path = str(REPO_ROOT / "hooks")
+    added = hooks_path not in sys.path
+    if added:
+        sys.path.insert(0, hooks_path)
     from _lib.policy import reset_cache
     reset_cache()
-    yield
-    reset_cache()
+    try:
+        yield
+    finally:
+        reset_cache()
+        if added:
+            try:
+                sys.path.remove(hooks_path)
+            except ValueError:
+                pass
 
 
 # ---------------------------------------------------------------------------
