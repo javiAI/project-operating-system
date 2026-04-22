@@ -1,0 +1,12 @@
+version: "0.1.0"
+project: "test-partial"
+type: "meta-repo"
+
+lifecycle:
+  pre_pr:
+    docs_sync_required:
+      - "ROADMAP.md"
+      - "HANDOFF.md"
+    docs_sync_conditional: []
+  # post_merge deliberately missing
+  # pre_write deliberately missing

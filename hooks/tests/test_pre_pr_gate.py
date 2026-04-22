@@ -81,17 +81,47 @@ def _git(cwd: Path, *args: str) -> str:
     return result.stdout
 
 
+POLICY_YAML_FOR_TESTS = """\
+lifecycle:
+  pre_pr:
+    docs_sync_required:
+      - "ROADMAP.md"
+      - "HANDOFF.md"
+    docs_sync_conditional:
+      - if_touched: ["generator/**"]
+        then_required: ["docs/ARCHITECTURE.md"]
+      - if_touched: ["hooks/**"]
+        then_required: ["docs/ARCHITECTURE.md"]
+        excludes: ["hooks/tests/**"]
+      - if_touched: ["skills/**"]
+        then_required: [".claude/rules/skills-map.md"]
+      - if_touched: [".claude/patterns/**"]
+        then_required: ["docs/ARCHITECTURE.md"]
+"""
+
+
 @pytest.fixture
 def repo(tmp_path: Path) -> Path:
-    """Real git repo: main branch + initial commit + .claude/logs ready."""
+    """Real git repo: main branch + initial commit + .claude/logs + policy.yaml."""
     _git(tmp_path, "init", "-q", "--initial-branch=main")
     _git(tmp_path, "config", "user.email", "test@example.com")
     _git(tmp_path, "config", "user.name", "Test")
     (tmp_path / "README.md").write_text("initial\n")
-    _git(tmp_path, "add", "README.md")
+    (tmp_path / "policy.yaml").write_text(POLICY_YAML_FOR_TESTS)
+    _git(tmp_path, "add", "README.md", "policy.yaml")
     _git(tmp_path, "commit", "-q", "-m", "initial")
     (tmp_path / ".claude" / "logs").mkdir(parents=True)
     return tmp_path
+
+
+@pytest.fixture(autouse=True)
+def _reset_policy_cache():
+    """Isolate loader cache between tests (different tmp_path each test)."""
+    sys.path.insert(0, str(REPO_ROOT / "hooks"))
+    from _lib.policy import reset_cache
+    reset_cache()
+    yield
+    reset_cache()
 
 
 def checkout(repo: Path, branch: str) -> None:
@@ -804,87 +834,104 @@ class TestIsGhPrCreateUnit:
 # ---------------------------------------------------------------------------
 
 
+def _test_rules():
+    """Construct the rules shape the unit tests use — mirrors POLICY_YAML_FOR_TESTS."""
+    sys.path.insert(0, str(REPO_ROOT / "hooks"))
+    from _lib.policy import ConditionalRule, DocsSyncRules
+    return DocsSyncRules(
+        baseline=("ROADMAP.md", "HANDOFF.md"),
+        conditional=(
+            ConditionalRule(("generator/**",), ("docs/ARCHITECTURE.md",), ()),
+            ConditionalRule(("hooks/**",), ("docs/ARCHITECTURE.md",), ("hooks/tests/**",)),
+            ConditionalRule(("skills/**",), (".claude/rules/skills-map.md",), ()),
+            ConditionalRule((".claude/patterns/**",), ("docs/ARCHITECTURE.md",), ()),
+        ),
+    )
+
+
 @needs_hook
 class TestCheckDocsSyncUnit:
     def test_baseline_present_no_missing(self):
-        missing, _ = ppg.check_docs_sync([
-            "ROADMAP.md", "HANDOFF.md", "docs/X.md",
-        ])
+        missing, _ = ppg.check_docs_sync(
+            ["ROADMAP.md", "HANDOFF.md", "docs/X.md"], _test_rules(),
+        )
         assert missing == []
 
     def test_missing_roadmap(self):
-        missing, _ = ppg.check_docs_sync(["HANDOFF.md", "src/foo.py"])
+        missing, _ = ppg.check_docs_sync(["HANDOFF.md", "src/foo.py"], _test_rules())
         assert "ROADMAP.md" in missing
 
     def test_missing_handoff(self):
-        missing, _ = ppg.check_docs_sync(["ROADMAP.md", "src/foo.py"])
+        missing, _ = ppg.check_docs_sync(["ROADMAP.md", "src/foo.py"], _test_rules())
         assert "HANDOFF.md" in missing
 
     def test_missing_both_baseline(self):
-        missing, _ = ppg.check_docs_sync(["src/foo.py"])
+        missing, _ = ppg.check_docs_sync(["src/foo.py"], _test_rules())
         assert "ROADMAP.md" in missing
         assert "HANDOFF.md" in missing
 
     def test_generator_triggers_architecture(self):
-        missing, triggers = ppg.check_docs_sync([
-            "generator/lib/x.ts", "ROADMAP.md", "HANDOFF.md",
-        ])
+        missing, triggers = ppg.check_docs_sync(
+            ["generator/lib/x.ts", "ROADMAP.md", "HANDOFF.md"], _test_rules(),
+        )
         assert "docs/ARCHITECTURE.md" in missing
         assert "generator/lib/x.ts" in triggers["docs/ARCHITECTURE.md"]
 
     def test_hooks_triggers_architecture(self):
-        missing, triggers = ppg.check_docs_sync([
-            "hooks/foo.py", "ROADMAP.md", "HANDOFF.md",
-        ])
+        missing, triggers = ppg.check_docs_sync(
+            ["hooks/foo.py", "ROADMAP.md", "HANDOFF.md"], _test_rules(),
+        )
         assert "docs/ARCHITECTURE.md" in missing
         assert "hooks/foo.py" in triggers["docs/ARCHITECTURE.md"]
 
     def test_skills_triggers_skills_map(self):
-        missing, triggers = ppg.check_docs_sync([
-            "skills/foo/SKILL.md", "ROADMAP.md", "HANDOFF.md",
-        ])
+        missing, triggers = ppg.check_docs_sync(
+            ["skills/foo/SKILL.md", "ROADMAP.md", "HANDOFF.md"], _test_rules(),
+        )
         assert ".claude/rules/skills-map.md" in missing
 
     def test_patterns_triggers_architecture(self):
-        missing, _ = ppg.check_docs_sync([
-            ".claude/patterns/bar.md", "ROADMAP.md", "HANDOFF.md",
-        ])
+        missing, _ = ppg.check_docs_sync(
+            [".claude/patterns/bar.md", "ROADMAP.md", "HANDOFF.md"], _test_rules(),
+        )
         assert "docs/ARCHITECTURE.md" in missing
 
     def test_generator_and_patterns_dedupe_architecture(self):
-        missing, _ = ppg.check_docs_sync([
-            "generator/lib/x.ts", ".claude/patterns/p.md",
-            "ROADMAP.md", "HANDOFF.md",
-        ])
+        missing, _ = ppg.check_docs_sync(
+            ["generator/lib/x.ts", ".claude/patterns/p.md",
+             "ROADMAP.md", "HANDOFF.md"],
+            _test_rules(),
+        )
         assert missing.count("docs/ARCHITECTURE.md") == 1
 
     def test_triggers_cap_at_three(self):
         files = [f"generator/lib/f{i}.ts" for i in range(10)] + [
             "ROADMAP.md", "HANDOFF.md",
         ]
-        _missing, triggers = ppg.check_docs_sync(files)
+        _missing, triggers = ppg.check_docs_sync(files, _test_rules())
         assert len(triggers["docs/ARCHITECTURE.md"]) == 3
 
     def test_architecture_present_not_missing(self):
-        missing, _ = ppg.check_docs_sync([
-            "generator/lib/x.ts",
-            "ROADMAP.md", "HANDOFF.md", "docs/ARCHITECTURE.md",
-        ])
+        missing, _ = ppg.check_docs_sync(
+            ["generator/lib/x.ts",
+             "ROADMAP.md", "HANDOFF.md", "docs/ARCHITECTURE.md"],
+            _test_rules(),
+        )
         assert "docs/ARCHITECTURE.md" not in missing
 
     def test_skills_map_present_not_missing(self):
-        missing, _ = ppg.check_docs_sync([
-            "skills/foo/SKILL.md",
-            "ROADMAP.md", "HANDOFF.md", ".claude/rules/skills-map.md",
-        ])
+        missing, _ = ppg.check_docs_sync(
+            ["skills/foo/SKILL.md",
+             "ROADMAP.md", "HANDOFF.md", ".claude/rules/skills-map.md"],
+            _test_rules(),
+        )
         assert ".claude/rules/skills-map.md" not in missing
 
     def test_tests_alone_do_not_trigger_conditional(self):
         """hooks/tests/** is a valid touched path but should NOT require ARCHITECTURE."""
-        missing, _ = ppg.check_docs_sync([
-            "hooks/tests/test_foo.py",
-            "ROADMAP.md", "HANDOFF.md",
-        ])
+        missing, _ = ppg.check_docs_sync(
+            ["hooks/tests/test_foo.py", "ROADMAP.md", "HANDOFF.md"], _test_rules(),
+        )
         assert "docs/ARCHITECTURE.md" not in missing
 
 

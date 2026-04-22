@@ -63,6 +63,28 @@ lifecycle:
     skills_required: ["pos:pre-commit-review"]
     blocking: true
 
+  pre_write:
+    # Enforced file patterns for hooks/pre-write-guard.py (D3 ↔ policy-loader D5b).
+    # Each pattern has a `label` that the hook maps to a test-pair derivation
+    # function in hooks/_lib/policy.py::derive_test_pair (Fase -1 (b.1): strings
+    # to YAML, derivation stays in code — no YAML DSL).
+    enforced_patterns:
+      - label: "hooks_top_level_py"
+        match_glob: "hooks/*.py"
+        exclude_globs:
+          - "hooks/_lib/**"
+          - "hooks/tests/**"
+      - label: "generator_ts"
+        match_glob: "generator/*.ts"
+        exclude_globs:
+          - "**/*.test.ts"
+      - label: "generator_ts"
+        match_glob: "generator/**/*.ts"
+        exclude_globs:
+          - "**/*.test.ts"
+          - "generator/__tests__/**"
+          - "generator/__fixtures__/**"
+
   pre_push:
     # NOTA (post-D1): `command_meta` declara la intención del contrato. La
     # aplicación efectiva se reparte en:
@@ -92,8 +114,15 @@ lifecycle:
       - "ROADMAP.md"
       - "HANDOFF.md"
     docs_sync_conditional:
-      - if_touched: ["generator/**", "hooks/**"]
+      # D5b split: generator/ + hooks/ separated so hooks/tests/** can be
+      # excluded from the hooks/ rule (editing tests is not arch-change).
+      # Pre-D5b divergence between hook and policy (hook excluded tests-only,
+      # policy listed hooks/** uniformly) is now reconciled here.
+      - if_touched: ["generator/**"]
         then_required: ["docs/ARCHITECTURE.md"]
+      - if_touched: ["hooks/**"]
+        then_required: ["docs/ARCHITECTURE.md"]
+        excludes: ["hooks/tests/**"]
       - if_touched: ["skills/**"]
         then_required: [".claude/rules/skills-map.md"]
       - if_touched: [".claude/patterns/**"]
