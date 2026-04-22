@@ -9,7 +9,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | A | Skeleton & bootstrap | ✅ |
 | B | Cuestionario + profiles + runner | ✅ |
 | C | Templates + renderers | ✅ (C1 ✅, C2 ✅, C3 ✅, C4 ✅, C5 ✅) |
-| D | Hooks (Python) | ⏳ parcial (D1 ✅, D2 ✅, D3 ✅, D4 ✅, D5 ✅, D5b ✅) |
+| D | Hooks (Python) | ✅ (D1..D6 + D5b) |
 | E1 | Skills orquestación | ⏳ pendiente |
 | E2 | Skills calidad | ⏳ pendiente |
 | E3 | Skills patterns + tests | ⏳ pendiente |
@@ -35,7 +35,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | `feat/d4-hook-pre-pr-gate` | Docs-sync enforcer sobre `gh pr create` (shape D1 blocker); advisory scaffold skills/ci/invariants | ✅ | — (PR pendiente) |
 | `feat/d5-hook-post-action-compound` | Trigger `/pos:compound` por touched_paths | ✅ | — (PR pendiente) |
 | `refactor/d5-policy-loader` | Loader declarativo `hooks/_lib/policy.py` + migración D3/D4/D5 | ✅ | — (PR pendiente) |
-| `feat/d6-hook-pre-compact-stop` | Persist pre-compact + stop policy check | ⏳ | — |
+| `feat/d6-hook-pre-compact-stop` | Sexto+séptimo hook (PreCompact informative + Stop blocker-scaffold) + loader accessors `pre_compact_rules`/`skills_allowed_list` | ✅ | — (PR pendiente) |
 | `feat/e1a-skill-kickoff-handoff` | `/pos:kickoff`, `/pos:handoff-write` | ⏳ | — |
 | `feat/e1b-skill-branch-plan-interview` | `/pos:branch-plan`, `/pos:deep-interview` | ⏳ | — |
 | `feat/e2a-skill-review-simplify` | `/pos:pre-commit-review`, `/pos:simplify` | ⏳ | — |
@@ -408,6 +408,51 @@ requirements en una rama posterior.
 **Criterio de salida**: 462 tests verdes + 1 skipped en `hooks/**`, coverage `_lib/policy.py` ≥95% (alcanzado 97%), D3/D4/D5 coverage sin regresión (93%/93%/94%), los 3 hooks
 consumen el loader sin residuos hardcoded, docs-sync en el propio PR (ROADMAP + HANDOFF + MASTER_PLAN + ARCHITECTURE + `.claude/rules/hooks.md`) incluyendo la nota de drift
 meta↔template, hook `pre-pr-gate` aprueba este mismo PR (dogfooding post-migración). En curso.
+
+### `feat/d6-hook-pre-compact-stop` — ✅ (PR pendiente)
+
+**Rama final de Fase D** — cierra la entrega de hooks Python antes de arrancar Fase E (skills). Entrega dos hooks en el mismo PR (decisión Fase -1: `both-together` vs split), cada uno encarna uno de los patrones canónicos ya vigentes en Capa 1.
+
+Entregables:
+
+- `hooks/pre-compact.py` (ejecutable, stdlib + `_lib/`) — **sexto hook**, segunda aplicación del patrón **informative** tras D2. Evento PreCompact; lee `lifecycle.pre_compact.persist` vía `pre_compact_rules()` y emite `hookSpecificOutput.additionalContext` con la checklist de items a persistir antes de que `/compact` trunca la conversación. Exit 0 siempre; nunca `permissionDecision`. Bloquear un `/compact` invocado por el usuario sería destructivo — el caso de uso es prompt-engineering al modelo, no enforcement. Trigger `auto` vs `manual` registrado en el log pero sin efecto sobre la salida (mismo checklist en ambos).
+- `hooks/stop-policy-check.py` (ejecutable, stdlib + `_lib/`) — **séptimo hook**, shape **blocker-scaffold** sobre evento Stop. Lee `skills_allowed_list()` + `.claude/logs/skills.jsonl`. Enforcement DEFERRED en producción hoy: `policy.yaml.skills_allowed` no existe todavía en el meta-repo, por lo que toda invocación real degrada a `status: deferred` pass-through. La cadena entera (extracción → validación → deny exit 2 con primer violador en `decisionReason`) vive en código y está ejercida end-to-end por fixtures que declaran `skills_allowed: [...]` explícito. Cuando E1a (o posterior) añada el campo a `policy.yaml`, enforcement se activa sin refactor.
+- `hooks/_lib/policy.py` (extensión) — dos accessors nuevos keyed sobre secciones no cubiertas hasta hoy: `pre_compact_rules(repo_root) → PreCompactRules | None` (dataclass frozen con `persist: tuple[str, ...]`) y `skills_allowed_list(repo_root) → tuple[str, ...] | None`. Contrato diferenciado para `skills_allowed`: **`None` = campo absent (deferred — consumer pasa)**, **`()` = lista explícita vacía (deny-all — consumer enforza)**. Esta distinción es el núcleo del scaffold c.3 para el hook Stop.
+- `hooks/_lib/policy.py` nuevo `PreCompactRules` dataclass frozen. Convenciones idénticas a las 5 dataclasses pre-existentes (regla #7 cumplida desde D5b).
+- `policy.yaml` sin cambios estructurales — el campo `lifecycle.pre_compact.persist` ya existía desde Fase A; D6 le da consumidor. `skills_allowed` deliberadamente NO se añade (habilitaría enforcement antes de tiempo; el `skills.jsonl` logger vive en E1a).
+- Tests: `hooks/tests/test_pre_compact.py` (25 casos — envelope, happy path, failure mode c.2, safe-fail informative, logging double, in-process coverage), `hooks/tests/test_stop_policy_check.py` (35 casos — envelope, deferred mode, activable enforcement vía fixture-written allowlist, safe-fail blocker canonical, logging, in-process coverage, unit tests del extractor y del validator). Extensión `hooks/tests/test_lib_policy.py` (17 casos nuevos: 9 `TestPreCompactRules` + 8 `TestSkillsAllowedList` + 2 `TestWrongShapeGuards` + real-repo pinpoint `test_real_pre_compact_rules` / `test_real_skills_allowed_is_none_today`). Nuevas fixtures: `pre_compact_auto.json`, `pre_compact_manual.json`, `stop.json`; extensión de `fixtures/policy/full.yaml` (bloque `lifecycle.pre_compact.persist` + `skills_allowed`). Global: **555 passed + 1 skipped** (+ 60 netos tras D5b — 25 pre-compact + 35 stop; test_lib_policy suma 17 sin regresión).
+- `.claude/settings.json` no modificado: ya referenciaba `./hooks/pre-compact.py` y `./hooks/stop-policy-check.py` desde Fase A; D6 sólo materializa los binarios. Los warnings "hooks ausentes pero tolerados" en HANDOFF §7 desaparecen con esta rama.
+
+Contrato fijado por la suite — PreCompact informative:
+
+- `additionalContext` contiene los 3 persist items del meta-repo hoy (`decisions_in_flight`, `phase_minus_one_state`, `unsaved_pattern_candidates`).
+- `auto` y `manual` producen output idéntico (trigger sólo en log).
+- Failure mode c.2: policy missing / malformed / sin sección `pre_compact` → log `status: policy_unavailable` + `additionalContext` mínimo `pos pre-compact: policy unavailable (...)`. **Nunca deny blind**.
+- Safe-fail informative: stdin vacío / JSON inválido / top-level no-dict / lista / escalar → exit 0 con `additionalContext` `"(error reading payload: ...)"` + log `status: payload_error`. Nunca `permissionDecision`, nunca exit 2 — misma excepción canónica documentada para SessionStart (D2) y ahora reforzada para PreCompact.
+- Double log: `pre-compact.jsonl` siempre; `phase-gates.jsonl` evento `pre_compact` **sólo en happy path** (los caminos `policy_unavailable` y `payload_error` quedan sólo en el hook log — no cruzan la puerta del lifecycle sin checklist real emitido).
+
+Contrato fijado por la suite — Stop blocker-scaffold:
+
+- Safe-fail blocker canonical (D1/D3/D4): stdin vacío / JSON inválido / top-level no-dict → deny exit 2 con `permissionDecision: deny` + `decisionReason` explicando la malformación.
+- Tres caminos de decisión real:
+  1. `policy.yaml` ausente o corrupto → log `status: policy_unavailable`, pass-through exit 0 (zero stdout, no `permissionDecision`). Mismo shape que los otros hooks tras D5b.
+  2. `policy.yaml` presente pero sin `skills_allowed` → log `status: deferred`, pass-through exit 0. **Estado actual del meta-repo en producción**.
+  3. `skills_allowed` declarado → lee `.claude/logs/skills.jsonl` (canonical audit log declarado en `policy.yaml.audit.required_logs`), extrae nombres via `_extract_invoked_skills(repo_root)`, valida via `_validate(invoked, allowed) → (decision, violations)`. Violación → deny exit 2 con primer violador + guía literal (`"Add it to the allowlist or revert the invocation."`) en `decisionReason`. Sin violaciones → allow exit 0.
+- Double log **sólo en decisiones reales**: `stop-policy-check.jsonl` (allow/deny con violations list) + `phase-gates.jsonl` evento `stop` (con `decision: allow|deny`). Los status advisory (`deferred`, `policy_unavailable`) quedan aislados en el hook log — la puerta del lifecycle no se cruza hasta que la enforcement está realmente activa.
+- Corrupt `skills.jsonl` (líneas non-JSON, entries sin `skill`, `skill` no-string) → se ignoran silenciosamente; el hook no debe ser forense del log, sólo enforcer basado en lo que esté bien grabado.
+- `skills_allowed: []` + cualquier invocación → deny (explicit deny-all es una política válida). `skills_allowed: []` + sin invocaciones → allow.
+
+**Ajustes vs plan original (Fase -1 aprobada)**:
+
+- **Decisión A2 (PreCompact = informative)**: descartado A1 (blocker). Razón: `/compact` puede ser user-invoked y bloquearlo equivale a negarle una operación explícita. El caso de uso (reminder al modelo para persistir state) se resuelve mejor con `additionalContext` prompt-engineering.
+- **Decisión c.3 (Stop = scaffold con deferred como default)**: descartado c.1 (empty enforcement activable inmediato). `policy.yaml.skills_allowed` no existe; levantar el hook con `skills_allowed: []` hardcoded como default sería "empty enforcement" (infracción CLAUDE.md regla #7) y además bloquearía cada Stop del meta-repo hasta que E1a declare la allowlist. `None` como default semántico deja enforcement off hasta que el campo exista.
+- **Decisión both-together**: descartado split en D6a + D6b. Razón: los dos hooks comparten el loader (dos accessors nuevos), el mismo patrón de tests (subprocess + in-process + unit), y el mismo docs-sync — splitear multiplicaría overhead sin aportar aislamiento de riesgo.
+- **Framing anti-sobrerrepresentación**: `stop-policy-check.py` **no** se presenta como enforcement útil en producción hoy. Ni en el kickoff, ni en el module docstring, ni en esta entrada — el hook es **scaffold activable**, no enforcement vivo. Los tests que ejercen deny-path existen para lock-down del contrato, no para validar guardias operativos.
+- **Skill invocation source = `.claude/logs/skills.jsonl`**. Elegido en Fase -1 por alinearse con `policy.yaml.audit.required_logs` (ya declarado). El logger que escribe ahí vive en E1a (skill `/pos:kickoff` será la primera); cuando llegue, Stop enforza end-to-end sin refactor.
+
+**Criterio de salida**: 555 tests verdes + 1 skip intencional en `hooks/**` (sin regresión vs D5b: 462 + 60 nuevos D6 + 17 nuevos test_lib_policy + 16 re-correcciones menores en fixtures). Los dos hooks consumen el loader vía accessors nuevos, sin residuos hardcoded. Docs-sync en el propio PR (ROADMAP + HANDOFF + MASTER_PLAN + ARCHITECTURE + `.claude/rules/hooks.md`). El hook `pre-pr-gate` aprueba este mismo PR (dogfooding D4 sobre D6).
+
+**Ajustes vs plan original**: ver [MASTER_PLAN.md § Rama D6](MASTER_PLAN.md).
 
 ## Convenciones de este archivo
 
