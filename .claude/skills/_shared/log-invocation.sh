@@ -29,6 +29,18 @@ ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 log_dir=".claude/logs"
 
 mkdir -p "$log_dir"
-printf '{"ts":"%s","skill":"%s","session_id":"%s","status":"%s"}\n' \
-    "$ts" "$skill" "$session_id" "$status" \
-    >> "$log_dir/skills.jsonl"
+# Encode via python3's json.dumps — shell printf can't safely escape
+# arbitrary characters (quotes, backslashes, control chars) in skill /
+# status / CLAUDE_SESSION_ID. An invalid JSONL line would be silently
+# skipped by stop-policy-check._extract_invoked_skills and cause
+# under-enforcement.
+python3 - "$ts" "$skill" "$session_id" "$status" >> "$log_dir/skills.jsonl" <<'PY'
+import json
+import sys
+
+ts, skill, session_id, status = sys.argv[1:5]
+print(json.dumps(
+    {"ts": ts, "skill": skill, "session_id": session_id, "status": status},
+    separators=(",", ":"),
+))
+PY

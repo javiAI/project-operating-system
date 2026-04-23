@@ -275,8 +275,10 @@ compound:
 # Absence of the key = deferred (the state before E1a). Empty list `[]`
 # = explicit deny-all. Misconfiguration (scalar, non-string items) is
 # flagged by the loader as `SKILLS_ALLOWED_INVALID` so a typo doesn't
-# silently disable enforcement — see `.claude/rules/hooks.md` §
-# stop-policy-check for the tri-state contract.
+# silently disable enforcement. Contract is defined in the loader
+# accessor `_lib/policy.skills_allowed_list` and cross-validated by
+# `hooks/tests/test_stop_policy_check.py` (see `TestMisconfiguredPolicy`
+# + `TestDeferredMode`).
 skills_allowed:
   - project-kickoff
   - writing-handoff

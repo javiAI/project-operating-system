@@ -46,7 +46,7 @@ You must NOT:
    - Conventions established during the branch that future branches must respect.
    - Open carry-overs with owner and activation condition.
 
-   Use the memory files under `~/.claude/projects/-Users-javierabrilibanez-Dev-project-operating-system/memory/` (type `project` in frontmatter). One decision per file, indexed in `MEMORY.md`.
+   Use the current project's Claude memory store (`type: project` in frontmatter). One decision per file, indexed in `MEMORY.md`. Do NOT hardcode the absolute path — Claude Code resolves the per-project memory directory from the current working directory.
 
 5. **Log the invocation** (best-effort, last step):
 

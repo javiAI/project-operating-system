@@ -34,6 +34,10 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 HOOK = REPO_ROOT / "hooks" / "stop-policy-check.py"
 LOGGER = REPO_ROOT / ".claude" / "skills" / "_shared" / "log-invocation.sh"
 
+# Make `_lib` importable here explicitly, without relying on the hook
+# module's sys.path mutation as a side effect of exec_module below.
+sys.path.insert(0, str(REPO_ROOT / "hooks"))
+
 _spec = importlib.util.spec_from_file_location("stop_policy_check", HOOK)
 assert _spec is not None and _spec.loader is not None
 sp = importlib.util.module_from_spec(_spec)
