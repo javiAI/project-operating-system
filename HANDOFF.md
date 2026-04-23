@@ -5,7 +5,7 @@
 ## 1. Snapshot
 
 - Repo: `project-operating-system` (plugin `pos`).
-- Fase actual: **E1a ✅ cerrada en rama** (`feat/e1a-skill-kickoff-handoff`, PR pendiente — docs-sync + simplify en curso). Anterior: **D6 ✅ PR #18** (`288afbe`). Siguiente tras merge E1a: **E1b — `feat/e1b-skill-branch-plan-interview`** (segundo par de skills de Fase E — planificación + deep interview).
+- Fase actual: **E1b ✅ cerrada en rama** (`feat/e1b-skill-branch-plan-interview`, PR pendiente — docs-sync + simplify en curso). Anterior: **E1a ✅ PR #19** (`9d6f8d1`). Siguiente tras merge E1b: **E2a — `feat/e2a-skill-review-simplify`** (primer par de Fase E bloque calidad — `/pos:pre-commit-review` + `/pos:simplify`).
 - Fuente de verdad ejecutable: [MASTER_PLAN.md](MASTER_PLAN.md).
 - Estado vivo: [ROADMAP.md](ROADMAP.md).
 - Arquitectura canonical: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -130,28 +130,27 @@ Hasta que `pos` tenga sus propias skills:
 
 ## 9. Próxima rama
 
-**E1b — `feat/e1b-skill-branch-plan-interview`** (tras merge de E1a — segundo par de Fase E, skills de planificación + interview).
+**E2a — `feat/e2a-skill-review-simplify`** (tras merge de E1b — primer par de Fase E bloque calidad, skills de revisión + simplificación pre-PR).
 
-Scope (ver [MASTER_PLAN.md § Rama E1b](MASTER_PLAN.md)):
+Scope (ver [MASTER_PLAN.md § Rama E2a](MASTER_PLAN.md)):
 
-- Segundo par de skills del bloque orquestación tras E1a (`project-kickoff` + `writing-handoff`). Cubre la entrada a una rama nueva: `branch-plan` (produce Fase -1 — resumen técnico/conceptual + ambigüedades + alternativas + test plan + docs plan; `context: fork` + opus por coste cognitivo alto) y `deep-interview` (socratic questioning para ramas de alto riesgo; opt-in del usuario; `context: fork` + opus). Ambos equivalentes a los futuros `/pos:branch-plan` y `/pos:deep-interview` del skills-map.
-- **Shape heredado de E1a**: SKILL.md oficial + frontmatter mínimo (`name`, `description`, `allowed-tools`). Extender con campos no canónicos requiere cita oficial. Helper de logging `_shared/log-invocation.sh` ya vive — E1b sólo añade dos líneas al `skills_allowed` de `policy.yaml`.
-- **Subagent / fork context**: E1a no abrió `.claude/agents/` todavía. E1b es la primera rama que podría necesitarlo (el primitive oficial de skills no incluye `agent:` — hay que elegir entre delegación manual via Agent tool o estructura tipo subagents). Fase -1 de E1b resuelve esa decisión.
+- Primer par de skills del bloque calidad tras cerrar orquestación Fase -1 (E1a + E1b = 4 skills). Cubre la salida de una rama: `/pos:pre-commit-review` (delegación a `code-reviewer` subagent para review con confidence-filter sobre el diff de la rama antes del PR) y `/pos:simplify` (reducción de código/docs previa al PR — ya existe como práctica manual aplicada al cerrar E1a/E1b; E2a la canonicaliza como skill con trigger claro).
+- **Shape heredado de E1a + E1b**: SKILL.md oficial + frontmatter mínimo (`name`, `description`, `allowed-tools`). Logging best-effort via `_shared/log-invocation.sh`. `skills_allowed` en `policy.yaml` extiende a 6 entries; contrato tri-estado de `skills_allowed_list()` intacto. Tests parametrizados por `E1_SKILLS_KNOWN` — E2a debe decidir si renombrar a `ALLOWED_SKILLS` (contract-bound al allowlist entero) o mantenerlo y añadir una constante nueva para las skills E2.
 
 Lectura mínima al arrancar:
 
-- [MASTER_PLAN.md § Rama E1b](MASTER_PLAN.md) — scope + decisiones previas + contexto a leer.
-- [.claude/skills/project-kickoff/SKILL.md](.claude/skills/project-kickoff/SKILL.md) + [.claude/skills/writing-handoff/SKILL.md](.claude/skills/writing-handoff/SKILL.md) — shape canónico establecido en E1a; E1b hereda exactamente el mismo primitive (sin `skill.json`, sin prefijo `pos:`, description `Use when ...`).
-- [.claude/skills/_shared/log-invocation.sh](.claude/skills/_shared/log-invocation.sh) — helper de logging ya vivo; las dos skills nuevas lo reusan (shape `{ts, skill, session_id, status}`, best-effort).
-- [.claude/rules/skills-map.md](.claude/rules/skills-map.md) — filas E1b todavía con prefijo `/pos:*` heredado; E1b las canonicaliza igual que E1a canonicalizó sus dos filas.
-- [policy.yaml](policy.yaml) § `skills_allowed` — E1a lo dejó con dos entries; E1b añade las dos nuevas.
-- [hooks/stop-policy-check.py](hooks/stop-policy-check.py) — el Stop hook ya enforza live desde E1a. E1b simplemente extiende la allowlist; el contrato no cambia.
+- [MASTER_PLAN.md § Rama E2a](MASTER_PLAN.md) — scope + decisiones previas + contexto a leer.
+- [.claude/skills/branch-plan/SKILL.md](.claude/skills/branch-plan/SKILL.md) — referencia de skill que delega via Agent tool inline (patrón reusable para `/pos:pre-commit-review` que debe llamar al subagent `code-reviewer`).
+- [.claude/skills/writing-handoff/SKILL.md](.claude/skills/writing-handoff/SKILL.md) — referencia de skill con scope estricto de escritura (patrón reusable para `/pos:simplify` si se decide hacerla mutadora; o main-read-only si se decide mostrar diff para approval).
+- [.claude/skills/_shared/log-invocation.sh](.claude/skills/_shared/log-invocation.sh) — helper de logging ya vivo desde E1a; E2a lo reusa sin cambios.
+- [.claude/rules/skills-map.md](.claude/rules/skills-map.md) — filas E2a todavía con prefijo `/pos:*` heredado; E2a las canonicaliza igual que E1a/E1b canonicalizaron las suyas.
+- [policy.yaml](policy.yaml) § `skills_allowed` — E1b lo dejó con 4 entries; E2a añade `pre-commit-review` + `simplify`.
 
-**Notas de arranque E1b**:
+**Notas de arranque E2a**:
 
-- Los hooks **no cambian** en E1b (igual que en E1a). Sólo evoluciona el contenido de `policy.yaml.skills_allowed`.
-- Decisión estructural abierta: `context: fork` para skills pesadas no está resuelta en el primitive oficial. E1b debe resolver si se delega via Agent tool desde el body de la SKILL.md, via un subagent en `.claude/agents/`, o si se descarta el fork en esta rama y se entrega sobre `context: main` con recorte explícito (diferir fork a una rama propia).
-- `writing-handoff` (entregada en E1a) ya valida el patrón de "skill con scope estricto de escritura"; `branch-plan` puede modelarse análogamente si se decide hacerla escritora (p. ej., crea el marker o escribe un `branch-plan-draft.md`).
+- Los hooks **no cambian** en E2a (igual que en E1a/E1b). Sólo evoluciona el contenido de `policy.yaml.skills_allowed` + `.claude/rules/skills-map.md` + `.claude/skills/<slug>/SKILL.md`.
+- Decisión estructural abierta: `/pos:simplify` — ¿skill **escritora** (aplica cambios en disco y reporta diff al cerrar) o **read-only** (emite propuesta textual para que el usuario aplique con Edit tool)? `writing-handoff` es precedente de scope estricto escritor; `branch-plan` / `deep-interview` son precedente de read-only. Fase -1 de E2a resuelve esa decisión.
+- Decisión estructural abierta: delegación Agent tool inline (patrón `branch-plan`) aplica a `/pos:pre-commit-review` que debe invocar `code-reviewer`. Confirmar que `subagent_type: "code-reviewer"` es el allowed subagent para ese flujo o elegir alternativa.
 
 ## 10. Estado D5 (cerrada en rama)
 
@@ -236,3 +235,35 @@ Lectura mínima al arrancar:
 **Resultado**: **610 passed + 1 skipped** en la suite conjunta `hooks/tests` + `.claude/skills/tests`. D6 regression intacta (575 baseline → 575 + 35 nuevos E1a). `stop-policy-check.py` entra en enforcement live con dos skills declaradas; fue `status: deferred` hasta este merge.
 
 **Detalle + deferrals + ajustes**: ver [ROADMAP.md § feat/e1a-skill-kickoff-handoff](ROADMAP.md), [MASTER_PLAN.md § Rama E1a](MASTER_PLAN.md), [.claude/rules/skills-map.md](.claude/rules/skills-map.md) y [docs/ARCHITECTURE.md § 5 Skills](docs/ARCHITECTURE.md).
+
+## 14. Estado E1b (cerrada en rama, docs-sync en curso)
+
+`feat/e1b-skill-branch-plan-interview` — **segunda rama de Fase E**. Completa el par de skills de orquestación Fase -1 que E1a dejó abierto: `branch-plan` (producer de los seis entregables) + `deep-interview` (clarificador socrático opt-in). Ambas heredan el contrato primitive-minimal canonizado en E1a sin reabrirlo.
+
+**Entregables**:
+
+- `.claude/skills/branch-plan/SKILL.md` — Fase -1 producer. Lee `MASTER_PLAN.md § Rama <slug>`, archivos de "Contexto a leer" por rangos, `HANDOFF.md §9`, git introspection cheap. Emite seis entregables en conversación (Resumen técnico / conceptual / Ambigüedades / Alternativas / Test plan / Docs plan). **Delega vía Agent tool inline** cuando el plan requiere leer ≥3 archivos no triviales: `subagent_type ∈ {Plan, code-architect, Explore}` según naturaleza; el subagent devuelve summary al tool result, la skill lo folds — no paste-through. **STOPS BEFORE marker** — no crea `.claude/branch-approvals/<slug>.approved`, no corre `git checkout -b`, no arranca Fase 1/2, no auto-invoca `deep-interview` (sólo sugiere opt-in en Ambigüedades). Logea via helper compartido.
+- `.claude/skills/deep-interview/SKILL.md` — socratic clarifier. **Opt-in estricto**: tres condiciones deben valerse (invocación explícita + ambigüedad conceptual real + usuario disponible para dialog); cualquier miss → una línea + log `status: declined` + salida silenciosa. Lectura minimal-only (`MASTER_PLAN § Rama`, `HANDOFF §9`, `git log -10`). Pregunta en clusters de 1–3 preguntas, máximo 3–5 clusters, corta antes si resuelve. Cierra con **Clarified / Still open / Recommend** + **ratification gate** antes de escribir a memoria `type: project` — silencio ≠ consent. **Main-strict, sin subagent**: el coste está en el dialog, no en reading. **No muta docs, ROADMAP, MASTER_PLAN, HANDOFF ni `.claude/rules/`**. Logea via helper compartido (`status ∈ {declined, partial, ok}`).
+- `policy.yaml` — `skills_allowed` extendido 2 → 4: `[project-kickoff, writing-handoff, branch-plan, deep-interview]`. Comentario inline actualizado ("E1a activated the scaffold, E1b extends to 4 skills"). `stop-policy-check.py` continúa en enforcement live, ahora con 4 skills aceptadas.
+- Tests (extensión, no reescritura):
+  - `.claude/skills/tests/test_skill_frontmatter.py` — constante `E1A_SKILLS` renombrada a `E1_SKILLS_KNOWN` (contract-bound al allowlist, no era-bound) + extendida a 4 entries. Todos los tests parametrizados (11 por skill × 4 skills = 44 automáticos) cubren el contrato sin cambio de código en los tests mismos. Añadidas dos clases `TestBranchPlanBehavior` (3 casos: fase_minus_one_deliverables + marker_disclaim + stop_signal) + `TestDeepInterviewBehavior` (3 casos: socratic + opt_in + no_silent_mutation).
+  - `hooks/tests/test_lib_policy.py::test_real_skills_allowed_populated_by_e1a` renombrado a `_by_e1b`; tupla esperada crece a 4 entries.
+  - `hooks/tests/test_skills_log_contract.py::TestEnforcementEndToEnd::test_all_four_e1_skills_end_to_end` — emite una línea JSONL por cada una de las 4 skills, invoca Stop hook, asserta allow. Guarda contra typo silencioso en policy / logger / Stop hook rompiendo el contrato 4-skills.
+
+**Contrato fijado por la suite** (extiende E1a sin reabrirlo):
+
+- Primitive frontmatter inmutable: `name` / `description` / `allowed-tools`; sin `skill.json`; sin prefijo `pos:`; sin campos inventados (`context`, `model`, `agent`, `effort`, `hooks`, `user-invocable`, `disable-model-invocation`). Description `"Use when ..."`. Logger best-effort step final.
+- `branch-plan` **nunca** crea marker / abre rama / auto-invoca `deep-interview`. Tests `TestBranchPlanBehavior::marker_disclaim` + `::stop_signal` lock down el disclaim en el body. Delegation vía Agent tool inline es **primitive-correct**: el primitive no soporta `context: fork` como campo frontmatter, pero el subagent corre en fork real — la skill sólo recibe summary.
+- `deep-interview` **es opt-in**. Tests `TestDeepInterviewBehavior::opt_in` lock downs the gating; `::no_silent_mutation` asegura ratification gate. Auto-trigger requiere rama E1c nueva con justificación — el framing actual es deliberado.
+- `skills_allowed` = 4 entries enforce vivo. La ausencia del 5º/6º/... slot cuando se invoque una skill no listada seguirá produciendo deny exit 2 (contrato D6 intacto).
+
+**Ajustes vs plan original (Fase -1 aprobada)**:
+
+- **Decisión A1.a `branch-plan` delegation** (vs A1.b main-strict): delegación inline vía Agent tool. Razón: Fase -1 arquitectónica puede requerir cross-file analysis no trivial; cargar todo en main contamina contexto. Delegación inline es el **fork-aproximado primitive-correct**. Ramas lightweight saltan la delegación y emiten los seis entregables directamente.
+- **Decisión A1.c `deep-interview` main-strict** (vs A1.a con subagent): conversational, sin subagent. Razón: el coste NO está en reading (body dice literal "do NOT read `docs/ARCHITECTURE.md` top-to-bottom"); está en el dialog del usuario. Un subagent intermediaría sin valor.
+- **Decisión A5.a — fix `skills.md` drift en E1b** (vs A5.b diferir a E1c): reconciliación en la misma rama que entrega las skills cuyo body es el testigo del contrato. Cambios al rule file: bloque `Frontmatter obligatorio` inflado eliminado + reemplazado por referencia al shape canónico en `skills-map.md` (fuente única); `Logging` reescrito con patrón `log-invocation.sh` + best-effort; corrección `/pos:kickoff` → `project-kickoff` y `/pos:handoff-write` → `writing-handoff` (eco de E1a que faltaba propagar); sección `Criterios context: fork` reescrita como nota histórica.
+- **Framing ajustes explícitos** (aprobados en Fase -1): `branch-plan` lleva disclaim literal "no crea marker / no abre rama / no ejecuta Fase -1 auto / solo produce paquete para aprobación" en `Scope (strict)` + `Explicitly out of scope`. `deep-interview` lleva disclaim literal "opt-in real / no insiste / resume y se detiene / no muta docs/memoria salvo ratificación del usuario" en `Framing` + `Failure modes` + `Explicitly out of scope`.
+
+**Resultado**: **639 passed + 1 skipped** en la suite conjunta `hooks/tests` + `.claude/skills/tests` (+29 vs baseline E1a de 610: 22 parametrizados por `E1_SKILLS_KNOWN` 2→4 + 3 branch-plan behavior + 3 deep-interview behavior + 1 log-contract integration). E1a regression intacta. `test_real_skills_allowed_populated_by_e1b` flippa el pinpoint anterior (tupla 2→4). `stop-policy-check.py` sigue en enforcement live sin cambio de código, sólo con allowlist ampliada.
+
+**Detalle + deferrals + ajustes**: ver [ROADMAP.md § feat/e1b-skill-branch-plan-interview](ROADMAP.md), [MASTER_PLAN.md § Rama E1b](MASTER_PLAN.md), [.claude/rules/skills-map.md](.claude/rules/skills-map.md) y [.claude/rules/skills.md](.claude/rules/skills.md) (reconciliado en esta rama).
