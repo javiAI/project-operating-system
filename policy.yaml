@@ -265,6 +265,25 @@ compound:
   conflict_policy: "block-merge"  # si el pattern nuevo entra en conflicto con uno existente
 
 # ─────────────────────────────────────────────
+# Skill allowlist (E1a — activates hooks/stop-policy-check.py scaffold)
+# ─────────────────────────────────────────────
+# Declaring this list flips the D6 Stop-hook scaffold from
+# `status: deferred` pass-through to live enforcement: any skill
+# invocation logged to `.claude/logs/skills.jsonl` for the current
+# session that is NOT in this list denies the Stop event.
+#
+# Absence of the key = deferred (the state before E1a). Empty list `[]`
+# = explicit deny-all. Misconfiguration (scalar, non-string items) is
+# flagged by the loader as `SKILLS_ALLOWED_INVALID` so a typo doesn't
+# silently disable enforcement. Contract is defined in the loader
+# accessor `_lib/policy.skills_allowed_list` and cross-validated by
+# `hooks/tests/test_stop_policy_check.py` (see `TestMisconfiguredPolicy`
+# + `TestDeferredMode`).
+skills_allowed:
+  - project-kickoff
+  - writing-handoff
+
+# ─────────────────────────────────────────────
 # Auditing
 # ─────────────────────────────────────────────
 audit:

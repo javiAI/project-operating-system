@@ -338,22 +338,54 @@ Input: JSON stdin con `tool_name`, `tool_input`, `session_id`, etc.
 Output: JSON stdout con `hookSpecificOutput`, `permissionDecision`, `additionalContext`, `decisionReason`.
 Exit: 0 = ok, 2 = blocking.
 
-## 5. Skills (plugin namespace `pos:`)
+## 5. Skills (Claude Code Skills primitive)
 
-Ver `.claude/rules/skills-map.md` para mapa completo con modelo + contexto.
+Ver `.claude/rules/skills-map.md` para mapa completo. Primer conjunto real entregado en E1a (`project-kickoff` + `writing-handoff`).
 
-### Principio `context: fork`
+### Primitive oficial (fijado en E1a)
 
-Skills con análisis pesado (`/pos:compound`, `/pos:audit-*`, `/pos:pre-commit-review`, `/pos:simplify`) corren en subagente aislado:
+Cada skill vive en `.claude/skills/<slug>/SKILL.md`. Frontmatter YAML **minimal**:
 
 ```yaml
-context: fork
-agent: code-reviewer   # agents/code-reviewer.md
-model: claude-sonnet-4-6
-effort: high
+---
+name: <slug-kebab-case>               # coincide con el nombre del directorio. SIN prefijo `pos:` ni namespace.
+description: Use when <disparadores>. # "Use when …" — selección eligible por el modelo, no trigger garantizado.
+allowed-tools:                        # opcional. YAML list (no string).
+  - Read
+  - Bash(git log:*)
+---
+
+# <slug>
+
+Cuerpo en markdown. Instrucciones declarativas al modelo + steps ejecutables.
 ```
 
-El agente recibe solo el payload necesario. Devuelve un report estructurado al context principal. Ahorro: 20-40k tokens por invocación.
+**No inventar campos**. Fase -1 v1 de E1a propuso `context:` / `model:` / `agent:` / `effort:` / `hooks:` / `user-invocable:` por analogía con slash commands y con rules antiguas; fueron rechazados por no tener documentación oficial citable en el SDK. Si una versión futura del SDK los añade, se citan con fuente antes de introducirlos (rama propia). Si un consumo pesado requiere subagent, se delega via Agent tool desde el body de la SKILL.md (decisión abierta en E1b) en vez de extender frontmatter.
+
+### Logging best-effort (helper compartido)
+
+Toda skill cierra con una invocación Bash al helper compartido:
+
+```bash
+.claude/skills/_shared/log-invocation.sh <name> <status>
+```
+
+Shape de `.claude/logs/skills.jsonl` fijado en E1a (`{ts, skill, session_id, status}` — 4 campos, sin `args`, sin `duration_ms`). Fallback `session_id: "unknown"` si `CLAUDE_SESSION_ID` ausente. `mkdir -p` del log dir — crea si falta.
+
+**Framing operacional, no criptográfico**: si el modelo omite el step (rare pero posible), el sistema pierde traza de esa invocación pero nunca rompe. `stop-policy-check.py` trata ausencia de entry como "no invocación" → allow (silencio ≠ violación). Extender el shape requiere rama propia + migración de `_extract_invoked_skills` + tests del contrato.
+
+### Allowlist enforcement (D6 scaffold + E1a flip-switch)
+
+`policy.yaml.skills_allowed` lista los skills que el repo acepta invocar. Contrato tri-estado de `skills_allowed_list(repo_root)` (D6 + post-review):
+
+| Estado del campo                                   | Accessor devuelve             | `stop-policy-check.py` hace                    |
+|----------------------------------------------------|-------------------------------|------------------------------------------------|
+| Ausente                                            | `None`                        | `status: deferred` pass-through                |
+| Presente pero mal formada (scalar / no-string…)    | `SKILLS_ALLOWED_INVALID`      | `status: policy_misconfigured` pass-through (observable) |
+| `[]` (lista declarada vacía)                       | `()`                          | Enforcement live — deny-all                    |
+| Lista poblada                                      | `tuple[str, ...]`             | Enforcement live — deny si invocación fuera    |
+
+E1a flippa de "Ausente" a "Lista poblada" sin tocar código del hook — puro cambio declarativo en `policy.yaml`.
 
 ### Sustituciones soportadas
 

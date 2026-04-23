@@ -821,12 +821,14 @@ class TestRealRepoPolicy:
         assert "phase_minus_one_state" in rules.persist
         assert "unsaved_pattern_candidates" in rules.persist
 
-    def test_real_skills_allowed_is_none_today(self):
-        """Meta-repo policy has NO skills_allowed today → accessor returns None.
-
-        Pinpoints the (c.3) scaffold contract: stop-policy-check.py degrades
-        to `status: deferred` in prod until E1a adds the field.
+    def test_real_skills_allowed_populated_by_e1a(self):
+        """E1a populates `skills_allowed` with the first two real skills →
+        accessor returns a typed tuple. This flips the D6 Stop-hook scaffold
+        from `status: deferred` pass-through to live enforcement.
         """
         from _lib import policy
         repo_root = Path(__file__).resolve().parents[2]
-        assert policy.skills_allowed_list(repo_root) is None
+        assert policy.skills_allowed_list(repo_root) == (
+            "project-kickoff",
+            "writing-handoff",
+        )

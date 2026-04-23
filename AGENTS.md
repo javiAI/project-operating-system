@@ -62,16 +62,17 @@ Antes de considerar una rama ✅:
 
 ## Skills requeridas por lifecycle (ver policy.yaml)
 
-No existen todavía (Fase E*). Hasta entonces, el LLM ejecuta los equivalentes manuales:
+Fase E en curso. Skills entregadas (E1a) y equivalentes manuales de las pendientes:
 
-| Skill futura | Equivalente manual |
-|---|---|
-| `/pos:kickoff` | Leer HANDOFF.md §1-§4. |
-| `/pos:branch-plan` | Producir el texto de Fase -1 §2.1 a mano. |
-| `/pos:pre-commit-review` | Invocar subagent `code-reviewer` con diff staged. |
-| `/pos:simplify` | Pasar el diff por subagent con prompt "reduce sin perder semántica". |
-| `/pos:compound` | Al mergear, evaluar manualmente si `touched_paths` del profile matchea. |
-| `/pos:audit-plugin` | Seguir checklist de [docs/SAFETY_POLICY.md](docs/SAFETY_POLICY.md) a mano. |
+| Skill | Estado | Equivalente manual |
+|---|---|---|
+| `project-kickoff` | ✅ E1a | Snapshot 30s al arrancar sesión; si falla, leer HANDOFF.md §1-§4 a mano. |
+| `writing-handoff` | ✅ E1a | Actualizar HANDOFF §1/§9/§6b/gotchas antes de `/compact` o `/clear`; si falla, escribir a mano con el mismo scope estricto. |
+| `/pos:branch-plan` | ⏳ E1b | Producir el texto de Fase -1 §2.1 a mano. |
+| `/pos:pre-commit-review` | ⏳ E2a | Invocar subagent `code-reviewer` con diff staged. |
+| `/pos:simplify` | ⏳ E2a | Pasar el diff por subagent con prompt "reduce sin perder semántica". |
+| `/pos:compound` | ⏳ E3a | Al mergear, evaluar manualmente si `touched_paths` del profile matchea. |
+| `/pos:audit-plugin` | ⏳ E2b | Seguir checklist de [docs/SAFETY_POLICY.md](docs/SAFETY_POLICY.md) a mano. |
 
 ## Cuando algo falla
 
