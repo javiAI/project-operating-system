@@ -33,7 +33,7 @@ allowed-tools:                        # opcional. Lista YAML (no string). Ej: Re
 | Skill | Lifecycle | Modelo | Context | Qué hace |
 |---|---|---|---|---|
 | `project-kickoff` | inicio de sesión (`/kickoff`, "continúa", "arranca la siguiente rama") | sonnet | main | Snapshot ≤12 líneas (branch, phase, last merge, next branch, warnings) + STOP antes de Fase -1 |
-| `branch-plan` | Fase -1 (rama nueva) | sonnet + Agent-tool inline delegation (Plan/code-architect/Explore) cuando lectura ≥3 files no triviales | main (con delegation inline) | Produce los 6 entregables (técnico / conceptual / ambigüedades / alternativas / test plan / docs plan). **NO** crea marker, **NO** abre rama, **NO** auto-invoca `deep-interview` (sólo sugiere opt-in). |
+| `branch-plan` | Fase -1 (rama nueva) | sonnet + Agent-tool inline delegation (pick subagent by capability; Claude Code defaults today: `Plan` / `code-architect` / `Explore`) cuando lectura ≥3 files no triviales | main (con delegation inline) | Produce los 6 entregables (técnico / conceptual / ambigüedades / alternativas / test plan / docs plan). **NO** crea marker, **NO** abre rama, **NO** auto-invoca `deep-interview` (sólo sugiere opt-in). |
 | `deep-interview` | Fase -1 opt-in (alto riesgo conceptual) | sonnet | main (conversacional, sin subagent) | Socratic questioning para clarificar scope. Opt-in estricto (tres condiciones). Clusters 1–3 preguntas × máximo 3–5 clusters. Cierra con Clarified/Still open/Recommend + ratification gate antes de escribir memoria. **NO** muta docs / ROADMAP / MASTER_PLAN / HANDOFF / rules. |
 | `writing-handoff` | pre-`/clear` o `/compact` / cierre de rama | sonnet | main | Edita HANDOFF §1/§9/§6b/gotchas + persiste decisiones durables a memoria; NO toca MASTER_PLAN/ROADMAP/docs |
 

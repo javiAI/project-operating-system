@@ -33,11 +33,15 @@ You MUST NOT:
 
 ## Delegation (when reading is heavy)
 
-If producing the plan requires reading ≥3 non-trivial files (e.g., the full `docs/ARCHITECTURE.md` section, multiple prior branches' gotchas, a large rule file, or a significant subtree of `generator/` or `hooks/`), delegate that reading to a subagent instead of loading it into the main context. Use the `Agent` tool with:
+If producing the plan requires reading ≥3 non-trivial files (e.g., the full `docs/ARCHITECTURE.md` section, multiple prior branches' gotchas, a large rule file, or a significant subtree of `generator/` or `hooks/`), delegate that reading to a subagent via the `Agent` tool instead of loading it into the main context.
 
-- `subagent_type: "Plan"` when you need an independent plan proposal to cross-check against.
-- `subagent_type: "code-architect"` when the branch is architectural and you need a second opinion on design patterns.
-- `subagent_type: "Explore"` when the task is pure context gathering across many files.
+Pick the `subagent_type` by the capability you need. The concrete names below reflect the Claude Code defaults shipped today — inspect the `Agent` tool's `subagent_type` enum at call time and match by capability if the environment exposes different names:
+
+- **Independent planning** — an agent that produces its own plan proposal so you can cross-check against yours. Claude Code today: `Plan`.
+- **Architectural second opinion** — an agent that critiques design patterns and proposes alternatives. Claude Code today: `code-architect`.
+- **Pure context gathering** — an agent that explores many files and returns a digest. Claude Code today: `Explore`.
+
+If none of the available subagent types fit cleanly, fall back to a general-purpose agent (Claude Code default: `general-purpose`) with an explicit task prompt.
 
 The subagent's summary comes back as a tool result. Fold its conclusions into the deliverables — don't paste its raw output verbatim.
 

@@ -1,6 +1,6 @@
 ---
 name: deep-interview
-description: Use when the user explicitly asks for "deep interview", "entrevista socrática", "interrógame", or says the next branch is high-risk and wants scope clarified before `branch-plan` produces deliverables. Socratic questioning surfaces tacit assumptions. Opt-in — never auto-activate. If the user declines or disengages, stop silently. Does NOT mutate docs, MASTER_PLAN, ROADMAP, or project memory unless the user explicitly ratifies a specific decision as durable.
+description: Use when the user explicitly asks for "deep interview", "entrevista socrática", "interrógame", or says the next branch is high-risk and wants scope clarified before `branch-plan` produces deliverables. Socratic questioning surfaces tacit assumptions. Opt-in — never auto-activate. If the user declines or disengages, acknowledge in one line and stop (no follow-ups). Does NOT mutate docs, MASTER_PLAN, ROADMAP, or project memory unless the user explicitly ratifies a specific decision as durable.
 allowed-tools:
   - Read
   - Grep
@@ -12,7 +12,7 @@ allowed-tools:
 
 Surface tacit assumptions about the next branch by asking the user focused questions, one small cluster at a time. The goal is user-owned clarity, not skill-owned output.
 
-Framing: this is opt-in. Activate only when the user explicitly asks for an interview or names the branch as high-risk conceptually. Never auto-trigger on Fase -1. If the user declines the interview or disengages mid-way, stop silently — do not insist, do not continue the questioning, do not "just ask one more".
+Framing: this is opt-in. Activate only when the user explicitly asks for an interview or names the branch as high-risk conceptually. Never auto-trigger on Fase -1. If the user declines the interview or disengages mid-way, acknowledge in one line and stop — do not insist, do not continue the questioning, do not "just ask one more".
 
 ## When to activate
 

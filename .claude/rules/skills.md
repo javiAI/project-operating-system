@@ -38,12 +38,15 @@ Ver [skills-map.md § Shape canónico](skills-map.md) para el shape autoritativo
 
 ## Fork / delegación (sin campo `context:`)
 
-El primitive no soporta `context: fork` declarativamente. Si una skill requiere cross-file analysis pesado (≥3 archivos no triviales), **delegar inline vía Agent tool** desde el body de la SKILL.md es el patrón correcto:
+El primitive no soporta `context: fork` declarativamente. Si una skill requiere cross-file analysis pesado (≥3 archivos no triviales), **delegar inline vía Agent tool** desde el body de la SKILL.md es el patrón correcto.
 
-- `subagent_type: "Plan"` — plan proposal independiente para cross-check.
-- `subagent_type: "code-architect"` — segunda opinión de diseño.
-- `subagent_type: "Explore"` — context gathering cross-files puro.
-- `subagent_type: "code-reviewer"` — review de diff de rama (patrón canónico para `/pos:pre-commit-review` entregable en E2a).
+La skill debe escoger el `subagent_type` **por capacidad**, no por nombre hardcoded — los nombres concretos son defaults de Claude Code y pueden variar entre releases/entornos. Regla operativa: inspeccionar el enum `subagent_type` de la tool `Agent` en runtime y matchear por capacidad. Los nombres abajo reflejan los defaults de Claude Code hoy:
+
+- **Planning independiente** (cross-check contra el plan de la skill) — Claude Code hoy: `Plan`.
+- **Segunda opinión arquitectónica** (crítica de diseño) — Claude Code hoy: `code-architect`.
+- **Context gathering cross-files** (explora y devuelve digest) — Claude Code hoy: `Explore`.
+- **Review de diff de rama** (confidence-filtered review) — Claude Code hoy: `code-reviewer` (patrón canónico previsto para `/pos:pre-commit-review` en E2a).
+- **Fallback general** si ninguna capacidad específica encaja — Claude Code hoy: `general-purpose` con task prompt explícito.
 
 El subagent corre en fork real; la skill recibe el summary al tool result y lo folds en su output — no paste-through.
 
