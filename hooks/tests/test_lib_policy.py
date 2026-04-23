@@ -428,6 +428,186 @@ class TestDeriveTestPair:
         assert policy.derive_test_pair("other/foo.py", "hooks_top_level_py") is None
 
 
+# -------------------- pre_compact_rules (D6) -----------------------------
+
+
+class TestPreCompactRules:
+    def test_full_policy(self, repo_with_policy):
+        from _lib import policy
+        root = repo_with_policy("full.yaml")
+        rules = policy.pre_compact_rules(root)
+        assert rules is not None
+        assert rules.persist == (
+            "decisions_in_flight",
+            "phase_minus_one_state",
+            "unsaved_pattern_candidates",
+        )
+
+    def test_missing_section_returns_none(self, repo_with_policy):
+        from _lib import policy
+        root = repo_with_policy("minimal.yaml")
+        assert policy.pre_compact_rules(root) is None
+
+    def test_missing_file_returns_none(self, tmp_path):
+        from _lib import policy
+        assert policy.pre_compact_rules(tmp_path) is None
+
+    def test_malformed_yaml_returns_none(self, repo_with_policy):
+        from _lib import policy
+        root = repo_with_policy("malformed.yaml")
+        assert policy.pre_compact_rules(root) is None
+
+    def test_persist_missing_returns_none(self, tmp_path):
+        from _lib import policy
+        (tmp_path / "policy.yaml").write_text(
+            "lifecycle:\n  pre_compact: {}\n", encoding="utf-8"
+        )
+        assert policy.pre_compact_rules(tmp_path) is None
+
+    def test_persist_non_list_returns_none(self, tmp_path):
+        from _lib import policy
+        (tmp_path / "policy.yaml").write_text(
+            "lifecycle:\n  pre_compact:\n    persist: \"bad\"\n",
+            encoding="utf-8",
+        )
+        assert policy.pre_compact_rules(tmp_path) is None
+
+    def test_persist_mixed_types_returns_none(self, tmp_path):
+        from _lib import policy
+        (tmp_path / "policy.yaml").write_text(
+            "lifecycle:\n  pre_compact:\n    persist: [a, 42]\n",
+            encoding="utf-8",
+        )
+        assert policy.pre_compact_rules(tmp_path) is None
+
+    def test_persist_empty_list_returns_empty_tuple(self, tmp_path):
+        from _lib import policy
+        (tmp_path / "policy.yaml").write_text(
+            "lifecycle:\n  pre_compact:\n    persist: []\n",
+            encoding="utf-8",
+        )
+        rules = policy.pre_compact_rules(tmp_path)
+        assert rules is not None
+        assert rules.persist == ()
+
+    def test_pre_compact_non_mapping_returns_none(self, tmp_path):
+        from _lib import policy
+        (tmp_path / "policy.yaml").write_text(
+            "lifecycle:\n  pre_compact: 42\n", encoding="utf-8"
+        )
+        assert policy.pre_compact_rules(tmp_path) is None
+
+
+# -------------------- skills_allowed_list (D6) ---------------------------
+
+
+class TestSkillsAllowedList:
+    def test_full_policy(self, repo_with_policy):
+        from _lib import policy
+        root = repo_with_policy("full.yaml")
+        allowed = policy.skills_allowed_list(root)
+        assert allowed == ("pos:kickoff", "pos:branch-plan", "pos:handoff-write")
+
+    def test_missing_section_returns_none(self, repo_with_policy):
+        from _lib import policy
+        root = repo_with_policy("minimal.yaml")
+        assert policy.skills_allowed_list(root) is None
+
+    def test_missing_file_returns_none(self, tmp_path):
+        from _lib import policy
+        assert policy.skills_allowed_list(tmp_path) is None
+
+    def test_malformed_yaml_returns_none(self, repo_with_policy):
+        from _lib import policy
+        root = repo_with_policy("malformed.yaml")
+        assert policy.skills_allowed_list(root) is None
+
+    def test_empty_list_returns_empty_tuple(self, tmp_path):
+        from _lib import policy
+        (tmp_path / "policy.yaml").write_text(
+            "skills_allowed: []\n", encoding="utf-8"
+        )
+        allowed = policy.skills_allowed_list(tmp_path)
+        assert allowed == ()
+
+    def test_wrong_shape_returns_invalid_sentinel(self, tmp_path):
+        """Scalar instead of list → SKILLS_ALLOWED_INVALID (NOT None)."""
+        from _lib import policy
+        (tmp_path / "policy.yaml").write_text(
+            "skills_allowed: \"not-a-list\"\n", encoding="utf-8"
+        )
+        assert policy.skills_allowed_list(tmp_path) is policy.SKILLS_ALLOWED_INVALID
+
+    def test_mixed_types_returns_invalid_sentinel(self, tmp_path):
+        """List with non-string element → SKILLS_ALLOWED_INVALID."""
+        from _lib import policy
+        (tmp_path / "policy.yaml").write_text(
+            "skills_allowed: [\"pos:kickoff\", 42]\n", encoding="utf-8"
+        )
+        assert policy.skills_allowed_list(tmp_path) is policy.SKILLS_ALLOWED_INVALID
+
+    def test_dict_shape_returns_invalid_sentinel(self, tmp_path):
+        from _lib import policy
+        (tmp_path / "policy.yaml").write_text(
+            "skills_allowed:\n  a: 1\n", encoding="utf-8"
+        )
+        assert policy.skills_allowed_list(tmp_path) is policy.SKILLS_ALLOWED_INVALID
+
+    def test_invalid_sentinel_distinct_from_none(self, tmp_path):
+        """Absent and invalid must NOT collapse to the same value.
+
+        Consumers rely on this distinction: absent → deferred (valid state),
+        invalid → misconfigured (observable policy error).
+        """
+        from _lib import policy
+        (tmp_path / "policy.yaml").write_text(
+            "version: \"0.1.0\"\n", encoding="utf-8"
+        )
+        absent = policy.skills_allowed_list(tmp_path)
+        assert absent is None
+        policy.reset_cache()
+        (tmp_path / "policy.yaml").write_text(
+            "skills_allowed: \"bad\"\n", encoding="utf-8"
+        )
+        invalid = policy.skills_allowed_list(tmp_path)
+        assert invalid is policy.SKILLS_ALLOWED_INVALID
+        assert invalid is not None  # belt-and-suspenders
+
+    def test_explicit_empty_distinct_from_missing(self, tmp_path):
+        """`skills_allowed: []` → `()` (deny-all); absent → None (deferred)."""
+        from _lib import policy
+        (tmp_path / "policy.yaml").write_text(
+            "skills_allowed: []\n", encoding="utf-8"
+        )
+        assert policy.skills_allowed_list(tmp_path) == ()
+        policy.reset_cache()
+        (tmp_path / "policy.yaml").write_text("version: \"1.0.0\"\n", encoding="utf-8")
+        assert policy.skills_allowed_list(tmp_path) is None
+
+    def test_three_states_are_all_distinct(self, tmp_path):
+        """None (absent) vs SKILLS_ALLOWED_INVALID vs tuple — three states.
+
+        Before this fix, `None` collapsed absent + invalid, which let a typo
+        silently turn enforcement off. The accessor must keep them distinct.
+        """
+        from _lib import policy
+        # absent → None
+        (tmp_path / "policy.yaml").write_text("version: \"0.1.0\"\n", encoding="utf-8")
+        assert policy.skills_allowed_list(tmp_path) is None
+        # invalid → sentinel
+        policy.reset_cache()
+        (tmp_path / "policy.yaml").write_text(
+            "skills_allowed: 42\n", encoding="utf-8"
+        )
+        assert policy.skills_allowed_list(tmp_path) is policy.SKILLS_ALLOWED_INVALID
+        # valid → tuple
+        policy.reset_cache()
+        (tmp_path / "policy.yaml").write_text(
+            "skills_allowed: [\"pos:kickoff\"]\n", encoding="utf-8"
+        )
+        assert policy.skills_allowed_list(tmp_path) == ("pos:kickoff",)
+
+
 # -------------------- failure mode (c.2) ---------------------------------
 
 
@@ -441,6 +621,8 @@ class TestFailureMode:
         assert policy.docs_sync_rules(root) is None
         assert policy.post_merge_trigger(root) is None
         assert policy.pre_write_rules(root) is None
+        assert policy.pre_compact_rules(root) is None
+        assert policy.skills_allowed_list(root) is None
 
     def test_missing_file_all_queries_return_none(self, tmp_path):
         from _lib import policy
@@ -448,6 +630,8 @@ class TestFailureMode:
         assert policy.docs_sync_rules(tmp_path) is None
         assert policy.post_merge_trigger(tmp_path) is None
         assert policy.pre_write_rules(tmp_path) is None
+        assert policy.pre_compact_rules(tmp_path) is None
+        assert policy.skills_allowed_list(tmp_path) is None
 
     def test_empty_file_all_queries_return_none(self, tmp_path):
         from _lib import policy
@@ -510,6 +694,18 @@ class TestWrongShapeGuards:
             "lifecycle:\n  pre_write: [wrong]\n", encoding="utf-8"
         )
         assert policy.pre_write_rules(tmp_path) is None
+
+    def test_lifecycle_string_pre_compact(self, tmp_path):
+        from _lib import policy
+        (tmp_path / "policy.yaml").write_text("lifecycle: not_a_mapping\n", encoding="utf-8")
+        assert policy.pre_compact_rules(tmp_path) is None
+
+    def test_pre_compact_non_mapping(self, tmp_path):
+        from _lib import policy
+        (tmp_path / "policy.yaml").write_text(
+            "lifecycle:\n  pre_compact: [wrong]\n", encoding="utf-8"
+        )
+        assert policy.pre_compact_rules(tmp_path) is None
 
 
 class TestOptionalListShape:
@@ -614,3 +810,23 @@ class TestRealRepoPolicy:
         labels = [p.label for p in rules.enforced_patterns]
         assert "hooks_top_level_py" in labels
         assert "generator_ts" in labels
+
+    def test_real_pre_compact_rules(self):
+        """Meta-repo policy declares pre_compact.persist → loader returns rules."""
+        from _lib import policy
+        repo_root = Path(__file__).resolve().parents[2]
+        rules = policy.pre_compact_rules(repo_root)
+        assert rules is not None
+        assert "decisions_in_flight" in rules.persist
+        assert "phase_minus_one_state" in rules.persist
+        assert "unsaved_pattern_candidates" in rules.persist
+
+    def test_real_skills_allowed_is_none_today(self):
+        """Meta-repo policy has NO skills_allowed today → accessor returns None.
+
+        Pinpoints the (c.3) scaffold contract: stop-policy-check.py degrades
+        to `status: deferred` in prod until E1a adds the field.
+        """
+        from _lib import policy
+        repo_root = Path(__file__).resolve().parents[2]
+        assert policy.skills_allowed_list(repo_root) is None
