@@ -464,9 +464,33 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 
 **Criterio de salida**: 610 passed + 1 skipped en la suite conjunta `hooks/tests` + `.claude/skills/tests` (575 D6 baseline + 35 netos E1a — 24 frontmatter + 11 log-contract). D6 regression intacta. `test_real_skills_allowed_populated_by_e1a` flippa el pinpoint anterior. Docs-sync dentro del PR (ROADMAP + HANDOFF + MASTER_PLAN + `.claude/rules/skills-map.md` renombrando filas + `docs/ARCHITECTURE.md § 5 Skills` alineado con el primitive oficial). `pre-pr-gate.py` aprueba este PR (dogfooding D4 sobre E1a).
 
-### Rama E1b — `feat/e1b-skill-branch-plan-interview`
+### Rama E1b — `feat/e1b-skill-branch-plan-interview` — ✅
 
-**Scope**: `skills/branch-plan/`, `skills/deep-interview/`. Ambas `context: fork`, opus.
+**Scope**: `.claude/skills/branch-plan/SKILL.md`, `.claude/skills/deep-interview/SKILL.md`. Completa el par de skills de orquestación Fase -1 que E1a dejó abierto. Hereda contrato primitive-minimal canonizado en E1a (NO `skill.json`, NO prefijo `pos:`, NO campos inventados). Extiende `policy.yaml.skills_allowed` 2 → 4.
+
+**Decisiones Fase -1 (v1 aprobada directa; E1a ya corrigió el primitive — no hay v2)**:
+
+- **Decisión A1.a `branch-plan` delegation** (descartado A1.b main-strict). Razón: Fase -1 arquitectónica puede requerir cross-file analysis no trivial (múltiples prior gotchas + `docs/ARCHITECTURE.md § Capa X` + subtree de `generator/` o `hooks/`); cargar todo en main contamina contexto mientras la skill está activa. Delegación **inline vía Agent tool** con `subagent_type ∈ {Plan, code-architect, Explore}` es el **fork-aproximado primitive-correct**: el subagent corre en fork real; la skill sólo recibe summary. Para ramas lightweight (scope obvio + ≤2 files), la skill salta delegation y emite los seis entregables directamente en main.
+- **Decisión A1.c `deep-interview` main-strict** (descartado A1.a con subagent). Razón: el coste de una entrevista NO está en reading (body dice literal "do NOT read `docs/ARCHITECTURE.md` top-to-bottom"); está en el dialog del usuario. Un subagent intermediaría sin valor y rompería la interactividad socrática. Lectura deliberadamente minimal: `MASTER_PLAN § Rama` + `HANDOFF §9` + `git log -10`.
+- **Decisión A5.a — fix `skills.md` drift en E1b** (descartado A5.b diferirlo a E1c). Razón: `.claude/rules/skills.md` antes de E1b declaraba frontmatter extendido (`user-invocable`, `disable-model-invocation`, `model`, `effort`, `context`, `agent`, `hooks`, `paths`) + prefijo `pos:` + "La skill no debe loguear por sí misma" — todo contradice el contrato E1a. Reconciliamos en la misma rama que entrega las skills cuyo body es el testigo del contrato real.
+- **Framing ajustes explícitos**:
+  - `branch-plan` — disclaim literal "no crea marker / no abre rama / no ejecuta Fase -1 auto / solo produce paquete para aprobación" en `Scope (strict)` + `Explicitly out of scope`.
+  - `deep-interview` — disclaim literal "opt-in real / no insiste / resume y se detiene / no muta docs/memoria salvo ratificación del usuario" en `Framing` + `Failure modes` + `Explicitly out of scope`. Step "user gives one-word / empty answers for two consecutive clusters → assume disengagement" cierra el caso "usuario no quiere seguir pero no lo dice explícito".
+- **No se tocan E1a artifacts** — `project-kickoff` y `writing-handoff` quedan intactos. E1b sólo extiende la allowlist + añade dos skills nuevas + fixes de rule file. Regresión E1a cubierta por tests parametrizados.
+- **`E1A_SKILLS` → `E1_SKILLS_KNOWN`**: constante renombrada contract-bound al allowlist (no era-bound). Extender la allowlist en E2a/E2b actualizará esta constante, no creará una nueva.
+- **Logging via `log-invocation.sh`** sin cambios — helper heredado de E1a. `branch-plan` logea step 7, `deep-interview` logea step 7 con `status ∈ {declined, partial, ok}` según camino recorrido.
+
+**Contexto a leer**:
+
+- `.claude/skills/project-kickoff/SKILL.md` + `.claude/skills/writing-handoff/SKILL.md` — shape canónico E1a; E1b hereda el mismo primitive exacto.
+- `.claude/skills/_shared/log-invocation.sh` — helper de logging heredado; las dos skills nuevas lo reusan sin cambios.
+- `.claude/rules/skills-map.md` § Shape canónico + filas `branch-plan` / `deep-interview` — contenido autoritativo del contrato; E1b canonicaliza las filas (sin prefijo `/pos:*`).
+- `.claude/rules/skills.md` — rule file drifted pre-E1b; E1b lo reconcilia (decisión A5.a).
+- `hooks/_lib/policy.py::skills_allowed_list` — contrato tri-estado intacto, sólo crece la tupla esperada.
+- `hooks/tests/test_skills_log_contract.py` — suite que valida end-to-end el contrato logger ↔ Stop hook; E1b añade el caso `test_all_four_e1_skills_end_to_end`.
+- `.claude/skills/tests/test_skill_frontmatter.py` — suite que valida el shape primitive; E1b extiende la parametrización.
+
+**Criterio de salida**: 639 passed + 1 skipped en la suite conjunta `hooks/tests` + `.claude/skills/tests` (+29 vs baseline E1a de 610: 22 parametrizados via `E1_SKILLS_KNOWN` 2→4 + 3 branch-plan behavior + 3 deep-interview behavior + 1 log-contract integration). E1a regression intacta. `test_real_skills_allowed_populated_by_e1b` flippa el pinpoint de la tupla 2→4. `stop-policy-check.py` sigue en enforcement live sin cambio de código. Docs-sync dentro del PR (ROADMAP + HANDOFF §1/§9/§14 + MASTER_PLAN § Rama E1b + `.claude/rules/skills-map.md` canonicalizando `/pos:branch-plan` → `branch-plan` y `/pos:deep-interview` → `deep-interview` + `.claude/rules/skills.md` reconciliado con el contrato E1a). `pre-pr-gate.py` aprueba este PR (dogfooding D4 sobre E1b).
 
 ---
 

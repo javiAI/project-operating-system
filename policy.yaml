@@ -265,7 +265,7 @@ compound:
   conflict_policy: "block-merge"  # si el pattern nuevo entra en conflicto con uno existente
 
 # ─────────────────────────────────────────────
-# Skill allowlist (E1a — activates hooks/stop-policy-check.py scaffold)
+# Skill allowlist (E1a activated the scaffold, E1b extends to 4 skills)
 # ─────────────────────────────────────────────
 # Declaring this list flips the D6 Stop-hook scaffold from
 # `status: deferred` pass-through to live enforcement: any skill
@@ -282,6 +282,8 @@ compound:
 skills_allowed:
   - project-kickoff
   - writing-handoff
+  - branch-plan
+  - deep-interview
 
 # ─────────────────────────────────────────────
 # Auditing

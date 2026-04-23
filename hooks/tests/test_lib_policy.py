@@ -821,14 +821,17 @@ class TestRealRepoPolicy:
         assert "phase_minus_one_state" in rules.persist
         assert "unsaved_pattern_candidates" in rules.persist
 
-    def test_real_skills_allowed_populated_by_e1a(self):
-        """E1a populates `skills_allowed` with the first two real skills →
-        accessor returns a typed tuple. This flips the D6 Stop-hook scaffold
-        from `status: deferred` pass-through to live enforcement.
+    def test_real_skills_allowed_populated_by_e1b(self):
+        """E1a populated `skills_allowed` with the first two real skills;
+        E1b extends it with the Fase -1 pair (branch-plan + deep-interview).
+        Accessor returns the full 4-tuple — locks down the contract between
+        `policy.yaml.skills_allowed` and the loader against silent drift.
         """
         from _lib import policy
         repo_root = Path(__file__).resolve().parents[2]
         assert policy.skills_allowed_list(repo_root) == (
             "project-kickoff",
             "writing-handoff",
+            "branch-plan",
+            "deep-interview",
         )
