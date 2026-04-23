@@ -8,14 +8,34 @@ paths: []
 
 Mapa de referencia. Se actualiza a medida que cada Fase E* entrega skills.
 
+## Shape canónico (fijado en E1a)
+
+Cada skill vive en `.claude/skills/<slug>/SKILL.md` con frontmatter YAML minimal del primitive oficial de Claude Code Skills:
+
+```yaml
+---
+name: <slug-kebab-case>               # debe coincidir con el nombre del directorio. SIN prefijo `pos:`.
+description: Use when <disparadores>. # "Use when …" — selección eligible por el modelo, NO trigger garantizado.
+allowed-tools:                        # opcional. Lista YAML (no string). Ej: Read, Bash(git log:*), Bash(.claude/skills/_shared/log-invocation.sh:*)
+  - Read
+  - Bash(git log:*)
+---
+```
+
+**No inventar campos** más allá de `name` / `description` / `allowed-tools`. Campos como `context:` / `model:` / `agent:` / `effort:` / `hooks:` / `user-invocable:` propuestos en Fase -1 v1 de E1a fueron rechazados por no tener documentación oficial citable en el SDK actual. Si una versión futura del SDK los añade, citar la fuente antes de introducirlos (rama propia).
+
+**Logging best-effort**: toda skill termina con una llamada Bash a `.claude/skills/_shared/log-invocation.sh <name> <status>` — emite una línea JSONL a `.claude/logs/skills.jsonl` con shape estable `{ts, skill, session_id, status}`. Si el modelo omite el step, el sistema pierde traza pero no rompe (silencio ≠ violación para `stop-policy-check.py`).
+
+**Allowlist enforcement**: `policy.yaml.skills_allowed` debe listar cada skill que el repo acepta invocar. Ausencia = el hook Stop pasa en modo `deferred`. Lista poblada = enforcement live (invocar una skill no-allowlisted deniega el Stop).
+
 ## Core (entregado en E1)
 
 | Skill | Lifecycle | Modelo | Context | Qué hace |
 |---|---|---|---|---|
-| `/pos:kickoff` | inicio de sesión | sonnet | main | Snapshot 30s + detecta siguiente rama |
+| `project-kickoff` | inicio de sesión (`/kickoff`, "continúa", "arranca la siguiente rama") | sonnet | main | Snapshot ≤12 líneas (branch, phase, last merge, next branch, warnings) + STOP antes de Fase -1 |
 | `/pos:branch-plan` | Fase -1 | opus | fork | Resumen técnico/conceptual + ambigüedades + alternativas |
 | `/pos:deep-interview` | Fase -1 (alto riesgo) | opus | fork | Socratic questioning para clarificar scope |
-| `/pos:handoff-write` | pre-/clear o /compact | sonnet | main | Persiste estado actual en HANDOFF.md + memoria |
+| `writing-handoff` | pre-`/clear` o `/compact` / cierre de rama | sonnet | main | Edita HANDOFF §1/§9/§6b/gotchas + persiste decisiones durables a memoria; NO toca MASTER_PLAN/ROADMAP/docs |
 
 ## Calidad (entregado en E2)
 

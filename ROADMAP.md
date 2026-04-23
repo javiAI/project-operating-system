@@ -10,7 +10,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | B | Cuestionario + profiles + runner | ✅ |
 | C | Templates + renderers | ✅ (C1 ✅, C2 ✅, C3 ✅, C4 ✅, C5 ✅) |
 | D | Hooks (Python) | ✅ (D1..D6 + D5b) |
-| E1 | Skills orquestación | ⏳ pendiente |
+| E1 | Skills orquestación | 🔄 en vuelo (E1a ✅) |
 | E2 | Skills calidad | ⏳ pendiente |
 | E3 | Skills patterns + tests | ⏳ pendiente |
 | F | Audit + selftest + marketplace | ⏳ pendiente |
@@ -36,7 +36,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | `feat/d5-hook-post-action-compound` | Trigger `/pos:compound` por touched_paths | ✅ | — (PR pendiente) |
 | `refactor/d5-policy-loader` | Loader declarativo `hooks/_lib/policy.py` + migración D3/D4/D5 | ✅ | — (PR pendiente) |
 | `feat/d6-hook-pre-compact-stop` | Sexto+séptimo hook (PreCompact informative + Stop blocker-scaffold) + loader accessors `pre_compact_rules`/`skills_allowed_list` | ✅ | — (PR pendiente) |
-| `feat/e1a-skill-kickoff-handoff` | `/pos:kickoff`, `/pos:handoff-write` | ⏳ | — |
+| `feat/e1a-skill-kickoff-handoff` | Skills `project-kickoff` + `writing-handoff` (primitive oficial Claude Code) + logger `_shared/log-invocation.sh` + `skills_allowed` activa scaffold D6 | ✅ | — (PR pendiente) |
 | `feat/e1b-skill-branch-plan-interview` | `/pos:branch-plan`, `/pos:deep-interview` | ⏳ | — |
 | `feat/e2a-skill-review-simplify` | `/pos:pre-commit-review`, `/pos:simplify` | ⏳ | — |
 | `feat/e2b-skill-compress-audit-plugin` | `/pos:compress`, `/pos:audit-plugin` | ⏳ | — |
@@ -453,6 +453,44 @@ Contrato fijado por la suite — Stop blocker-scaffold:
 **Criterio de salida**: 555 tests verdes + 1 skip intencional en `hooks/**` (sin regresión vs D5b: 462 + 60 nuevos D6 + 17 nuevos test_lib_policy + 16 re-correcciones menores en fixtures). Los dos hooks consumen el loader vía accessors nuevos, sin residuos hardcoded. Docs-sync en el propio PR (ROADMAP + HANDOFF + MASTER_PLAN + ARCHITECTURE + `.claude/rules/hooks.md`). El hook `pre-pr-gate` aprueba este mismo PR (dogfooding D4 sobre D6).
 
 **Ajustes vs plan original**: ver [MASTER_PLAN.md § Rama D6](MASTER_PLAN.md).
+
+## Progreso Fase E
+
+### `feat/e1a-skill-kickoff-handoff` — ✅ (PR pendiente)
+
+Primera rama de Fase E — **primera entrega de Claude Code Skills reales** del meta-repo. Cierra el scaffold D6: `skills_allowed` se puebla por primera vez en `policy.yaml`, lo que flip-flop el hook `stop-policy-check.py` de `status: deferred` pass-through a enforcement vivo sin tocar código.
+
+Entregables:
+
+- `.claude/skills/project-kickoff/SKILL.md` — skill 30s-snapshot. Lee `git log/status/rev-parse`, `ROADMAP.md` § ⏳ row, `HANDOFF.md` §1 + §9. Emite snapshot ≤12 líneas (branch, phase, last merge, next branch, warnings). **STOPS BEFORE Fase -1** — no crea markers, no ejecuta `branch-plan`. Logea via helper compartido (step 4, best-effort).
+- `.claude/skills/writing-handoff/SKILL.md` — skill de cierre de rama. Edita **exclusivamente** `HANDOFF.md` §1, §9, §6b y gotchas §7; jamás toca `MASTER_PLAN.md` / `ROADMAP.md` / `docs/**` (gobernados por docs-sync del PR, no por la skill). Persiste decisiones durables a memoria proyectil (`project` type). Logea vía helper compartido (step 5).
+- `.claude/skills/_shared/log-invocation.sh` — helper POSIX bash que emite **una línea JSONL** por invocación a `.claude/logs/skills.jsonl` con shape mínimo y estable `{ts, skill, session_id, status}`. Sin `args`, sin `duration_ms`. Fallback `session_id: "unknown"` si `CLAUDE_SESSION_ID` ausente; `mkdir -p` del directorio — crea si falta. **Best-effort operacional**: si el modelo omite el último paso de la skill, el sistema pierde traza de esa invocación pero nunca rompe. `stop-policy-check.py` trata ausencia de entrada como "no invocación" → allow (silencio ≠ violación).
+- `policy.yaml` — añade `skills_allowed: [project-kickoff, writing-handoff]` a top-level (scope E1a). **Esto es el flip-switch** del D6 scaffold: una vez declarado, toda invocación logged para la sesión actual que NO esté en la lista deniega el Stop. El deny-path canonicaliza a `deny-all` cuando la lista es `[]` y `SKILLS_ALLOWED_INVALID` si la clave está mal formada (tri-estado declarado en `hooks/_lib/policy.py`).
+- Tests:
+  - `.claude/skills/tests/test_skill_frontmatter.py` — 24 casos (4 clases `TestStructure`, `TestFrontmatter`, `TestBody`, `TestSharedLogger`) parametrizados por slug. Valida: dir + SKILL.md existe; NO `skill.json`; frontmatter keys ⊆ `{name, description, allowed-tools}`; `name` == dir name; description case-insensitive `startswith "use when"`; `allowed-tools` es `list[str]` si presente; `name` sin prefijo `pos:`; body referencia `.claude/skills/_shared/log-invocation.sh`; shared logger existe y es ejecutable.
+  - `hooks/tests/test_skills_log_contract.py` — 11 casos (3 clases `TestLoggerShape`, `TestExtractorReadsLoggerOutput`, `TestEnforcementEndToEnd`). Exercise end-to-end: logger emite exactamente 4 keys, append-only, default status=ok, crea logs dir si falta; `_extract_invoked_skills` lee output del logger; entradas de otra sesión ignoradas; enforcement real con nombres `project-kickoff` / `writing-handoff` (**este es el test que cruza la integración con D6**, usando los nombres reales — mientras `test_stop_policy_check.py` sigue usando placeholders `pos:*` como fixtures).
+  - `hooks/tests/test_lib_policy.py::test_real_skills_allowed_populated_by_e1a` — antes asertaba `skills_allowed_list(repo_root) is None`. Renombrado y flippeado: ahora asserta `== ("project-kickoff", "writing-handoff")`. Lock-down del contrato entre `policy.yaml` y el accessor.
+- `pytest.ini` (root-level) — `addopts = --import-mode=importlib`. Necesario para que pytest descubra tests en `hooks/tests/` y `.claude/skills/tests/` sin colisión de `__init__.py` (dos dirs `tests/` no-siblings → pytest intenta importar ambos como package `tests` y el segundo falla con `ModuleNotFoundError`). Importlib mode evita el shared prefix requirement.
+
+Suite global post-E1a: **610 passed + 1 skipped** (575 D6 baseline + 11 log-contract + 24 frontmatter; el skip es el D5 intencional `TestIntegrationDiffUnavailable` por subprocess-no-cover). Sin regresión en `hooks/**`.
+
+Contrato fijado por la suite:
+
+- Skill primitive = `.claude/skills/<slug>/SKILL.md` con frontmatter YAML mínimo (`name`, `description`, `allowed-tools` opcional). **No `skill.json`**, **no prefijo `pos:`** en `name`, **no campos inventados** (`context`, `model`, `agent`, `effort`, `hooks`, `user-invocable` no existen en el primitive oficial; si alguna versión futura del SDK los añade, se citan con fuente antes de introducirlos).
+- Description framed como `"Use when ..."` — selección eligible por el modelo, **no trigger garantizado**. El primitive de Claude Code ya canonicaliza así la auto-activación; no la prometemos como infalible.
+- Log shape estable a 4 campos `{ts, skill, session_id, status}`. Extender requiere nueva rama + justificación + migración de `_extract_invoked_skills` + tests del contrato.
+- `writing-handoff` **no** toca `MASTER_PLAN.md` / `ROADMAP.md` / `docs/**`. El PR en curso hace ese docs-sync; la skill escribe HANDOFF con scope estricto declarado en su body (§1, §9, §6b, gotchas). Si un futuro caller pide ampliar scope, abrir rama E1c — no extender E1a.
+
+**Ajustes vs plan original (Fase -1 aprobada)**:
+
+- **Primitive correction** — Fase -1 v1 propuso `skill.json` + frontmatter extendido (campos `context`, `model`, `agent`, `effort`). Rechazado por el usuario; reemitida v2 alineada con el primitive oficial de Claude Code (solo `SKILL.md` + YAML minimal). Aprendizaje permanente: si una primitive del SDK no tiene documentación oficial citable, no la inventamos por analogía con slash commands.
+- **Decisión C1 (logger inline via Bash call)** — descartado C2 (hook nuevo) y C3 (sin log). Razón: C1 es suficiente para E1a y evita reabrir Fase D con un séptimo hook; el log es útil y el framing "best-effort operacional" lo sostiene sin prometer enforcement criptográfico.
+- **Decisión `writing-handoff` = Edit directo (scoped)** — descartado diff-only. Razón: si la skill existe para escribir handoff, que escriba; diff-only introduce fricción artificial. Condición aceptada: scope estricto §1/§9/§6b/gotchas.
+- **Decisión `_shared/` vs `_lib/`** — elegido `.claude/skills/_shared/`. Razón: no es librería runtime general, es utility compartida entre skills; `_lib/` se confundiría con `hooks/_lib/`.
+- **Ubicación de tests** — split intencional: frontmatter en `.claude/skills/tests/` (dominio skills), integración log ↔ stop-policy-check en `hooks/tests/` (dominio consumer). Pytest `--import-mode=importlib` en raíz para que ambos dirs convivan.
+- **`skills_allowed` poblado en esta rama** — descartado "E1a-sin-allowlist + E1b activa". Razón: la skill `project-kickoff` es la primera que escribe `.claude/logs/skills.jsonl`; si hay skill + hay logger + hay hook scaffold, activar el scaffold en la misma rama que lo habilita cierra el loop sin dejar scaffold dormido entre ramas.
+
+**Criterio de salida**: 610 tests verdes + 1 skip intencional en todas las suites (`hooks/tests` + `.claude/skills/tests`). D6 regression intacto; `test_real_skills_allowed_populated_by_e1a` flippa el pinpoint anterior al estado esperado. Docs-sync dentro del PR (ROADMAP + HANDOFF + MASTER_PLAN + `docs/ARCHITECTURE.md` §5 Skills + `.claude/rules/skills-map.md` renombrando `/pos:kickoff` → `project-kickoff` y `/pos:handoff-write` → `writing-handoff` + AGENTS.md si procede). El hook `pre-pr-gate.py` aprueba este mismo PR (dogfooding D4 sobre E1a).
 
 ## Convenciones de este archivo
 
