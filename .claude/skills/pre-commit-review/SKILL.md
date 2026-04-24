@@ -14,7 +14,7 @@ allowed-tools:
 
 # pre-commit-review
 
-Produce a prioritized review of the current branch's diff (`main..HEAD`) before the user opens a PR with `gh pr create`. Delegate the heavy analysis to the `code-reviewer` subagent; the main thread only prepares context and folds the summary.
+Produce a prioritized review of the current branch's diff (`main...HEAD`) before the user opens a PR with `gh pr create`. Delegate the heavy analysis to the `code-reviewer` subagent; the main thread only prepares context and folds the summary.
 
 Framing: this is an eligibility hint, not a guaranteed auto-trigger. Claude Code decides whether to activate you based on `description`. Output is a review proposal — the user decides which findings to act on.
 
@@ -22,7 +22,7 @@ Framing: this is an eligibility hint, not a guaranteed auto-trigger. Claude Code
 
 You MAY:
 - Read the kickoff commit and recent branch commits with `git log`.
-- Inspect the diff with `git diff main..HEAD`.
+- Inspect the diff with `git diff main...HEAD`.
 - Read `.claude/rules/*.md`, `CLAUDE.md`, and any file cited in the branch's `MASTER_PLAN.md` entry to seed invariants into the review prompt.
 - Delegate the analysis to the `code-reviewer` subagent via the Agent tool (see "Delegation" below).
 - Emit prioritized findings in this conversation (confidence-filtered, bucketed by severity).
@@ -41,7 +41,7 @@ Main thread stays cheap; heavy analysis goes to the `code-reviewer` subagent via
 1. Main gathers context — kickoff commit, branch scope, invariants cited in `.claude/rules/*.md` that touch paths in the diff.
 2. Main invokes `Agent(subagent_type="code-reviewer", prompt=...)` with:
    - The prepared context (branch scope + invariants applicable to touched paths).
-   - The full diff (`git diff main..HEAD`).
+   - The full diff (`git diff main...HEAD`).
    - Explicit asks: bugs, logic errors, security vulnerabilities, adherence to branch scope, adherence to repo invariants.
 3. Subagent runs in its own fork, returns a summary with confidence-filtered findings.
 4. Main folds the summary — does NOT paste-through. Prioritizes by severity, attaches `file:line` references, groups by theme if useful.
@@ -96,7 +96,7 @@ The string `code-reviewer` here reflects the Claude Code default shipped today. 
 ## Failure modes
 
 - HEAD is `main` / `master` → no branch to review; stop and tell the user. Log `status: partial`.
-- `git diff main..HEAD` returns empty → no changes to review; stop. Log `status: partial`.
+- `git diff main...HEAD` returns empty → no changes to review; stop. Log `status: partial`.
 - `code-reviewer` subagent unavailable at runtime → fall back to `general-purpose` with an equivalent task prompt; note the fallback in the user-facing summary. Log `status: degraded`.
 - Subagent returns an empty / unusable summary → report it to the user; do NOT invent findings. Log `status: ambiguous`.
 

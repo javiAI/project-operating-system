@@ -363,9 +363,9 @@ class TestPreCommitReviewBehavior:
             "pre-commit-review body must reference `git diff` — scope is the "
             "branch diff, not the working tree nor the full repo."
         )
-        assert "main..head" in low, (
-            "pre-commit-review body must reference `main..HEAD` to pin the "
-            "diff base for the review (branch diff, not staged/unstaged)."
+        assert "main...head" in low, (
+            "pre-commit-review body must reference `main...HEAD` to pin the "
+            "diff base for the review (merge-base relative, robust to branch state)."
         )
 
     def test_body_disclaims_writing_and_replacement(self):
@@ -428,9 +428,9 @@ class TestSimplifyBehavior:
         three explicit disclaims."""
         _, body = read_skill("simplify")
         low = body.lower()
-        assert "git diff --name-only" in low and "main..head" in low, (
-            "simplify body must reference `git diff --name-only main..HEAD` "
-            "so scope derivation is deterministic and greppable."
+        assert "git diff --name-only" in low and "main...head" in low, (
+            "simplify body must reference `git diff --name-only main...HEAD` "
+            "so scope derivation is deterministic, greppable, and merge-base robust."
         )
         no_new_files_tokens = (
             "does not create new files",
