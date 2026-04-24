@@ -1,4 +1,4 @@
-"""Contract tests for the Claude Code Skill primitive used by pos (E1a + E1b).
+"""Contract tests for the Claude Code Skill primitive used by pos (E1 + E2a).
 
 Scope:
   - Frontmatter shape (official primitive: name + description + allowed-tools).
@@ -23,15 +23,24 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SKILLS_DIR = REPO_ROOT / ".claude" / "skills"
 
-# Skill slugs delivered in E1 (E1a: project-kickoff, writing-handoff;
-# E1b: branch-plan, deep-interview). Constant is contract-bound, not
-# era-bound — extending Fase E adds entries here.
-# Must match policy.yaml.skills_allowed exactly.
-E1_SKILLS_KNOWN = [
+# Skill slugs delivered through Fase E so far. Constant is contract-bound
+# (must match `policy.yaml.skills_allowed` exactly), not era-bound — it was
+# renamed from `ALLOWED_SKILLS` in E2a once the allowlist crossed a phase
+# boundary. Adding a skill = extending this list + `policy.yaml.skills_allowed`
+# in the same branch; the suite's 11 parametrized contract tests cover it
+# automatically.
+#
+# Delivered:
+#   E1a — project-kickoff, writing-handoff
+#   E1b — branch-plan, deep-interview
+#   E2a — pre-commit-review, simplify
+ALLOWED_SKILLS = [
     "project-kickoff",
     "writing-handoff",
     "branch-plan",
     "deep-interview",
+    "pre-commit-review",
+    "simplify",
 ]
 
 # Officially supported SKILL.md frontmatter fields in Claude Code.
@@ -71,20 +80,20 @@ def read_skill(slug: str) -> tuple[dict, str]:
 
 
 class TestStructure:
-    @pytest.mark.parametrize("slug", E1_SKILLS_KNOWN)
+    @pytest.mark.parametrize("slug", ALLOWED_SKILLS)
     def test_skill_dir_exists(self, slug: str):
         assert (SKILLS_DIR / slug).is_dir()
 
-    @pytest.mark.parametrize("slug", E1_SKILLS_KNOWN)
+    @pytest.mark.parametrize("slug", ALLOWED_SKILLS)
     def test_skill_md_exists(self, slug: str):
         assert (SKILLS_DIR / slug / "SKILL.md").is_file()
 
-    @pytest.mark.parametrize("slug", E1_SKILLS_KNOWN)
+    @pytest.mark.parametrize("slug", ALLOWED_SKILLS)
     def test_skill_md_parses(self, slug: str):
         fm, body = read_skill(slug)
         assert fm and body
 
-    @pytest.mark.parametrize("slug", E1_SKILLS_KNOWN)
+    @pytest.mark.parametrize("slug", ALLOWED_SKILLS)
     def test_no_skill_json(self, slug: str):
         """skill.json is not part of the official primitive. Don't emit it."""
         assert not (SKILLS_DIR / slug / "skill.json").exists()
@@ -96,7 +105,7 @@ class TestStructure:
 
 
 class TestFrontmatter:
-    @pytest.mark.parametrize("slug", E1_SKILLS_KNOWN)
+    @pytest.mark.parametrize("slug", ALLOWED_SKILLS)
     def test_required_keys_present(self, slug: str):
         fm, _ = read_skill(slug)
         missing = REQUIRED_FRONTMATTER_KEYS - set(fm)
@@ -104,7 +113,7 @@ class TestFrontmatter:
             f"Skill '{slug}' frontmatter missing required keys: {missing}"
         )
 
-    @pytest.mark.parametrize("slug", E1_SKILLS_KNOWN)
+    @pytest.mark.parametrize("slug", ALLOWED_SKILLS)
     def test_no_invented_fields(self, slug: str):
         """Only the official three fields are allowed. Adding more requires a
         citation (see feedback memory 'Skill primitive stays minimal')."""
@@ -115,14 +124,14 @@ class TestFrontmatter:
             "Remove them or justify with an official Claude Code doc citation."
         )
 
-    @pytest.mark.parametrize("slug", E1_SKILLS_KNOWN)
+    @pytest.mark.parametrize("slug", ALLOWED_SKILLS)
     def test_name_matches_dir(self, slug: str):
         fm, _ = read_skill(slug)
         assert fm["name"] == slug, (
             f"frontmatter name={fm['name']!r} does not match dir name={slug!r}"
         )
 
-    @pytest.mark.parametrize("slug", E1_SKILLS_KNOWN)
+    @pytest.mark.parametrize("slug", ALLOWED_SKILLS)
     def test_description_is_use_when_shape(self, slug: str):
         """description is a selection hint for the model, not a guaranteed
         trigger. Frame as 'Use when …' so the model treats it as eligibility,
@@ -136,7 +145,7 @@ class TestFrontmatter:
             f"(frame as selection hint, not auto-trigger). Got: {desc!r}"
         )
 
-    @pytest.mark.parametrize("slug", E1_SKILLS_KNOWN)
+    @pytest.mark.parametrize("slug", ALLOWED_SKILLS)
     def test_allowed_tools_shape(self, slug: str):
         """`allowed-tools` is optional. If present, it must be a list of
         non-empty strings — no strings with wildcards alone, no nested shapes."""
@@ -154,7 +163,7 @@ class TestFrontmatter:
                 f"got entry {t!r}"
             )
 
-    @pytest.mark.parametrize("slug", E1_SKILLS_KNOWN)
+    @pytest.mark.parametrize("slug", ALLOWED_SKILLS)
     def test_name_has_no_pos_prefix(self, slug: str):
         """No `pos:` prefix in skill names. The plugin marketplace namespace
         (if ever packaged) is applied by the marketplace, not by us."""
@@ -170,7 +179,7 @@ class TestFrontmatter:
 
 
 class TestBody:
-    @pytest.mark.parametrize("slug", E1_SKILLS_KNOWN)
+    @pytest.mark.parametrize("slug", ALLOWED_SKILLS)
     def test_body_references_shared_logger(self, slug: str):
         """Skills must emit a log entry to .claude/logs/skills.jsonl via the
         shared helper. Best-effort: the model can skip it in a rare invocation
@@ -309,4 +318,229 @@ class TestDeepInterviewBehavior:
         assert any(tok in low for tok in guard_tokens), (
             "deep-interview body must explicitly guard against silent "
             "mutation of docs or memory (use 'ratif', 'confirm', etc.)."
+        )
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Behavior-specific contracts (E2a — pre-commit-review + simplify)
+#
+# Lock down the Fase -1 decisions ratified by the user:
+#   - `pre-commit-review` delegates to the `code-reviewer` subagent over the
+#     branch diff, produces prioritized findings, never rewrites code, never
+#     applies fixes, never replaces `simplify`.
+#   - `simplify` is a writer scoped strictly to files already in the branch
+#     diff: can Edit, cannot create new files, cannot touch files outside the
+#     diff. Frames itself as a reducer (not a bug finder) and reports what it
+#     simplified and what it chose not to touch.
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class TestPreCommitReviewBehavior:
+    def test_delegates_to_code_reviewer(self):
+        """The skill must delegate to the `code-reviewer` subagent via the
+        Agent tool (same pattern branch-plan established in E1b). The string
+        `code-reviewer` is hardcoded with a disclaimer about default-name
+        fragility (see .claude/rules/skills.md § Fork / delegación)."""
+        _, body = read_skill("pre-commit-review")
+        low = body.lower()
+        assert "code-reviewer" in low, (
+            "pre-commit-review body must name the `code-reviewer` subagent "
+            "(the canonical default in Claude Code today) so the delegation "
+            "contract is explicit and greppable."
+        )
+        assert "subagent_type" in low or "agent tool" in low, (
+            "pre-commit-review body must reference the Agent-tool delegation "
+            "mechanism (e.g., `subagent_type`) so the pattern matches E1b "
+            "branch-plan's delegation precedent."
+        )
+
+    def test_scope_is_branch_diff(self):
+        """Review operates on the branch diff, not the full tree. Body must
+        show the exact git invocation (`git diff ... main..HEAD`)."""
+        _, body = read_skill("pre-commit-review")
+        low = body.lower()
+        assert "git diff" in low, (
+            "pre-commit-review body must reference `git diff` — scope is the "
+            "branch diff, not the working tree nor the full repo."
+        )
+        assert "main..head" in low, (
+            "pre-commit-review body must reference `main..HEAD` to pin the "
+            "diff base for the review (branch diff, not staged/unstaged)."
+        )
+
+    def test_body_disclaims_writing_and_replacement(self):
+        """The skill produces findings, never writes; and it does not
+        replace `simplify` (they are complementary, ordered: simplify first,
+        then review)."""
+        _, body = read_skill("pre-commit-review")
+        low = body.lower()
+        assert "findings" in low, (
+            "pre-commit-review body must mention `findings` as its output "
+            "shape — the skill produces prioritized findings, not patches."
+        )
+        no_write_tokens = (
+            "does not rewrite",
+            "does not apply",
+            "no reescribe",
+            "no aplica",
+            "not rewrite",
+            "not apply",
+        )
+        assert any(tok in low for tok in no_write_tokens), (
+            "pre-commit-review body must explicitly disclaim rewriting code "
+            "or applying fixes (use 'does not rewrite', 'no aplica', etc.)."
+        )
+        assert "simplify" in low, (
+            "pre-commit-review body must name `simplify` so its relationship "
+            "(complementary, not substitute) is on the page."
+        )
+        no_replace_tokens = (
+            "does not replace",
+            "no sustituye",
+            "no reemplaza",
+            "not a substitute",
+        )
+        assert any(tok in low for tok in no_replace_tokens), (
+            "pre-commit-review body must explicitly disclaim replacing "
+            "`simplify` (use 'does not replace', 'no sustituye', etc.)."
+        )
+
+
+class TestSimplifyBehavior:
+    def test_allowed_tools_includes_edit(self):
+        """`simplify` is a writer scoped to the branch diff. `allowed-tools`
+        must include `Edit` — precedent `writing-handoff` (E1a)."""
+        fm, _ = read_skill("simplify")
+        tools = fm.get("allowed-tools") or []
+        assert any(
+            isinstance(t, str) and (t == "Edit" or t.startswith("Edit("))
+            for t in tools
+        ), (
+            "simplify frontmatter `allowed-tools` must include `Edit` — the "
+            "skill writes changes to files in the branch diff. Got: "
+            f"{tools!r}"
+        )
+
+    def test_scope_limited_to_branch_diff_no_new_files(self):
+        """Writer scope is strict: files already in the diff only, no new
+        files, nothing outside the diff. Body must show the exact command
+        that derives the scope (`git diff --name-only main..HEAD`) and the
+        three explicit disclaims."""
+        _, body = read_skill("simplify")
+        low = body.lower()
+        assert "git diff --name-only" in low and "main..head" in low, (
+            "simplify body must reference `git diff --name-only main..HEAD` "
+            "so scope derivation is deterministic and greppable."
+        )
+        no_new_files_tokens = (
+            "does not create new files",
+            "no crea archivos nuevos",
+            "no crea nuevos archivos",
+            "no new files",
+            "never create new files",
+        )
+        assert any(tok in low for tok in no_new_files_tokens), (
+            "simplify body must explicitly disclaim creating new files "
+            "(use 'does not create new files', 'no crea archivos nuevos')."
+        )
+        outside_tokens = (
+            "outside the diff",
+            "fuera del diff",
+            "not in branch diff",
+            "no presentes en el diff",
+        )
+        assert any(tok in low for tok in outside_tokens), (
+            "simplify body must explicitly disclaim touching files outside "
+            "the branch diff (use 'outside the diff', 'fuera del diff')."
+        )
+
+    def test_body_frames_reducer_not_bug_finder(self):
+        """simplify reduces redundancy / noise / accidental complexity /
+        premature abstraction. It does NOT hunt bugs, does NOT intentionally
+        change behavior, does NOT do major refactors."""
+        _, body = read_skill("simplify")
+        low = body.lower()
+        reducer_tokens = (
+            "redundan",       # redundancia / redundancy
+            "accidental",     # accidental complexity
+            "prematura",      # abstracción prematura
+            "premature",      # premature abstraction
+            "ruido",          # ruido
+            "noise",
+        )
+        assert sum(tok in low for tok in reducer_tokens) >= 2, (
+            "simplify body must frame its target (redundancia / ruido / "
+            "complejidad accidental / abstracción prematura) — at least two "
+            "of those concepts must be named explicitly."
+        )
+        no_bugs_tokens = (
+            "does not find bugs",
+            "does not hunt bugs",
+            "no busca bugs",
+            "not a bug finder",
+        )
+        assert any(tok in low for tok in no_bugs_tokens), (
+            "simplify body must explicitly disclaim bug hunting "
+            "(use 'does not find bugs', 'no busca bugs')."
+        )
+        no_behavior_change_tokens = (
+            "does not change behavior",
+            "no cambia comportamiento",
+            "not change behavior",
+            "preserves behavior",
+            "preserva comportamiento",
+        )
+        assert any(tok in low for tok in no_behavior_change_tokens), (
+            "simplify body must explicitly disclaim changing behavior "
+            "intentionally (use 'does not change behavior', etc.)."
+        )
+        no_refactor_tokens = (
+            "no major refactor",
+            "not a major refactor",
+            "no refactor mayor",
+            "sin refactor mayor",
+        )
+        assert any(tok in low for tok in no_refactor_tokens), (
+            "simplify body must explicitly disclaim doing major refactors "
+            "(use 'no major refactor', 'no refactor mayor')."
+        )
+
+    def test_body_reports_what_simplified_and_what_skipped(self):
+        """At close, the skill must report two lists: what it simplified
+        and what it deliberately decided NOT to touch."""
+        _, body = read_skill("simplify")
+        low = body.lower()
+        report_tokens = (
+            "reporta",
+            "reports",
+            "report",
+            "summary",
+            "resumen",
+        )
+        assert any(tok in low for tok in report_tokens), (
+            "simplify body must describe a reporting step at close "
+            "(use 'reporta', 'reports', 'summary')."
+        )
+        simplified_tokens = (
+            "qué simplificó",
+            "what was simplified",
+            "what it simplified",
+            "simplificaciones aplicadas",
+            "changes applied",
+        )
+        assert any(tok in low for tok in simplified_tokens), (
+            "simplify body must mention reporting what was simplified "
+            "(use 'qué simplificó', 'what was simplified')."
+        )
+        skipped_tokens = (
+            "qué decidió no tocar",
+            "what it chose not to touch",
+            "decided not to touch",
+            "lo que no tocó",
+            "intentionally left",
+            "deliberadamente dejó",
+        )
+        assert any(tok in low for tok in skipped_tokens), (
+            "simplify body must mention reporting what it chose NOT to "
+            "touch (use 'qué decidió no tocar', 'what it chose not to touch')."
         )
