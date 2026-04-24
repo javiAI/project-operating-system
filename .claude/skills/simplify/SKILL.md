@@ -1,6 +1,6 @@
 ---
 name: simplify
-description: Use when the user asks to "simplifica antes del PR", "quita redundancia", "pasada de simplify", "pasa simplify a la rama", or just before `/pos:pre-commit-review`. Reduces redundancia, ruido, accidental complexity and premature abstraction in files already present in the branch diff (`git diff --name-only main..HEAD`). Writer-scoped — edits files in the diff, does not create new files, does not touch files outside the diff. Does not find bugs. Does not change behavior. No major refactor. Reports what it simplified and what it decided not to touch.
+description: Use when the user asks to "simplifica antes del PR", "quita redundancia", "pasada de simplify", "pasa simplify a la rama", or just before `/pos:pre-commit-review`. Reduces redundancia, ruido, accidental complexity and premature abstraction in files already present in the branch diff (`git diff --name-only main...HEAD`). Writer-scoped — edits files in the diff, does not create new files, does not touch files outside the diff. Does not find bugs. Does not change behavior. No major refactor. Reports what it simplified and what it decided not to touch.
 allowed-tools:
   - Read
   - Grep
@@ -50,7 +50,7 @@ Do NOT target:
 
    ```bash
    git merge-base main HEAD
-   git diff --name-only main..HEAD
+   git diff --name-only main...HEAD
    ```
 
    Store the list. Every subsequent `Edit` call MUST target a file in this list. Paths not in the list are out of scope, period. The skill does not create new files and does not touch files outside the diff.
@@ -58,7 +58,7 @@ Do NOT target:
 2. **Read the full diff**:
 
    ```bash
-   git diff main..HEAD
+   git diff main...HEAD
    ```
 
    Identify candidate reductions against the targets above. Skip anything that looks like a bug or a behavior change — note it separately; this skill does not find bugs and does not change behavior.

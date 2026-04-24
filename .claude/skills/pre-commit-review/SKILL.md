@@ -1,6 +1,6 @@
 ---
 name: pre-commit-review
-description: Use when the user asks to "revisa la rama", "pre-commit review", "review antes del PR", "chequea el diff", or right before running `gh pr create`. Prepares the review context in the main thread (branch kickoff, scope, applicable invariants), delegates the analysis to the `code-reviewer` subagent via the Agent tool over `git diff main..HEAD`, and folds the subagent summary into prioritized findings. Does NOT rewrite code. Does NOT apply fixes. Does NOT replace `simplify`.
+description: Use when the user asks to "revisa la rama", "pre-commit review", "review antes del PR", "chequea el diff", or right before running `gh pr create`. Prepares the review context in the main thread (branch kickoff, scope, applicable invariants), delegates the analysis to the `code-reviewer` subagent via the Agent tool over `git diff main...HEAD`, and folds the subagent summary into prioritized findings. Does NOT rewrite code. Does NOT apply fixes. Does NOT replace `simplify`.
 allowed-tools:
   - Read
   - Grep
@@ -54,8 +54,8 @@ The string `code-reviewer` here reflects the Claude Code default shipped today. 
 
    ```bash
    git merge-base main HEAD
-   git diff main..HEAD --stat
-   git log --oneline main..HEAD
+   git diff main...HEAD --stat
+   git log --oneline main...HEAD
    ```
 
    If the user names a different base, use that. If HEAD is `main` itself, stop — no branch to review.
@@ -69,7 +69,7 @@ The string `code-reviewer` here reflects the Claude Code default shipped today. 
 3. **Delegate to `code-reviewer`** via the Agent tool. The prompt must include:
    - Branch name, base, and kickoff scope.
    - Invariants applicable to the touched paths (grep output, not full rule files).
-   - The full diff (`git diff main..HEAD`).
+   - The full diff (`git diff main...HEAD`).
    - Explicit asks: "bugs, logic errors, security vulnerabilities, places where the diff leaves the branch scope, and violations of the cited invariants. Group findings by severity (blocker / high / medium / nit). Confidence-filter: omit findings below medium confidence."
 
    If the runtime Agent tool does NOT list `code-reviewer`, fall back to `general-purpose` with a prompt that names the capability; note the fallback in the user-facing summary.
