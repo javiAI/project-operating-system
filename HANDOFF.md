@@ -5,7 +5,7 @@
 ## 1. Snapshot
 
 - Repo: `project-operating-system` (plugin `pos`).
-- Fase actual: **E1b ✅ cerrada en rama** (`feat/e1b-skill-branch-plan-interview`, PR pendiente — docs-sync + simplify en curso). Anterior: **E1a ✅ PR #19** (`9d6f8d1`). Siguiente tras merge E1b: **E2a — `feat/e2a-skill-review-simplify`** (primer par de Fase E bloque calidad — `/pos:pre-commit-review` + `/pos:simplify`).
+- Fase actual: **E2a ✅ cerrada en rama** (`feat/e2a-skill-review-simplify`, PR pendiente — docs-sync + simplify + review en curso). Anterior: **E1b ✅ PR #20** (`ac6bd4d`). Siguiente tras merge E2a: **E2b — `feat/e2b-skill-compress-audit-plugin`** (segundo par de Fase E bloque calidad — `/pos:compress` haiku + `/pos:audit-plugin` community-tool gate).
 - Fuente de verdad ejecutable: [MASTER_PLAN.md](MASTER_PLAN.md).
 - Estado vivo: [ROADMAP.md](ROADMAP.md).
 - Arquitectura canonical: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -130,27 +130,30 @@ Hasta que `pos` tenga sus propias skills:
 
 ## 9. Próxima rama
 
-**E2a — `feat/e2a-skill-review-simplify`** (tras merge de E1b — primer par de Fase E bloque calidad, skills de revisión + simplificación pre-PR).
+**E2b — `feat/e2b-skill-compress-audit-plugin`** (tras merge de E2a — segundo par de Fase E bloque calidad; completa el ciclo calidad antes de abrir E3 patterns + tests).
 
-Scope (ver [MASTER_PLAN.md § Rama E2a](MASTER_PLAN.md)):
+Scope (ver [MASTER_PLAN.md § Rama E2b](MASTER_PLAN.md)):
 
-- Primer par de skills del bloque calidad tras cerrar orquestación Fase -1 (E1a + E1b = 4 skills). Cubre la salida de una rama: `/pos:pre-commit-review` (delegación a `code-reviewer` subagent para review con confidence-filter sobre el diff de la rama antes del PR) y `/pos:simplify` (reducción de código/docs previa al PR — ya existe como práctica manual aplicada al cerrar E1a/E1b; E2a la canonicaliza como skill con trigger claro).
-- **Shape heredado de E1a + E1b**: SKILL.md oficial + frontmatter mínimo (`name`, `description`, `allowed-tools`). Logging best-effort via `_shared/log-invocation.sh`. `skills_allowed` en `policy.yaml` extiende a 6 entries; contrato tri-estado de `skills_allowed_list()` intacto. Tests parametrizados por `E1_SKILLS_KNOWN` — E2a debe decidir si renombrar a `ALLOWED_SKILLS` (contract-bound al allowlist entero) o mantenerlo y añadir una constante nueva para las skills E2.
+- Segundo par de skills del bloque calidad. `/pos:compress` (haiku, reductor de docs/logs largos cuando el contexto cruza ~120k tokens — complemento del canonical order `simplify → pre-commit-review` pero on-demand, no pre-PR) + `/pos:audit-plugin` (sonnet, GO/NO-GO gate contra `docs/SAFETY_POLICY.md` antes de instalar cualquier MCP/plugin/community tool). `/pos:audit-plugin` implementa por primera vez la regla #6 CLAUDE.md (community tools → audit obligatorio).
+- **Shape heredado de E1a + E1b + E2a**: SKILL.md oficial + frontmatter mínimo (`name`, `description`, `allowed-tools`). Logging best-effort via `_shared/log-invocation.sh`. `skills_allowed` en `policy.yaml` extiende 6 → 8 entries; contrato tri-estado de `skills_allowed_list()` intacto. Tests parametrizados por `ALLOWED_SKILLS` (renombrado en E2a, ya contract-bound al allowlist entero).
+- **Precedentes aplicables de E2a**: delegación hybrid via Agent tool inline (patrón usado para `code-reviewer` en `pre-commit-review`) — `audit-plugin` puede ser la segunda consumidora si necesita cross-file analysis pesado (candidato `Explore` para scan del repositorio objetivo, `code-architect` para segunda opinión sobre diseño del plugin). Si esa segunda repetición se materializa, reabrir la decisión de hardcodear el subagent name (A5 E2a) y evaluar si extraer un helper compartido — precondición regla #7 CLAUDE.md recién abierta por E2a.
 
 Lectura mínima al arrancar:
 
-- [MASTER_PLAN.md § Rama E2a](MASTER_PLAN.md) — scope + decisiones previas + contexto a leer.
-- [.claude/skills/branch-plan/SKILL.md](.claude/skills/branch-plan/SKILL.md) — referencia de skill que delega via Agent tool inline (patrón reusable para `/pos:pre-commit-review` que debe llamar al subagent `code-reviewer`).
-- [.claude/skills/writing-handoff/SKILL.md](.claude/skills/writing-handoff/SKILL.md) — referencia de skill con scope estricto de escritura (patrón reusable para `/pos:simplify` si se decide hacerla mutadora; o main-read-only si se decide mostrar diff para approval).
-- [.claude/skills/_shared/log-invocation.sh](.claude/skills/_shared/log-invocation.sh) — helper de logging ya vivo desde E1a; E2a lo reusa sin cambios.
-- [.claude/rules/skills-map.md](.claude/rules/skills-map.md) — filas E2a todavía con prefijo `/pos:*` heredado; E2a las canonicaliza igual que E1a/E1b canonicalizaron las suyas.
-- [policy.yaml](policy.yaml) § `skills_allowed` — E1b lo dejó con 4 entries; E2a añade `pre-commit-review` + `simplify`.
+- [MASTER_PLAN.md § Rama E2b](MASTER_PLAN.md) — scope + decisiones previas + contexto a leer.
+- [.claude/skills/pre-commit-review/SKILL.md](.claude/skills/pre-commit-review/SKILL.md) — referencia de skill con Agent-tool hybrid delegation (main prepara context + subagent analiza + main folds summary). Patrón reusable si `audit-plugin` delega análisis pesado.
+- [.claude/skills/simplify/SKILL.md](.claude/skills/simplify/SKILL.md) — referencia de skill con scope writer-scoped determinista. Patrón reusable si `audit-plugin` mutara archivos (escribir GO/NO-GO decision en disco, por ejemplo) — aunque lo esperable es que sea read-only y emita decisión + razón.
+- [.claude/skills/_shared/log-invocation.sh](.claude/skills/_shared/log-invocation.sh) — helper de logging ya vivo desde E1a; E2b lo reusa sin cambios.
+- [docs/SAFETY_POLICY.md](docs/SAFETY_POLICY.md) — política que `audit-plugin` debe implementar como gate.
+- [.claude/rules/skills-map.md](.claude/rules/skills-map.md) — filas E2b todavía con prefijo `/pos:*` heredado; E2b las canonicaliza igual que E1a/E1b/E2a canonicalizaron las suyas.
+- [policy.yaml](policy.yaml) § `skills_allowed` — E2a lo dejó con 6 entries; E2b añade `compress` + `audit-plugin`.
 
-**Notas de arranque E2a**:
+**Notas de arranque E2b**:
 
-- Los hooks **no cambian** en E2a (igual que en E1a/E1b). Sólo evoluciona el contenido de `policy.yaml.skills_allowed` + `.claude/rules/skills-map.md` + `.claude/skills/<slug>/SKILL.md`.
-- Decisión estructural abierta: `/pos:simplify` — ¿skill **escritora** (aplica cambios en disco y reporta diff al cerrar) o **read-only** (emite propuesta textual para que el usuario aplique con Edit tool)? `writing-handoff` es precedente de scope estricto escritor; `branch-plan` / `deep-interview` son precedente de read-only. Fase -1 de E2a resuelve esa decisión.
-- Decisión estructural abierta: delegación Agent tool inline (patrón `branch-plan`) aplica a `/pos:pre-commit-review` que debe invocar `code-reviewer`. Confirmar que `subagent_type: "code-reviewer"` es el allowed subagent para ese flujo o elegir alternativa.
+- Los hooks **no cambian** en E2b (mismo patrón que E1a/E1b/E2a). Sólo evoluciona `policy.yaml.skills_allowed` + `.claude/rules/skills-map.md` + `.claude/skills/<slug>/SKILL.md`. `docs/SAFETY_POLICY.md` podría necesitar refinamiento si la skill revela ambigüedades en la policy actual.
+- Decisión estructural abierta: `/pos:compress` — ¿skill escritora (reemplaza docs/logs largos por versión comprimida y reporta diff) o read-only (emite compresión propuesta + user aplica)? Precedente mixto E2a: `simplify` es writer-scoped (A1.b); `pre-commit-review` es read-only. Decidir en Fase -1 de E2b en función del trigger típico ("on-demand cuando contexto >120k" sugiere writer — el usuario ya aceptó la pérdida de detalle al invocar).
+- Decisión estructural abierta: `/pos:audit-plugin` — ¿delega a `code-architect` / `Explore` subagent o es main-strict? Mapping: el análisis de seguridad de un plugin puede requerir leer múltiples archivos fuente + manifest + ejemplos de uso → candidato a delegation hybrid. Confirmar en Fase -1.
+- Si `audit-plugin` delega a un subagent nombrado, tenemos la segunda repetición que la regla #7 CLAUDE.md pide para extraer helper. Evaluar en Fase -1: ¿helper runtime para `_resolve_subagent_type(capability)` es el paso correcto ahora, o basta con copiar el disclaimer hardcoded que E2a estableció?
 
 ## 10. Estado D5 (cerrada en rama)
 
@@ -267,3 +270,37 @@ Lectura mínima al arrancar:
 **Resultado**: **639 passed + 1 skipped** en la suite conjunta `hooks/tests` + `.claude/skills/tests` (+29 vs baseline E1a de 610: 22 parametrizados por `E1_SKILLS_KNOWN` 2→4 + 3 branch-plan behavior + 3 deep-interview behavior + 1 log-contract integration). E1a regression intacta. `test_real_skills_allowed_populated_by_e1b` flippa el pinpoint anterior (tupla 2→4). `stop-policy-check.py` sigue en enforcement live sin cambio de código, sólo con allowlist ampliada.
 
 **Detalle + deferrals + ajustes**: ver [ROADMAP.md § feat/e1b-skill-branch-plan-interview](ROADMAP.md), [MASTER_PLAN.md § Rama E1b](MASTER_PLAN.md), [.claude/rules/skills-map.md](.claude/rules/skills-map.md) y [.claude/rules/skills.md](.claude/rules/skills.md) (reconciliado en esta rama).
+
+## 15. Estado E2a (cerrada en rama, docs-sync en curso)
+
+`feat/e2a-skill-review-simplify` — **tercera rama de Fase E**, primer par del bloque calidad. Cierra el ciclo pre-PR con dos skills orquestadas en orden canónico `simplify → pre-commit-review`: primero reduce el diff, luego el review opera sobre el diff ya ligero. Ambas heredan íntegro el contrato primitive-minimal de E1a/E1b y lo extienden con patrones nuevos (writer-scoped-al-diff + Agent-tool hybrid delegation).
+
+**Entregables**:
+
+- `.claude/skills/pre-commit-review/SKILL.md` — skill delegadora al subagent `code-reviewer` vía Agent tool inline. Scope hybrid: main prepara context ligero (branch kickoff + invariantes citados en `.claude/rules/*.md` aplicables al diff); el subagent recibe ese context + `git diff main...HEAD` completo + asks explícitos (bugs / logic / security / scope adherence / invariant violations), corre en fork real y devuelve summary confidence-filtered; el main folds (dedup + file:line + severity order + veredicto `clean to PR | findings blocking | findings advisory only`) — **no paste-through**. **Nunca edita, nunca abre PR, nunca sustituye a `simplify`**. Logea via helper compartido. Fallback declarado: si el runtime Agent tool no expone `code-reviewer`, fall back a `general-purpose` con task prompt equivalente.
+- `.claude/skills/simplify/SKILL.md` — skill reductora writer-scoped. `allowed-tools` incluye `Edit` (diferencia clave con `pre-commit-review`). Scope derivado en step 1 via `git diff --name-only main...HEAD`; **todo `Edit` call valida que el `file_path` pertenezca a esa lista** — si no, reclassify as `skip (out of scope)`. **No crea archivos nuevos**, **no toca archivos fuera del diff**, **no cambia comportamiento**, **no busca bugs** (ese es `pre-commit-review`), **no hace refactor mayor**. Targets declarados: redundancia / ruido / complejidad accidental / abstracción prematura. Cierra con reporte dos partes: "qué simplificó / what was simplified" + "qué decidió no tocar / what it chose not to touch" con razón por cada skip.
+- `policy.yaml.skills_allowed` extendida 4 → 6: `[project-kickoff, writing-handoff, branch-plan, deep-interview, pre-commit-review, simplify]`. Comentario inline actualizado (`E1a scaffold → E1b 4 skills → E2a 6 skills`). `stop-policy-check.py` sigue en enforcement live, ahora con 6 skills aceptadas — sin cambio de código en el hook.
+- Tests (extensión, no reescritura):
+  - `.claude/skills/tests/test_skill_frontmatter.py` — constante `E1_SKILLS_KNOWN` renombrada a `ALLOWED_SKILLS` (contract-bound al allowlist entero, no era-bound) + extendida 4 → 6. Todos los tests parametrizados (11 por skill × 6 skills = 66 automáticos) cubren el contrato sin cambio. Dos clases nuevas: `TestPreCommitReviewBehavior` (3 casos: delegation a `code-reviewer` + scope `git diff main...HEAD` + disclaim de escritura y de reemplazo de `simplify`) + `TestSimplifyBehavior` (4 casos: `allowed-tools` incluye `Edit` + scope derivado + reducer framing + forma del reporte final).
+  - `hooks/tests/test_lib_policy.py::test_real_skills_allowed_populated_by_e1b` renombrado a `_by_e2a`; tupla esperada crece 4 → 6 entries.
+  - `hooks/tests/test_skills_log_contract.py::test_all_four_e1_skills_end_to_end` renombrado a `test_all_six_e1_e2a_skills_end_to_end`; allowlist + loop cubren las 6 skills.
+
+**Contrato fijado por la suite** (extiende E1a + E1b sin reabrirlos):
+
+- Primitive frontmatter inmutable (`name` / `description` / `allowed-tools`); sin `skill.json`; sin prefijo `pos:`; sin campos inventados. Precedentes E1a + E1b intactos.
+- `pre-commit-review` **nunca** reescribe código, **nunca** aplica fixes, **nunca** abre PR, **nunca** sustituye a `simplify`. Test `TestPreCommitReviewBehavior::test_body_disclaims_writing_and_replacement` lock downs los 4 tokens literales (`findings` + uno de `does not rewrite` / `does not apply` / equivalentes + `simplify` + uno de `does not replace` / `not a substitute`).
+- `simplify` **nunca** crea archivos, **nunca** toca archivos fuera del diff, **nunca** cambia comportamiento, **nunca** busca bugs, **nunca** hace refactor mayor. Los 4 tests `TestSimplifyBehavior` lock down cada disclaim + la derivación determinista del scope + la forma del reporte final.
+- `ALLOWED_SKILLS = 6` entries enforce vivo. Invocar una skill no listada sigue produciendo deny exit 2 (contrato D6 intacto).
+- Canonical order `simplify → pre-commit-review` documentada en ambos bodies. Ambas disclaim replacement mutuo.
+
+**Ajustes vs plan original (Fase -1 aprobada)**:
+
+- **Decisión A1.b writer-scoped strict** (vs A1.a read-only + user aplica): `simplify` edita directo archivos del diff; scope derivado via `git diff --name-only main...HEAD`; disciplina declarada en body + locked via 4 behavior tests. Tradeoff consciente: el usuario no ve diff de simplify para pre-approval — se compensa con reporte final que hace explícito el criterio del LLM.
+- **Decisión A2.c hybrid delegation** (vs A2.a all-main / A2.b all-subagent): main prepara context ligero + subagent analiza diff pesado + main folds summary. A2.a descartado por coste en contexto; A2.b descartado porque el subagent no vería invariantes repo-specific del `.claude/rules/`. Hybrid captura lo mejor. Precedente directo: `branch-plan` (E1b A1.a) delegation pattern.
+- **Decisión A3.a rename atómico** (vs A3.b mantener `E1_SKILLS_KNOWN` + añadir `E2_SKILLS_KNOWN`): `ALLOWED_SKILLS` contract-bound al allowlist entero, no a la era. Rename trae update coordinado de `.claude/rules/skills.md` línea 61.
+- **Decisión A5 hardcode subagent name + disclaimer** (vs helper runtime): una sola skill consumidora hoy; abstracción prematura rechazada por regla #7 CLAUDE.md. Disclaimer literal apunta a `.claude/rules/skills.md § Fork / delegación`; fallback a `general-purpose` declarado. Reabrir en E2b si `audit-plugin` aporta segunda repetición.
+- **YAML parse gotcha** atrapado en GREEN: `simplify` frontmatter v1 contenía `"Writer scoped: edits files..."` → el `: ` activaba parser YAML como mapping-separator y rompía el frontmatter entero. Fix: em-dash `Writer-scoped — edits files...`. Lección para futuras skills: evitar `palabra: palabra` dentro de descriptions.
+
+**Resultado**: **668 passed + 1 skipped** en la suite conjunta `hooks/tests` + `.claude/skills/tests` (+29 vs baseline E1b de 639: 22 parametrizados por `ALLOWED_SKILLS` 4→6 + 3 pre-commit-review behavior + 4 simplify behavior + 1 log-contract integration actualizado + 1 `_populated_by_e2a` renombrado. El skip es el D5 intencional `TestIntegrationDiffUnavailable` por subprocess-no-cover). E1a + E1b + D1..D6 regression intacta. `test_real_skills_allowed_populated_by_e2a` flippa el pinpoint anterior (tupla 4→6). `stop-policy-check.py` sigue en enforcement live sin cambio de código, sólo con allowlist ampliada.
+
+**Detalle + deferrals + ajustes**: ver [ROADMAP.md § feat/e2a-skill-review-simplify](ROADMAP.md), [MASTER_PLAN.md § Rama E2a](MASTER_PLAN.md), [.claude/rules/skills-map.md](.claude/rules/skills-map.md) y [.claude/rules/skills.md](.claude/rules/skills.md) (rename `E1_SKILLS_KNOWN` → `ALLOWED_SKILLS` + notas E2a).

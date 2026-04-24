@@ -45,12 +45,19 @@ La skill debe escoger el `subagent_type` **por capacidad**, no por nombre hardco
 - **Planning independiente** (cross-check contra el plan de la skill) — Claude Code hoy: `Plan`.
 - **Segunda opinión arquitectónica** (crítica de diseño) — Claude Code hoy: `code-architect`.
 - **Context gathering cross-files** (explora y devuelve digest) — Claude Code hoy: `Explore`.
-- **Review de diff de rama** (confidence-filtered review) — Claude Code hoy: `code-reviewer` (patrón canónico previsto para `/pos:pre-commit-review` en E2a).
+- **Review de diff de rama** (confidence-filtered review) — Claude Code hoy: `code-reviewer`. **Primera consumidora: `pre-commit-review` (E2a)**. Patrón: main prepara context ligero (branch kickoff + invariantes de `.claude/rules/*.md` aplicables al diff); delega via `Agent(subagent_type="code-reviewer", ...)` con `git diff main..HEAD` completo + asks explícitos; subagent corre en fork real, devuelve summary confidence-filtered; main folds (dedup + file:line + severity). Hardcode del nombre `code-reviewer` en el body **con disclaimer** + fallback a `general-purpose` si el runtime enum no lo expone — decisión A5 de E2a: una sola consumidora hoy no justifica helper runtime (regla #7 CLAUDE.md). Reabrir si una segunda skill aporta la repetición.
 - **Fallback general** si ninguna capacidad específica encaja — Claude Code hoy: `general-purpose` con task prompt explícito.
 
 El subagent corre en fork real; la skill recibe el summary al tool result y lo folds en su output — no paste-through.
 
-**Precedentes**: `branch-plan` (E1b) delega cuando el plan es heavy; `deep-interview` (E1b) nunca delega (su coste está en el dialog, no en reading); `project-kickoff` y `writing-handoff` (E1a) son main-strict por scope acotado.
+**Precedentes**:
+
+- `branch-plan` (E1b) delega cuando el plan es heavy (pick `Plan` / `code-architect` / `Explore` por capacidad).
+- `deep-interview` (E1b) nunca delega — su coste está en el dialog, no en reading.
+- `pre-commit-review` (E2a) delega siempre a `code-reviewer` como hybrid pattern (main prepara context, subagent analiza, main folds) — primer uso del subagent `code-reviewer` en el repo.
+- `project-kickoff` y `writing-handoff` (E1a), `simplify` (E2a) son main-strict por scope acotado.
+
+**Precedentes de writer-scope**: `writing-handoff` (E1a) escribe **sólo** en HANDOFF.md con scope por sección declarado en el body; `simplify` (E2a) es la **segunda** writer-scoped del repo — edita **sólo** archivos presentes en `git diff --name-only main..HEAD`, con scope check en cada `Edit` call y reclasificación a `skip (out of scope)` si el `file_path` no está en la lista derivada. Ambas cierran con reporte de qué cambiaron y qué decidieron no tocar.
 
 ## Modelo
 
@@ -58,9 +65,9 @@ El primitive no soporta `model:` en el frontmatter — la skill corre en el mode
 
 ## Tests
 
-- **Contract tests** del primitive en `.claude/skills/tests/test_skill_frontmatter.py` — parametrizados por `E1_SKILLS_KNOWN` (contract-bound al `skills_allowed` del meta-repo, no era-bound). Validan: dir + SKILL.md existe; NO `skill.json`; frontmatter keys ⊆ `{name, description, allowed-tools}`; `name` == dir name; description case-insensitive `startswith "use when"`; `allowed-tools` es `list[str]` si presente; `name` sin prefijo `pos:`; body referencia `.claude/skills/_shared/log-invocation.sh`; shared logger existe y es ejecutable.
-- **Behavior tests** del body — ver `TestBranchPlanBehavior` + `TestDeepInterviewBehavior` en el mismo file (añadidas en E1b). Lock down framing strings concretos (disclaim de marker, opt-in gating, no silent mutation). Modelo: añade una `TestXxxBehavior` class por skill cuando el framing del body sea parte del contrato.
-- **Integration contract** logger ↔ Stop hook en `hooks/tests/test_skills_log_contract.py`. Añadir un caso `test_all_N_skills_end_to_end` cuando la allowlist crezca (precedente: `test_all_four_e1_skills_end_to_end` en E1b).
+- **Contract tests** del primitive en `.claude/skills/tests/test_skill_frontmatter.py` — parametrizados por `ALLOWED_SKILLS` (renombrado desde `E1_SKILLS_KNOWN` en E2a cuando la allowlist cruzó el límite de fase; contract-bound al `skills_allowed` del meta-repo, no era-bound: extender = añadir entrada aquí + en `policy.yaml`, no renombrar). Validan: dir + SKILL.md existe; NO `skill.json`; frontmatter keys ⊆ `{name, description, allowed-tools}`; `name` == dir name; description case-insensitive `startswith "use when"`; `allowed-tools` es `list[str]` si presente; `name` sin prefijo `pos:`; body referencia `.claude/skills/_shared/log-invocation.sh`; shared logger existe y es ejecutable.
+- **Behavior tests** del body — añadir una `TestXxxBehavior` class por skill cuando el framing del body sea parte del contrato. Existentes: `TestBranchPlanBehavior` + `TestDeepInterviewBehavior` (E1b — disclaim de marker, opt-in gating, no silent mutation); `TestPreCommitReviewBehavior` + `TestSimplifyBehavior` (E2a — delegation a `code-reviewer`, scope `git diff main..HEAD`, disclaim de escritura / reemplazo de `simplify`, writer-scoped-al-diff, reducer-not-bug-finder, reporte de qué simplificó + qué decidió no tocar).
+- **Integration contract** logger ↔ Stop hook en `hooks/tests/test_skills_log_contract.py`. Añadir un caso `test_all_N_skills_end_to_end` (o renombrar el existente) cuando la allowlist crezca. Precedente: `test_all_four_e1_skills_end_to_end` (E1b) → `test_all_six_e1_e2a_skills_end_to_end` (E2a).
 
 ## Logging — best-effort via helper
 

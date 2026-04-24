@@ -10,8 +10,8 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | B | Cuestionario + profiles + runner | ✅ |
 | C | Templates + renderers | ✅ (C1 ✅, C2 ✅, C3 ✅, C4 ✅, C5 ✅) |
 | D | Hooks (Python) | ✅ (D1..D6 + D5b) |
-| E1 | Skills orquestación | 🔄 en vuelo (E1a ✅, E1b ✅) |
-| E2 | Skills calidad | ⏳ pendiente |
+| E1 | Skills orquestación | ✅ (E1a + E1b) |
+| E2 | Skills calidad | 🔄 en vuelo (E2a ✅) |
 | E3 | Skills patterns + tests | ⏳ pendiente |
 | F | Audit + selftest + marketplace | ⏳ pendiente |
 | G | Knowledge Plane (opcional) | ⏳ solo planificación (scope cerrado, sin implementación) |
@@ -38,7 +38,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | `feat/d6-hook-pre-compact-stop` | Sexto+séptimo hook (PreCompact informative + Stop blocker-scaffold) + loader accessors `pre_compact_rules`/`skills_allowed_list` | ✅ | — (PR pendiente) |
 | `feat/e1a-skill-kickoff-handoff` | Skills `project-kickoff` + `writing-handoff` (primitive oficial Claude Code) + logger `_shared/log-invocation.sh` + `skills_allowed` activa scaffold D6 | ✅ | — (PR pendiente) |
 | `feat/e1b-skill-branch-plan-interview` | Skills `branch-plan` (Fase -1 producer, Agent-tool delegation inline) + `deep-interview` (opt-in socratic, no silent mutation); `skills_allowed` a 4 entries | ✅ | — (PR pendiente) |
-| `feat/e2a-skill-review-simplify` | `/pos:pre-commit-review`, `/pos:simplify` | ⏳ | — |
+| `feat/e2a-skill-review-simplify` | Skills `pre-commit-review` (delegación a `code-reviewer` subagent sobre `git diff main...HEAD`) + `simplify` (writer scoped al branch diff; no crea archivos, no cambia comportamiento, no busca bugs); `skills_allowed` a 6 entries; rename `E1_SKILLS_KNOWN` → `ALLOWED_SKILLS` | ✅ | — (PR pendiente) |
 | `feat/e2b-skill-compress-audit-plugin` | `/pos:compress`, `/pos:audit-plugin` | ⏳ | — |
 | `feat/e3a-skill-compound-pattern-audit` | `/pos:compound`, `/pos:pattern-audit` | ⏳ | — |
 | `feat/e3b-skill-test-scaffold-audit-coverage` | `/pos:test-scaffold`, `/pos:test-audit`, `/pos:coverage-explain` | ⏳ | — |
@@ -261,7 +261,7 @@ Entregables:
 
 - **Scope reformulado**: snapshot minimal <=10 líneas con orden fijo `Branch / Phase / Last merge / Warnings` y `"(none)"` literal cuando no hay warnings (ajuste explícito del usuario contra "menos automatismo ciego, más estructura + ayuda real"). Sin prose sobrante.
 - **Phase derivation**: regex case-insensitive `^(feat|fix|chore|refactor)[/_]([a-z])(\d+)-` sobre el nombre de rama → letra+num.upper() (D2, C5, B12…). Fallback en `main`/`master` a `phase-gates.jsonl` mediante recorrido hacia adelante conservando la última fase parseable (streaming O(1) memoria, tolerante a JSONDecodeError por línea). Si nada resuelve → `"unknown"`. **No** parsea `MASTER_PLAN.md` ni `ROADMAP.md` (frágil).
-- **Warnings activos**: `marker ausente` (rama no `main`/`master` sin `.claude/branch-approvals/<sanitize_slug(branch)>.approved`) + `docs-sync pendiente` (diff `main..HEAD` sin tocar `ROADMAP.md` ni `HANDOFF.md`). `docs-sync` es aviso-only; enforcement real queda diferido a D4 (`pre-pr-gate.py`). Warning "contexto >120k" descartado — no medible desde hook.
+- **Warnings activos**: `marker ausente` (rama no `main`/`master` sin `.claude/branch-approvals/<sanitize_slug(branch)>.approved`) + `docs-sync pendiente` (diff `main...HEAD` sin tocar `ROADMAP.md` ni `HANDOFF.md`). `docs-sync` es aviso-only; enforcement real queda diferido a D4 (`pre-pr-gate.py`). Warning "contexto >120k" descartado — no medible desde hook.
 - **Safe-fail graceful canonizado** como excepción para hooks informativos (decisión G Fase -1): payload malformado → exit 0 + `additionalContext` con `(error reading payload: ...)` + log de error. Hooks bloqueantes (`PreToolUse`, `PreCompact`, `Stop`) mantienen `deny` + exit 2. Política canónica actualizada en `.claude/rules/hooks.md` y `docs/ARCHITECTURE.md §7`.
 - **Extracción `_lib/` + refactor D1 en el mismo PR** (decisión A1): cierra deuda de duplicación antes de D3. Contenido mínimo (`sanitize_slug`, `append_jsonl`, `now_iso`); nuevos helpers sólo cuando ≥2 hooks los usen (regla #7).
 - **Sin `hooks/tests/test_lib/`** (ajuste del usuario Fase -1): helpers triviales (3-20 líneas cada uno) cubren indirectamente desde los hook tests. Sobretestear `sanitize_slug("feat/x") == "feat_x"` en aislamiento sería ruido.
@@ -526,6 +526,43 @@ Contrato fijado por la suite (extiende el contrato E1a sin reabrirlo):
 - **No se tocan E1a artifacts** — `project-kickoff` y `writing-handoff` quedan intactos; E1b sólo extiende la allowlist + añade dos skills nuevas + fixes de rule file. Regresión E1a cubierta por los mismos tests parametrizados (que ahora corren 4 vs 2 pero sin renombrar nada).
 
 **Criterio de salida**: 639 tests verdes + 1 skip intencional en todas las suites (`hooks/tests` + `.claude/skills/tests`). E1a regression intacto (los tests parametrizados que cubrían `project-kickoff` / `writing-handoff` siguen pasando; la constante renombrada los sigue cubriendo); `test_real_skills_allowed_populated_by_e1b` flippa el pinpoint de la tupla 2→4. Docs-sync dentro del PR (ROADMAP + HANDOFF + MASTER_PLAN § Rama E1b + `.claude/rules/skills-map.md` canonicalizando `/pos:branch-plan` → `branch-plan` y `/pos:deep-interview` → `deep-interview` + `.claude/rules/skills.md` reconciliado con el contrato E1a). El hook `pre-pr-gate.py` aprueba este mismo PR (dogfooding D4 sobre E1b).
+
+### `feat/e2a-skill-review-simplify` — ✅ (PR pendiente)
+
+Tercera rama de Fase E — **primer par del bloque calidad**. Cierra el ciclo pre-PR con dos skills que se orquestan en orden canónico `simplify → pre-commit-review`: primero reduce el diff (redundancia / ruido / complejidad accidental / abstracción prematura), luego el review opera sobre el diff ya ligero. Ambas heredan íntegro el contrato primitive-minimal de E1a/E1b y lo extienden con patrones nuevos (writer-scoped-al-diff + Agent-tool hybrid delegation).
+
+Entregables:
+
+- `.claude/skills/pre-commit-review/SKILL.md` — skill delegadora. Scope: `Read`/`Grep`/`Bash(git log/diff/status/merge-base)` sobre la rama; **delega el análisis pesado** al subagent `code-reviewer` vía Agent tool inline, pasando context preparado en main (branch kickoff + scope + invariantes citados en `.claude/rules/*.md` cuyos `paths:` solapen el diff) + `git diff main...HEAD` completo + asks explícitos (bugs + logic + security + scope adherence + invariant violations). El subagent corre en fork real y devuelve summary confidence-filtered; el main folds (dedup + file:line + severity order + veredicto `clean to PR | findings blocking | findings advisory only`) — **no paste-through**. **Nunca edita, nunca abre PR, nunca sustituye a `simplify`**. Logea via helper compartido.
+- `.claude/skills/simplify/SKILL.md` — skill reductora writer-scoped. Scope: `Read`/`Grep`/**`Edit`** (diferencia clave con `pre-commit-review`) + git introspection. Deriva el scope en step 1 con `git diff --name-only main...HEAD` y **todo `Edit` call valida que el `file_path` pertenezca a esa lista**; si no, reclassify as `skip (out of scope)`. **No crea archivos nuevos** (si una reducción lo requeriría, emite nota), **no toca archivos fuera del diff**, **no cambia comportamiento**, **no busca bugs** (ese es `pre-commit-review`), **no hace refactor mayor**. Cierra con reporte dos partes: "qué simplificó / what was simplified" + "qué decidió no tocar / what it chose not to touch". Logea via helper compartido.
+- `policy.yaml.skills_allowed` extendida 4 → 6: `[project-kickoff, writing-handoff, branch-plan, deep-interview, pre-commit-review, simplify]`. Comentario inline updated (`E1a scaffold → E1b 4 skills → E2a 6 skills`). `stop-policy-check.py` continúa en enforcement live, ahora con 6 skills aceptadas.
+- Tests (extensión, no reescritura):
+  - `.claude/skills/tests/test_skill_frontmatter.py` — constante `E1_SKILLS_KNOWN` renombrada a `ALLOWED_SKILLS` (contract-bound al allowlist entero) + extendida 4 → 6. Todos los tests parametrizados (11 por skill × 6 skills = 66 automáticos) cubren el contrato sin cambio. Añadidas dos clases: `TestPreCommitReviewBehavior` (3 casos: `test_delegates_to_code_reviewer` + `test_scope_is_branch_diff` + `test_body_disclaims_writing_and_replacement`) + `TestSimplifyBehavior` (4 casos: `test_allowed_tools_includes_edit` + `test_scope_limited_to_branch_diff_no_new_files` + `test_body_frames_reducer_not_bug_finder` + `test_body_reports_what_simplified_and_what_skipped`).
+  - `hooks/tests/test_lib_policy.py::test_real_skills_allowed_populated_by_e1b` renombrado a `_by_e2a`; tupla esperada crece 4 → 6 entries.
+  - `hooks/tests/test_skills_log_contract.py::test_all_four_e1_skills_end_to_end` renombrado a `test_all_six_e1_e2a_skills_end_to_end`; allowlist + loop cubren las 6 skills.
+
+Suite global post-E2a: **668 passed + 1 skipped** (+29 vs baseline E1b de 639: 22 parametrizados por `ALLOWED_SKILLS` 4→6 + 3 pre-commit-review behavior + 4 simplify behavior; 1 log-contract integration actualizado + 1 `_populated_by_e2a` renombrado. El skip es el D5 intencional `TestIntegrationDiffUnavailable` por subprocess-no-cover). Sin regresión en `hooks/**` ni E1a/E1b regression.
+
+Contrato fijado por la suite (extiende E1a + E1b sin reabrirlos):
+
+- Primitive frontmatter inmutable (`name` / `description` / `allowed-tools`), sin `skill.json`, sin prefijo `pos:`, sin campos inventados. Precedentes E1a + E1b intactos.
+- `pre-commit-review` **nunca** reescribe código, **nunca** aplica fixes, **nunca** abre PR, **nunca** sustituye a `simplify`. Test `TestPreCommitReviewBehavior::test_body_disclaims_writing_and_replacement` lock downs los 4 tokens literales requeridos en el body (`findings` + `does not rewrite` o equivalente + `simplify` + `does not replace` / `not a substitute`). Delegation pattern `code-reviewer` + `subagent_type` + `git diff main...HEAD` lock down por `test_delegates_to_code_reviewer` + `test_scope_is_branch_diff`.
+- `simplify` **nunca** crea archivos, **nunca** toca archivos fuera del diff, **nunca** cambia comportamiento, **nunca** busca bugs, **nunca** hace refactor mayor. Tests `TestSimplifyBehavior` × 4 lock down cada disclaim literal + la derivación determinista del scope (`git diff --name-only main...HEAD` en el body) + la forma del reporte final (lista de simplificado + lista de skipped con razón).
+- `ALLOWED_SKILLS = 6` entries enforce vivo. Invocar una skill no listada sigue produciendo deny exit 2 (contrato D6 intacto).
+- Canonical order `simplify → pre-commit-review` documentada en ambos bodies. Ambas disclaim replacement mutuo.
+
+**Ajustes vs plan original (Fase -1 aprobada)**:
+
+- **Decisión A1.b writer-scoped strict** (vs A1.a read-only proponer + user aplica): `simplify` edita directamente archivos del diff; scope derivado via `git diff --name-only main...HEAD`; disciplina declarada en body + locked via 4 behavior tests. Razón: evitar fricción de un gate adicional en un ciclo pre-PR ya largo; si aparece drift en la disciplina, remedy es PR correctiva, no cambio de patrón. Tradeoff consciente: el usuario no ve diff de simplify para pre-approval.
+- **Decisión A2.c hybrid delegation** (vs A2.a all-main / A2.b all-subagent): main prepara context ligero (kickoff commit + invariantes) + subagent analiza diff completo + main folds summary. A2.a descartado por coste en contexto (full diff + invariantes en main); A2.b descartado porque el subagent no vería invariantes repo-specific. Hybrid captura lo mejor. Precedente directo: `branch-plan` (E1b A1.a) delegation pattern.
+- **Decisión A3.a rename atómico** (vs A3.b mantener `E1_SKILLS_KNOWN` + añadir `E2_SKILLS_KNOWN`): `ALLOWED_SKILLS` contract-bound al allowlist entero, no a la era. Dos constantes coexistiendo propagaría el envejecimiento a cada fase futura. Rename trae update coordinado de `.claude/rules/skills.md` línea 61.
+- **Decisión A5 hardcode subagent name + disclaimer** (vs helper runtime con capability resolution): una sola skill consumidora hoy; abstracción prematura rechazada por regla #7 CLAUDE.md. Disclaimer literal en el body apunta a `.claude/rules/skills.md § Fork / delegación`; fallback a `general-purpose` declarado si el runtime enum no expone `code-reviewer`. Reabrir si E2b `audit-plugin` u otra skill aporta segunda repetición.
+- **Framing ajustes explícitos** (aprobados en Fase -1):
+  - `simplify` body carries literal tokens locked by tests: `git diff --name-only`, `main...HEAD`, `does not create new files`, `outside the diff`, `does not find bugs`, `does not change behavior`, `no major refactor`, tokens de targets (`redundan` / `accidental` / `prematura` / `ruido` / `noise`) + tokens de reporte (`qué simplificó` / `what was simplified` + `qué decidió no tocar` / `what it chose not to touch`). Step 4 lleva la regla dura: "Scope check every call: the `file_path` must match an entry from step 1. If it doesn't, do NOT edit — re-classify as `skip (out of scope)`".
+  - `pre-commit-review` body carries literal: "does not rewrite code", "does not apply fixes", "does not replace `simplify` and is not a substitute for it" + bloque de Delegation hybrid con el disclaimer del subagent name hardcoded + fallback a `general-purpose`.
+- **YAML parse gotcha atrapado en GREEN**: descripción v1 de `simplify` contenía `"Writer scoped: edits files..."` — el `: ` activaba el parser YAML como mapping-separator y rompía el frontmatter entero. Fix: em-dash `Writer-scoped — edits files...`. Lección para futuras skills: evitar `palabra: palabra` dentro de descriptions.
+
+**Criterio de salida**: 668 verdes + 1 skip intencional. E1a + E1b + D1..D6 regression intacta. `test_real_skills_allowed_populated_by_e2a` flippa el pinpoint de la tupla 4→6. `stop-policy-check.py` sigue en enforcement live sin cambio de código — sólo con allowlist ampliada. Docs-sync dentro del PR (ROADMAP § E2a + HANDOFF §1/§9 + §15 nuevo + MASTER_PLAN § Rama E2a + `.claude/rules/skills-map.md` canonicalizando 2 filas Calidad + `.claude/rules/skills.md` rename `E1_SKILLS_KNOWN` → `ALLOWED_SKILLS` + notas sobre E2a como primera consumidora de `code-reviewer` y `simplify` como segunda writer-scoped tras `writing-handoff`). `docs/ARCHITECTURE.md` **no** requerido (E2a no toca `generator/` ni `hooks/`). El hook `pre-pr-gate.py` aprueba este mismo PR (dogfooding D4 sobre E2a).
 
 ## Convenciones de este archivo
 

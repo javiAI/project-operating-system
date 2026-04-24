@@ -39,10 +39,12 @@ allowed-tools:                        # opcional. Lista YAML (no string). Ej: Re
 
 ## Calidad (entregado en E2)
 
+Canonical order pre-PR: **`simplify → pre-commit-review`**. Reduce primero, review después sobre el diff ya ligero. Ambas skills disclaim literal que no se sustituyen entre sí (running `pre-commit-review` no obvia `simplify`; running `simplify` no obvia `pre-commit-review`).
+
 | Skill | Lifecycle | Modelo | Context | Qué hace |
 |---|---|---|---|---|
-| `/pos:pre-commit-review` | Fase N+2 | sonnet | fork | Review con agent code-reviewer |
-| `/pos:simplify` | Fase N+1 | sonnet | fork | Reducción de código/docs antes de PR |
+| `simplify` | Fase N+1 (pre-PR) | sonnet | main (writer-scoped) | Reduce redundancia / ruido / complejidad accidental / abstracción prematura en archivos ya presentes en `git diff --name-only main..HEAD`. **Writer-scoped strict**: edita vía `Edit` sólo archivos del diff; no crea archivos nuevos; no toca archivos fuera del diff; no cambia comportamiento; no busca bugs; no hace refactor mayor. Cierra con reporte "qué simplificó / what was simplified" + "qué decidió no tocar / what it chose not to touch". |
+| `pre-commit-review` | Fase N+2 (pre-PR) | sonnet | main + Agent-tool hybrid delegation (`code-reviewer`) | Main prepara context (branch kickoff + invariantes de `.claude/rules/*.md` aplicables al diff); delega vía `Agent(subagent_type="code-reviewer", ...)` con `git diff main..HEAD` completo + asks explícitos (bugs + logic + security + scope adherence + invariant violations); subagent corre en fork real y devuelve summary confidence-filtered; main folds (dedup + file:line + severity order + veredicto de una línea). Fallback a `general-purpose` si el runtime enum no expone `code-reviewer`. **Nunca edita, nunca abre PR, nunca sustituye a `simplify`**. |
 | `/pos:compress` | on-demand (contexto >120k) | haiku | fork | Comprime docs/logs largos |
 | `/pos:audit-plugin` | antes de instalar MCP/plugin | sonnet | fork | GO/NO-GO por política SAFETY_POLICY.md |
 
