@@ -25,10 +25,10 @@ SKILLS_DIR = REPO_ROOT / ".claude" / "skills"
 
 # Skill slugs delivered through Fase E so far. Constant is contract-bound
 # (must match `policy.yaml.skills_allowed` exactly), not era-bound — it was
-# renamed from `ALLOWED_SKILLS` in E2a once the allowlist crossed a phase
-# boundary. Adding a skill = extending this list + `policy.yaml.skills_allowed`
-# in the same branch; the suite's 11 parametrized contract tests cover it
-# automatically.
+# renamed from `E1_SKILLS_KNOWN` to `ALLOWED_SKILLS` in E2a once the allowlist
+# crossed a phase boundary. Adding a skill = extending this list +
+# `policy.yaml.skills_allowed` in the same branch; the suite's 11 parametrized
+# contract tests cover it automatically.
 #
 # Delivered:
 #   E1a — project-kickoff, writing-handoff

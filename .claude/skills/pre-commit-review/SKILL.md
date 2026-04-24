@@ -4,6 +4,7 @@ description: Use when the user asks to "revisa la rama", "pre-commit review", "r
 allowed-tools:
   - Read
   - Grep
+  - Agent
   - Bash(git log:*)
   - Bash(git diff:*)
   - Bash(git status:*)
