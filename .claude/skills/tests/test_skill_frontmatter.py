@@ -23,25 +23,9 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SKILLS_DIR = REPO_ROOT / ".claude" / "skills"
 
-# Skill slugs delivered through Fase E so far. Constant is contract-bound
-# (must match `policy.yaml.skills_allowed` exactly), not era-bound — it was
-# renamed from `E1_SKILLS_KNOWN` to `ALLOWED_SKILLS` in E2a once the allowlist
-# crossed a phase boundary. Adding a skill = extending this list +
-# `policy.yaml.skills_allowed` in the same branch; the suite's 11 parametrized
-# contract tests cover it automatically.
-#
-# Delivered:
-#   E1a — project-kickoff, writing-handoff
-#   E1b — branch-plan, deep-interview
-#   E2a — pre-commit-review, simplify
-ALLOWED_SKILLS = [
-    "project-kickoff",
-    "writing-handoff",
-    "branch-plan",
-    "deep-interview",
-    "pre-commit-review",
-    "simplify",
-]
+# Import canonical ALLOWED_SKILLS from shared module (E2b refactor).
+# Single source of truth for all test files to avoid duplication.
+from _allowed_skills import ALLOWED_SKILLS  # noqa: E402
 
 # Officially supported SKILL.md frontmatter fields in Claude Code.
 # Extending this set requires citing an official source — see feedback memory
@@ -543,4 +527,84 @@ class TestSimplifyBehavior:
         assert any(tok in low for tok in skipped_tokens), (
             "simplify body must mention reporting what it chose NOT to "
             "touch (use 'qué decidió no tocar', 'what it chose not to touch')."
+        )
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Behavior-specific contracts (E2b — compress + audit-plugin)
+#
+# Advisory-only scope in E2b: no enforcement, no writing to files,
+# no modification of policy.yaml.
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class TestCompressBehavior:
+    def test_body_disclaims_writing_files(self):
+        """compress is read-only advisory: it proposes which logs to compress,
+        but does NOT write files, delete logs, or modify docs."""
+        _, body = read_skill("compress")
+        low = body.lower()
+        no_write_tokens = (
+            "does not write",
+            "does not edit",
+            "does not delete",
+            "does not modify",
+            "no escribe",
+            "no edita",
+            "no elimina",
+            "no modifica",
+            "read-only",
+            "advisory",
+        )
+        assert any(tok in low for tok in no_write_tokens), (
+            "compress body must disclaim writing/editing/deleting files "
+            "(use 'does not write', 'read-only', 'advisory', etc.)."
+        )
+
+    def test_body_mentions_advisory_and_user_decision(self):
+        """User decides whether to archive/summarize logs. Skill proposes."""
+        _, body = read_skill("compress")
+        low = body.lower()
+        assert "advisory" in low or "proposa" in low or "suggest" in low, (
+            "compress body must frame itself as advisory (proposes, suggests) "
+            "not as a directive (never writes on its own)."
+        )
+
+    def test_body_contains_stop_signal(self):
+        """compress is read-only advisory: it must signal STOP (skill halts,
+        user decides next steps)."""
+        _, body = read_skill("compress")
+        assert "STOP" in body, (
+            "compress body must contain uppercase STOP boundary "
+            "(marks advisory-only scope limit)."
+        )
+
+
+class TestAuditPluginBehavior:
+    def test_body_mentions_safety_policy(self):
+        """audit-plugin audits against SAFETY_POLICY.md checklist."""
+        _, body = read_skill("audit-plugin")
+        low = body.lower()
+        assert "safety_policy" in low or "checklist" in low, (
+            "audit-plugin body must reference SAFETY_POLICY.md or "
+            "the audit checklist it implements."
+        )
+
+    def test_body_disclaims_enforcement_and_installation(self):
+        """E2b is advisory-only: no hard enforcement, no tool installation,
+        no policy.yaml modification, no audit logs."""
+        _, body = read_skill("audit-plugin")
+        low = body.lower()
+        assert "advisory" in low or "does not install" in low, (
+            "audit-plugin body must disclaim enforcement and installation "
+            "(frame as advisory, reference E2b limitation)."
+        )
+
+    def test_body_contains_stop_signal(self):
+        """audit-plugin is advisory-only gate: it must signal STOP (skill returns
+        decision, user decides whether to install)."""
+        _, body = read_skill("audit-plugin")
+        assert "STOP" in body, (
+            "audit-plugin body must contain uppercase STOP boundary "
+            "(marks advisory-only scope limit)."
         )

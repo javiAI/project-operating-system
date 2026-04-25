@@ -38,6 +38,13 @@ LOGGER = REPO_ROOT / ".claude" / "skills" / "_shared" / "log-invocation.sh"
 # module's sys.path mutation as a side effect of exec_module below.
 sys.path.insert(0, str(REPO_ROOT / "hooks"))
 
+# Import ALLOWED_SKILLS from the canonical location (shared skills tests module)
+# to avoid duplication across test files.
+SKILLS_TEST_DIR = REPO_ROOT / ".claude" / "skills" / "tests"
+if str(SKILLS_TEST_DIR) not in sys.path:
+    sys.path.insert(0, str(SKILLS_TEST_DIR))
+from _allowed_skills import ALLOWED_SKILLS  # noqa: E402
+
 _spec = importlib.util.spec_from_file_location("stop_policy_check", HOOK)
 assert _spec is not None and _spec.loader is not None
 sp = importlib.util.module_from_spec(_spec)
@@ -224,23 +231,16 @@ class TestEnforcementEndToEnd:
         result = run_stop_hook(repo)
         assert result.returncode == 0
 
-    def test_all_six_e1_e2a_skills_end_to_end(self, repo: Path):
-        """E2a extends the allowlist to 6 entries (E1a+E1b+E2a). Emit one
+    def test_all_eight_e1_e2b_skills_end_to_end(self, repo: Path):
+        """E2b extends the allowlist to 8 entries (E1a+E1b+E2a+E2b). Emit one
         log line per skill via the shared logger, invoke Stop, expect allow.
         Guards against a typo in either the policy, the logger, or the Stop
-        hook silently breaking the full 6-skill contract."""
-        write_skills_allowed(
-            repo,
-            ["project-kickoff", "writing-handoff",
-             "branch-plan", "deep-interview",
-             "pre-commit-review", "simplify"],
-        )
-        for skill in ("project-kickoff", "writing-handoff",
-                      "branch-plan", "deep-interview",
-                      "pre-commit-review", "simplify"):
+        hook silently breaking the full 8-skill contract."""
+        write_skills_allowed(repo, ALLOWED_SKILLS)
+        for skill in ALLOWED_SKILLS:
             run_logger(repo, skill)
         result = run_stop_hook(repo)
         assert result.returncode == 0, (
-            f"expected allow for all 6 E1+E2a skills, got deny: "
+            f"expected allow for all {len(ALLOWED_SKILLS)} E1+E2a+E2b skills, got deny: "
             f"stdout={result.stdout!r}"
         )

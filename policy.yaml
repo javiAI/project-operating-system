@@ -265,7 +265,7 @@ compound:
   conflict_policy: "block-merge"  # si el pattern nuevo entra en conflicto con uno existente
 
 # ─────────────────────────────────────────────
-# Skill allowlist (E1a scaffold → E1b 4 skills → E2a 6 skills)
+# Skill allowlist (E1a scaffold → E1b 4 skills → E2a 6 skills → E2b 8 skills)
 # ─────────────────────────────────────────────
 # Declaring this list flips the D6 Stop-hook scaffold from
 # `status: deferred` pass-through to live enforcement: any skill
@@ -286,6 +286,8 @@ skills_allowed:
   - deep-interview
   - pre-commit-review
   - simplify
+  - compress
+  - audit-plugin
 
 # ─────────────────────────────────────────────
 # Auditing

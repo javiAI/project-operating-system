@@ -10,6 +10,13 @@ HOOKS_DIR = Path(__file__).resolve().parents[1]
 if str(HOOKS_DIR) not in sys.path:
     sys.path.insert(0, str(HOOKS_DIR))
 
+# Import ALLOWED_SKILLS from the canonical location (shared skills tests module)
+# to avoid duplication across test files.
+SKILLS_TEST_DIR = Path(__file__).resolve().parents[2] / ".claude" / "skills" / "tests"
+if str(SKILLS_TEST_DIR) not in sys.path:
+    sys.path.insert(0, str(SKILLS_TEST_DIR))
+from _allowed_skills import ALLOWED_SKILLS  # noqa: E402
+
 FIXTURES_DIR = Path(__file__).parent / "fixtures" / "policy"
 
 
@@ -821,20 +828,14 @@ class TestRealRepoPolicy:
         assert "phase_minus_one_state" in rules.persist
         assert "unsaved_pattern_candidates" in rules.persist
 
-    def test_real_skills_allowed_populated_by_e2a(self):
+    def test_real_skills_allowed_populated_by_e2b(self):
         """E1a seeded `skills_allowed` with the first two real skills;
         E1b extended it with the Fase -1 pair (branch-plan + deep-interview);
-        E2a adds the pre-PR quality pair (pre-commit-review + simplify).
-        Accessor returns the full 6-tuple — locks down the contract between
+        E2a adds the pre-PR quality pair (pre-commit-review + simplify);
+        E2b extends it with advisory skills (compress + audit-plugin).
+        Accessor returns the full 8-tuple — locks down the contract between
         `policy.yaml.skills_allowed` and the loader against silent drift.
         """
         from _lib import policy
         repo_root = Path(__file__).resolve().parents[2]
-        assert policy.skills_allowed_list(repo_root) == (
-            "project-kickoff",
-            "writing-handoff",
-            "branch-plan",
-            "deep-interview",
-            "pre-commit-review",
-            "simplify",
-        )
+        assert policy.skills_allowed_list(repo_root) == tuple(ALLOWED_SKILLS)

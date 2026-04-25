@@ -11,7 +11,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | C | Templates + renderers | ✅ (C1 ✅, C2 ✅, C3 ✅, C4 ✅, C5 ✅) |
 | D | Hooks (Python) | ✅ (D1..D6 + D5b) |
 | E1 | Skills orquestación | ✅ (E1a + E1b) |
-| E2 | Skills calidad | 🔄 en vuelo (E2a ✅) |
+| E2 | Skills calidad | ✅ (E2a + E2b) |
 | E3 | Skills patterns + tests | ⏳ pendiente |
 | F | Audit + selftest + marketplace | ⏳ pendiente |
 | G | Knowledge Plane (opcional) | ⏳ solo planificación (scope cerrado, sin implementación) |
@@ -39,7 +39,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | `feat/e1a-skill-kickoff-handoff` | Skills `project-kickoff` + `writing-handoff` (primitive oficial Claude Code) + logger `_shared/log-invocation.sh` + `skills_allowed` activa scaffold D6 | ✅ | — (PR pendiente) |
 | `feat/e1b-skill-branch-plan-interview` | Skills `branch-plan` (Fase -1 producer, Agent-tool delegation inline) + `deep-interview` (opt-in socratic, no silent mutation); `skills_allowed` a 4 entries | ✅ | — (PR pendiente) |
 | `feat/e2a-skill-review-simplify` | Skills `pre-commit-review` (delegación a `code-reviewer` subagent sobre `git diff main...HEAD`) + `simplify` (writer scoped al branch diff; no crea archivos, no cambia comportamiento, no busca bugs); `skills_allowed` a 6 entries; rename `E1_SKILLS_KNOWN` → `ALLOWED_SKILLS` | ✅ | — (PR pendiente) |
-| `feat/e2b-skill-compress-audit-plugin` | `/pos:compress`, `/pos:audit-plugin` | ⏳ | — |
+| `feat/e2b-skill-compress-audit-plugin` | Read-only advisory skills: `/pos:compress` (context planner) + `/pos:audit-plugin` (community-tool gate); both E2b-scoped; enforcement deferred | ✅ | — (PR pendiente) |
 | `feat/e3a-skill-compound-pattern-audit` | `/pos:compound`, `/pos:pattern-audit` | ⏳ | — |
 | `feat/e3b-skill-test-scaffold-audit-coverage` | `/pos:test-scaffold`, `/pos:test-audit`, `/pos:coverage-explain` | ⏳ | — |
 | `feat/f1-skill-audit-session` | `/pos:audit-session` | ⏳ | — |
