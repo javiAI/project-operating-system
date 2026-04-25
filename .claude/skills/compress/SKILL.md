@@ -1,59 +1,65 @@
 ---
 name: compress
-description: Use when your conversation context is approaching ~120k tokens; suggests which `.claude/logs/*.jsonl` files could be archived or summarized to reclaim context space. Returns analysis only—does not modify files.
+description: Use when your conversation context is approaching ~120k tokens; suggests which `.claude/logs/*.jsonl` files could be archived or summarized to reclaim context space. Read-only advisory—does not modify files.
 allowed-tools:
   - Read
-  - Bash(cd:., find:., wc:., head:.)
+  - Bash(cd:., find:., wc:., head:., ls:.claude/logs)
 ---
 
 ## Framing
 
-This skill helps manage conversation context when logs grow large. It's purely advisory — you decide what to archive, summarize, or discard.
+This skill helps manage conversation context when logs grow large. It's purely **read-only advisory** — you decide what to archive, summarize, or discard.
 
 ## Scope (strict)
 
 You MAY:
-- Read `.claude/logs/*.jsonl` files (use `head`, `wc -l` to sample without loading full content).
-- Estimate size/line counts and age of logs.
-- Propose which logs are "safe to shrink" (old, already reviewed in memory/docs, verbose but non-critical).
+- List and read `.claude/logs/*.jsonl` files to sample content.
+- Estimate size/line counts and rough age of logs.
+- Propose which logs are candidates for compression (old, already reviewed, verbose but non-critical).
 - Recommend action: archive, summarize, or truncate.
 
 You MUST NOT:
-- Write to `.claude/logs/` or delete files.
-- Modify `.claude/rules/`, `ROADMAP.md`, `HANDOFF.md`, `MASTER_PLAN.md`, `docs/**`.
-- Make decisions on behalf of the user about what to keep.
-- Suggest compression of operational logs that are part of policy-gated decisions (e.g., `skills.jsonl` if enforcement is active).
+- Write to, edit, or delete any files — not even `.claude/logs/`.
+- Modify docs, ROADMAP, HANDOFF, MASTER_PLAN, `.claude/rules/`.
+- Make decisions on behalf of the user.
+- Suggest archiving operational logs that are actively gated (e.g., `skills.jsonl` if Stop enforcement is live).
 
 ## Steps
 
-1. **Sample logs** — list files in `.claude/logs/` with sizes + line counts.
-2. **Age check** — read first/last line of each `.jsonl` to infer age range.
-3. **Propose candidates** — output in Markdown:
+1. **Enumerate logs** — `ls -lh .claude/logs/*.jsonl` (or `find .claude/logs -name "*.jsonl"`).
+
+2. **Estimate line counts** — `wc -l` per file.
+
+3. **Infer age** — sample first/last line of each file (timestamps in entry `ts` field).
+
+4. **Propose candidates** — output Markdown table:
    ```markdown
    ## Compression candidates
 
-   | Log | Lines | Size | Age | Candidate | Reason |
-   |-----|-------|------|-----|-----------|--------|
-   | skills.jsonl | 48 | 12KB | 3 days | Archive if audit-trail not needed | Rare invocations after E2b kickoff |
+   | Log | Lines | Est. Size | Age range | Action |
+   |-----|-------|-----------|-----------|--------|
+   | hooks.jsonl | 523 | ~80KB | 4–7 days old | Safe to archive; non-critical operational trace |
+   | phase-gates.jsonl | 42 | ~5KB | 1–2 hours old | Keep; recent lifecycle events |
    ```
 
-4. **Provide context recovery estimate** — "Archiving X and Y would reclaim ~N tokens and restore conversion space."
+5. **Estimate context savings** — "Archiving hooks.jsonl + phase-gates-old.jsonl would recover ~100K tokens."
 
-5. **Stop** — do NOT act. User decides and executes.
+6. **STOP** — do NOT execute. User applies or discards the recommendation.
 
-6. **Log invocation** (best-effort):
+7. **Log invocation** (best-effort):
    ```bash
    .claude/skills/_shared/log-invocation.sh compress ok
    ```
 
-## Explicitly out of scope
-
-- Editing or deleting files.
-- Proposing compression of current session's operational logs (only "cold" old logs).
-- Modifying docs or changing user decisions.
-- Model routing overrides (defaulting to Sonnet).
-
 ## Failure modes
 
-- `.claude/logs/` missing → report gracefully; propose step 1 is to create logs if they don't exist yet.
-- Log file corrupted or unparseable JSON → skip that file and continue (advisory resilience).
+- `.claude/logs/` missing → skip gracefully; user likely hasn't run any logs yet.
+- Corrupted JSON in a log file → skip that file, continue with others.
+- Cannot read file → skip and note in output.
+
+## Explicitly out of scope
+
+- Editing, deleting, or writing any files.
+- Proposing compression of **active** operational logs (skills.jsonl if Stop is enforced, phase-gates.jsonl if recent).
+- Modifying docs.
+- Enforcing compression decisions (user-driven only).
