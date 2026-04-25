@@ -1,6 +1,6 @@
 ---
 name: test-audit
-description: Use when you want to audit test suites for potential issues (declares candidate signals: flaky, orphan, trivial assertions).
+description: "Use when you want to audit test suites for potential issues (declares candidate signals: flaky, orphan, trivial assertions)."
 allowed-tools:
   - Glob
   - Grep
@@ -42,26 +42,33 @@ Three types of candidate signals:
 
 1. **Discover test files** (Glob + Bash):
    - Use `Glob("**/*.test.ts")`, `Glob("**/*.spec.ts")`, `Glob("**/test_*.py")`, `Glob("**/tests/test_*.py")`, etc.
-   - Identify the test structure and language.
+   - Identify the test structure and language (TypeScript/JavaScript, Python, Go, Rust, etc.).
+   - Count discovered files to gauge repo test coverage scope.
 
 2. **Analyze each test file** (Read + Grep):
-   - Read the file. Parse the structure (test functions/describe blocks).
-   - Search for flaky patterns (assertions in loops: `for ... { expect(...) }`).
-   - Search for orphan patterns (imports from non-existent source: `import X from "../missing/path"`).
-   - Search for trivial assertions (`assert True`, `assert False`, standalone `assert x`).
+   - Read the file. Parse the structure (test functions/describe blocks, imports, fixtures).
+   - **Flaky risk detection** (Grep): search for assertions inside loops, conditionals, or state-dependent blocks:
+     - TypeScript/JS: `for\s*\([^)]*\)\s*\{[^}]*expect\(` or `if\s*\([^)]*\)\s*\{[^}]*expect\(`
+     - Python: `for .* in .*:\s+assert` or `if .*:\s+assert`
+   - **Orphan test detection** (Grep + Read): parse imports and check if referenced paths exist in source:
+     - Collect all `import/from` statements pointing to source code.
+     - Use `Glob` to verify those paths exist; report missing ones.
+   - **Trivial assertion detection** (Grep): search for meaningless assertions:
+     - `assert True`, `assert False`, `assert 1`, `assert 0`, `assert ""`, `assert None`
+     - Standalone `assert x` without comparison (high risk; hard to fail).
 
-3. **Declare candidate signals**:
-   - For each signal found, note the file, line, and reason.
-   - Classify by type (flaky / orphan / trivial).
-   - Do NOT run the tests to validate — this is static analysis only.
+3. **Declare candidate signals** (synthesis):
+   - For each signal found, record: file path, line number, pattern matched, reasoning.
+   - Classify by type: orphan (highest severity) ≥ flaky > trivial.
+   - Keep counts per type to summarize scope.
 
-4. **Report** (max 10 findings to keep output reasonable):
-   - Group by file.
-   - List candidates in severity order (orphan ≥ flaky > trivial).
-   - For each, provide reasoning, not a directive.
-   - Example: `tests/unit/foo.test.ts:15 — Assertion inside loop (flaky risk): for (const item of ...) { expect(...) }`.
+4. **Report** (constrain output, max 10 findings):
+   - Group by severity tier (orphan findings first, then flaky, then trivial).
+   - For each finding, format: `<file>:<line> — <type>: <pattern snippet> (<reasoning>)`.
+   - Example: `tests/unit/foo.test.ts:15 — Flaky risk: assertion inside for-loop (assert within loop is brittle to execution order)`.
+   - Include summary: "Found X orphan candidates, Y flaky candidates, Z trivial assertions. This is a static analysis sample, not exhaustive."
 
-5. **No guarantees**: Conclude with a note that this is advisory; user reviews and decides.
+5. **No guarantees**: Conclude with a note: "This is advisory-only. User reviews findings and decides which are real issues. Some candidates may be false positives (e.g., intentional assert-in-loop for batch testing)."
 
 6. **Log** (Bash call):
 ```bash

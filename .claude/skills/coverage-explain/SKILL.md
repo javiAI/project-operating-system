@@ -1,6 +1,6 @@
 ---
 name: coverage-explain
-description: Use when coverage reports show gaps (reads and explains coverage report data, declares missing coverage strategy).
+description: "Use when coverage reports show gaps (reads and explains coverage report data, declares missing coverage strategy)."
 allowed-tools:
   - Glob
   - Grep
@@ -39,32 +39,45 @@ When a coverage report shows a gap:
 
 ## Steps
 
-1. **Locate coverage report** (Glob + Bash):
-   - Detect coverage report locations: `coverage/lcov.json`, `.coverage`, `coverage.json`, `coverage.html/`, `htmlcov/`, `.nyc_output/coverage.json`.
-   - If user provides a path, read that; otherwise search canonical paths.
-   - If no report found, declare the limitation and suggest running coverage first.
+1. **Locate coverage report** (Glob + Bash + Read):
+   - Search canonical paths: `coverage/lcov.json`, `.coverage`, `coverage.json`, `coverage.html/`, `htmlcov/`, `.nyc_output/coverage.json`, `coverage/coverage.json`.
+   - If user provides a path arg, read that directly (Bash find to verify existence).
+   - If no report found, declare: "No coverage report detected in canonical locations. Run your test suite with coverage enabled first (e.g., `npm run test-coverage`, `pytest --cov`)."
+   - Declare which format was found (lcov.json, pytest-cov JSON, NYC, etc.).
 
-2. **Parse report** (Read):
-   - If lcov.json format: extract file entries, parse coverage per-file (lines_valid, lines_hit, branches_covered, etc.).
-   - If simple JSON: extract top-level coverage metrics (lines, branches, statements, functions).
-   - If HTML directory: look for a summary JSON or extract from index.html (heuristic, low confidence).
-   - Declare which report format you found and any limitations.
+2. **Parse report** (Read + analyze):
+   - **lcov.json**: extract file entries (`SF:filename`, `LH:lines_hit`, `LF:lines_found`); compute per-file coverage %.
+   - **JSON (pytest-cov, NYC format)**: extract top-level totals + per-file entries; compute %.
+   - **HTML directory**: attempt to parse `index.html` for summary or look for embedded JSON data.
+   - Declare confidence level: "Full data available" vs "Partial data (summary only)" vs "Heuristic extraction (low confidence)".
 
 3. **Analyze gaps**:
-   - Rank files by coverage % (lowest first).
-   - Identify files with <50%, <75%, <90% coverage (thresholds for severity).
-   - For each, calculate how many lines/branches are uncovered.
+   - **Overall coverage**: extract or compute total (lines_hit / lines_found × 100).
+   - **Per-file ranking**: sort all files by coverage % (lowest first).
+   - **Severity tiers**:
+     - Red (<50%): very low coverage, likely untested.
+     - Yellow (50–75%): gaps exist, reasonable targets exist.
+     - Green (>75%): mostly covered, refinement phase.
+   - For top 3–5 files, calculate: uncovered lines = lines_found - lines_hit.
 
-4. **Declare minimum targets**:
-   - If repo is currently at 60% overall, suggest raising to 70–75% as a reasonable next step.
-   - Do NOT impose a mandate (e.g., "must reach 95%"); user decides.
-   - For the top 3 uncovered files, suggest what % would help.
+4. **Declare minimum targets** (advisory, user decides):
+   - Current state: "Overall: 65% (X lines covered, Y lines uncovered)."
+   - If current < 70%: suggest incremental target (e.g., "Raising to 70–75% would require covering ~X additional lines in the top 3 files below").
+   - Do NOT mandate a threshold; frame as "Reasonable next step" or "Minimum baseline".
+   - For each red/yellow file, suggest: "File A currently 40%; raising to 60% would add Y lines."
 
-5. **Report**:
-   - Current state: overall coverage % (if available).
-   - Top uncovered files: sorted by % and gap size.
-   - Suggested minimal targets: "Raising the overall threshold to 75% would require covering X additional lines across Y files."
-   - No assertions, no directives, no code generation.
+5. **Report format**:
+   - **Header**: "Coverage Report Analysis (report from: <source> | timestamp: <if available>)".
+   - **Overall stats**: coverage %, total lines/branches.
+   - **Top gaps** (top 3–5 files):
+     ```
+     File | Coverage | Uncovered lines | Suggest to
+     -----|----------|-----------------|----------
+     src/utils/foo.ts | 45% | 120 | 60% (+60 lines)
+     src/api/bar.ts | 52% | 95 | 70% (+40 lines)
+     ```
+   - **Summary**: "Minimal viable next step: raising overall to 70% requires covering ~X lines across Y files (roughly Z% effort increase)."
+   - **Disclaimer**: "This is advisory. User owns coverage strategy. Some lines may be intentionally uncovered (error paths, edge cases, dead code)."
 
 6. **Log** (Bash call):
 ```bash
