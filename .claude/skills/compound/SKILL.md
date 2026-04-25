@@ -11,7 +11,7 @@ allowed-tools:
   - Bash(.claude/skills/_shared/log-invocation.sh:*)
 ---
 
-# compound — Extract and registry reusable code patterns
+# compound — Extract and register reusable code patterns
 
 Emit a pattern proposal PR when a merged branch exhibits extractable patterns. Writer-scoped strict: only .claude/patterns/ — does not touch code, tests, or docs.
 
@@ -52,7 +52,7 @@ Minimal: context, signal, rule, examples. Last observed auto-managed by pattern-
 1. **Scope check**: Does the branch diff (per `policy.yaml.lifecycle.post_merge.skills_conditional`) warrant pattern extraction?
    - Trigger: touched paths in `{generator/lib/**, generator/renderers/**, hooks/**, skills/**, templates/**}`.
    - Skip if only docs, only `.claude/patterns/`, or `<MIN_FILES_CHANGED`.
-   - Precondition: `git merge-base main HEAD` resolves and PR #22 merged into main.
+   - Precondition: current branch has merged into main (verify via `git merge-base main HEAD`).
 
 2. **Prepare context** (main thread):
    - Read `git log --oneline main...HEAD` (branch commits).

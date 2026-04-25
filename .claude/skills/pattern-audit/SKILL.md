@@ -47,7 +47,7 @@ Audit for:
 
 3. **Delegate to `code-architect`** (if patterns exist):
    - Send all patterns + their signals.
-   - Task: "Search the codebase for each pattern's signal. For each pattern, report: (a) signal found ≥2 times (✓), (b) signal drift (changed, found <2 times, no longer found), (c) example files changed/deleted, (d) rule inconsistency. Output: structured drift report per pattern, no code changes."
+   - Task: "Search the codebase for each pattern's signal. For each pattern, report: (a) signal found ≥2 times (✓), (b) signal drift (changed, found <2 times, no longer found), (c) example files changed/deleted, (d) rule inconsistency. Output format: structured drift report per pattern, no code changes. Return format: per-pattern findings with (✓ Clean | ⚠ Drift + details)."
    - Subagent returns a summary (findings only, no mutations).
 
 4. **Emit diagnostic report**:
