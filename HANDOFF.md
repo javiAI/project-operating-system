@@ -5,7 +5,8 @@
 ## 1. Snapshot
 
 - Repo: `project-operating-system` (plugin `pos`).
-- Fase actual: **E2a ✅ cerrada en rama** (`feat/e2a-skill-review-simplify`, PR pendiente — docs-sync + simplify + review en curso). Anterior: **E1b ✅ PR #20** (`ac6bd4d`). Siguiente tras merge E2a: **E2b — `feat/e2b-skill-compress-audit-plugin`** (segundo par de Fase E bloque calidad — `/pos:compress` haiku + `/pos:audit-plugin` community-tool gate).
+- Fase actual: **E2b en PR #22** (`feat/e2b-skill-compress-audit-plugin`, pendiente merge). Anterior: **E2a ✅ PR #21** (`9dc4620`). Siguiente tras merge E2b: **E3a — `feat/e3a-skill-compound-pattern-audit`** (primer par Fase E bloque patterns — `/pos:compound` + `/pos:pattern-audit`).
+- E2b entregó: `/pos:compress` (read-only log planner) + `/pos:audit-plugin` (read-only community-tool gate). Ambas advisory-only; enforcement deferred. Policy: `skills_allowed` 6→8.
 - Fuente de verdad ejecutable: [MASTER_PLAN.md](MASTER_PLAN.md).
 - Estado vivo: [ROADMAP.md](ROADMAP.md).
 - Arquitectura canonical: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -137,15 +138,25 @@ Scope (ver [MASTER_PLAN.md § Rama E3a](MASTER_PLAN.md)):
 - Primer par del bloque patterns + tests. `/pos:compound` (post-merge, extrae patrones reutilizables) + `/pos:pattern-audit` (valida no hay drift). Cierra el sistema de captura que D5 `post-action` sugería en advisory; ahora implementa la skill real.
 - Precedente E2a: delegación hybrid via Agent tool — `compound` puede ser candidata si necesita analizar múltiples archivos modificados (patrón: main prepara diff, subagent extrae patrones, main escribe al `.claude/patterns/`). Evaluación en Fase -1 si delega o main-strict.
 
-## 10. Estado E2b (cerrada en rama, docs-sync en curso)
+## 10. Estado E2b (en PR #22, pendiente merge)
 
-## 10. Estado D5 (cerrada en rama)
+Entregables completados:
+
+- `/pos:compress`: read-only advisory planner. Propone compresión de `.claude/logs/*.jsonl` (edad, tamaño, importancia). User decides ejecución. Logging best-effort.
+- `/pos:audit-plugin`: read-only advisory gate. Audita community tools contra SAFETY_POLICY.md 6-item checklist. Retorna GO/NO-GO/NEEDS_MORE_INFO. No instala, no enforza, no modifica policy. E2b advisory-only (enforcement deferred).
+- Policy: `skills_allowed` extendido 6→8 (compress, audit-plugin).
+- Tests: parametrizados (8 skills) + behavior contracts (STOP signal, advisory keywords locked).
+- Docs: MASTER_PLAN § E2b (decisiones A1a-A5a ratificadas) + ROADMAP (✅) + HANDOFF (este, actualizado) + skills-map.md (descripción final).
+
+**Próxima acción**: merge PR #22 → Fase N+7 context gate (§3) → Fase -1 de E3a (`feat/e3a-skill-compound-pattern-audit`).
+
+## 12. Estado D5 (cerrada en rama)
 
 `post-action` vivo: en cada `PostToolUse(Bash)` aplica detección jerárquica 2 tiers. Tier 1 (`shlex.split`): matcher A `git merge <ref>` excluyendo flags de control `--abort/--quit/--continue/--skip`; matcher C `git pull` excluyendo `--rebase`/`-r`. Tier 2 (`git reflog HEAD -1 --format=%gs`): confirma `"merge "` (A) o `"pull:" | "pull "` sin `"pull --rebase"` (C) — evita disparar en `git merge --abort` o en pulls rebase-sin-flag. `gh pr merge` (matcher B) descartado en Fase -1 por ausencia de `tool_response.exit_code` garantizado en PostToolUse(Bash). Con ambos tiers confirmados: `git diff --name-only HEAD@{1} HEAD` + `fnmatch` contra `TRIGGER_GLOBS` / `SKIP_IF_ONLY_GLOBS` / `MIN_FILES_CHANGED=2` (mirror literal de `policy.yaml.lifecycle.post_merge.skills_conditional[0]`). Match → emite `additionalContext` sugiriendo `/pos:compound` (4 líneas, cap 3 paths + `(+N more)`); nunca dispatcha la skill (D5 advisory-only, E3a entrega la skill real). Exit 0 siempre — PostToolUse non-blocking (ni `permissionDecision` ni exit 2 bajo ningún camino). Double log: `post-action.jsonl` con 4 status (`tier2_unconfirmed`, `diff_unavailable`, `confirmed_no_triggers`, `confirmed_triggers_matched`) + `phase-gates.jsonl` evento `post_merge` sólo en los dos status confirmed — los advisory tier2/diff no cruzan la puerta del lifecycle. Pass-through (Tier 1 miss) silencioso (cero log, replica D1). 111 tests D5 (110 passed + 1 skip intencional — delegación interna entre integración y unit), 432 totales en `hooks/**`, 97% coverage sobre `post-action.py`; D1/D2/D3/D4 intactos. Hardcode de `policy.yaml` es la **segunda repetición tras D4** — regla #7 CLAUDE.md cumplida dos veces, precondición abierta para la rama policy-loader.
 
 **Detalle + deferrals + ajustes**: ver [ROADMAP.md § feat/d5](ROADMAP.md), [MASTER_PLAN.md § Rama D5](MASTER_PLAN.md) y [.claude/rules/hooks.md § Quinto hook](.claude/rules/hooks.md).
 
-## 11. Estado D5b (cerrada en rama, docs-sync en curso)
+## 13. Estado D5b (cerrada en rama)
 
 `refactor/d5-policy-loader` — sub-rama que cumple la precondición CLAUDE.md regla #7 abierta por D4 + D5 (dos repeticiones hardcoded de `policy.yaml`). Entrega `hooks/_lib/policy.py` como **fuente única de verdad para los hooks D3/D4/D5** y migra los tres consumidores en el mismo PR.
 

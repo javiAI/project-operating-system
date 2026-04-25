@@ -10,11 +10,12 @@ HOOKS_DIR = Path(__file__).resolve().parents[1]
 if str(HOOKS_DIR) not in sys.path:
     sys.path.insert(0, str(HOOKS_DIR))
 
-# Import ALLOWED_SKILLS from the canonical location (skills test file)
+# Import ALLOWED_SKILLS from the canonical location (shared skills tests module)
 # to avoid duplication across test files.
 SKILLS_TEST_DIR = Path(__file__).resolve().parents[3] / ".claude" / "skills" / "tests"
-sys.path.insert(0, str(SKILLS_TEST_DIR))
-from test_skill_frontmatter import ALLOWED_SKILLS  # noqa: E402
+if str(SKILLS_TEST_DIR) not in sys.path:
+    sys.path.insert(0, str(SKILLS_TEST_DIR))
+from _allowed_skills import ALLOWED_SKILLS  # noqa: E402
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures" / "policy"
 

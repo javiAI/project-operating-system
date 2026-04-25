@@ -23,28 +23,9 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SKILLS_DIR = REPO_ROOT / ".claude" / "skills"
 
-# Skill slugs delivered through Fase E so far. Constant is contract-bound
-# (must match `policy.yaml.skills_allowed` exactly), not era-bound — it was
-# renamed from `E1_SKILLS_KNOWN` to `ALLOWED_SKILLS` in E2a once the allowlist
-# crossed a phase boundary. Adding a skill = extending this list +
-# `policy.yaml.skills_allowed` in the same branch; the suite's 11 parametrized
-# contract tests cover it automatically.
-#
-# Delivered:
-#   E1a — project-kickoff, writing-handoff
-#   E1b — branch-plan, deep-interview
-#   E2a — pre-commit-review, simplify
-#   E2b — compress, audit-plugin
-ALLOWED_SKILLS = [
-    "project-kickoff",
-    "writing-handoff",
-    "branch-plan",
-    "deep-interview",
-    "pre-commit-review",
-    "simplify",
-    "compress",
-    "audit-plugin",
-]
+# Import canonical ALLOWED_SKILLS from shared module (E2b refactor).
+# Single source of truth for all test files to avoid duplication.
+from _allowed_skills import ALLOWED_SKILLS  # noqa: E402
 
 # Officially supported SKILL.md frontmatter fields in Claude Code.
 # Extending this set requires citing an official source — see feedback memory
