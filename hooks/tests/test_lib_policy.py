@@ -12,7 +12,7 @@ if str(HOOKS_DIR) not in sys.path:
 
 # Import ALLOWED_SKILLS from the canonical location (shared skills tests module)
 # to avoid duplication across test files.
-SKILLS_TEST_DIR = Path(__file__).resolve().parents[3] / ".claude" / "skills" / "tests"
+SKILLS_TEST_DIR = Path(__file__).resolve().parents[2] / ".claude" / "skills" / "tests"
 if str(SKILLS_TEST_DIR) not in sys.path:
     sys.path.insert(0, str(SKILLS_TEST_DIR))
 from _allowed_skills import ALLOWED_SKILLS  # noqa: E402
