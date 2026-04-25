@@ -1,0 +1,99 @@
+---
+name: compound
+description: Use when a branch has merged into main and multiple code patterns emerge worth capturing for reuse.
+allowed-tools:
+  - Agent(subagent_type:code-architect)
+  - Glob
+  - Grep
+  - Read
+  - Write
+  - Bash(git log:main...HEAD, git diff:main...HEAD)
+  - Bash(.claude/skills/_shared/log-invocation.sh:*)
+---
+
+# compound — Extract and registry reusable code patterns
+
+Emit a pattern proposal PR when a merged branch exhibits extractable patterns. Writer-scoped strict: only .claude/patterns/ — does not touch code, tests, or docs.
+
+## Scope (writer-scoped strict)
+
+You MAY:
+- Read the merged diff (`main...HEAD`).
+- Delegate deep pattern analysis to `code-architect` subagent via Agent tool (hybrid pattern: main prepares context, subagent analyzes, main writes).
+- Create `.claude/patterns/<name>.md` with pattern entries (write-only, strict scope).
+
+You MUST NOT:
+- Refactor or modify code (even if patterns are obvious — code lives in prior branches).
+- Touch code, tests, or docs outside `.claude/patterns/`.
+- Auto-invoke `/pos:pattern-audit` (opt-in after the pattern proposal is reviewed).
+
+## Pattern format
+
+Each `.claude/patterns/*.md` entry declares a reusable pattern with mandatory fields:
+
+```
+## <Pattern Name>
+
+**Context**: [when this pattern is applicable; preconditions]
+
+**Signal**: [observable markers that indicate this pattern should be used]
+
+**Rule**: [the actual code snippet, abstraction, or idiom]
+
+**Examples**: [2–3 code references from the codebase where it appears]
+
+**Last observed**: [ISO date; updated on every PR that touches the pattern]
+```
+
+Minimal: context, signal, rule, examples. Last observed auto-managed by pattern-audit.
+
+## Steps
+
+1. **Scope check**: Does the branch diff (per `policy.yaml.lifecycle.post_merge.skills_conditional`) warrant pattern extraction?
+   - Trigger: touched paths in `{generator/lib/**, generator/renderers/**, hooks/**, skills/**, templates/**}`.
+   - Skip if only docs, only `.claude/patterns/`, or `<MIN_FILES_CHANGED`.
+   - Precondition: `git merge-base main HEAD` resolves and PR #22 merged into main.
+
+2. **Prepare context** (main thread):
+   - Read `git log --oneline main...HEAD` (branch commits).
+   - List touched top-level dirs + file count.
+   - Collect `.claude/patterns/*.md` existing entries (to avoid duplicates).
+
+3. **Delegate to `code-architect`** via Agent tool:
+   - Full diff: `git diff main...HEAD`.
+   - Existing patterns (so subagent can avoid re-proposing).
+   - Explicit task: "identify 1–3 patterns that repeat ≥2 times across the diff and would reduce future duplication. Output: pattern proposals (no code refactoring, no file changes)."
+   - Subagent returns a summary (not raw code).
+
+4. **Write pattern proposals** (if any):
+   - For each pattern from the subagent, create `.claude/patterns/<kebab-slug>.md`.
+   - Fill in Context, Signal, Rule (copy from codebase, verbatim), Examples, Last observed (today's ISO date).
+   - If a pattern already exists in `.claude/patterns/`, merge (append examples, update Last observed); do NOT overwrite.
+
+5. **STOP**. Do NOT:
+   - Create a PR yourself.
+   - Invoke `/pos:pattern-audit`.
+   - Refactor code outside `.claude/patterns/`.
+
+   Wait for user approval. If patterns are novel, user may review them, invoke pattern-audit, and decide to merge or iterate.
+
+6. **Log the invocation** (best-effort):
+
+   ```bash
+   .claude/skills/_shared/log-invocation.sh compound ok
+   ```
+
+## Failure modes
+
+- Branch `HEAD` is `main` → no diff; stop. Log `status: partial`.
+- Diff empty (no files changed) → no patterns to extract; stop. Log `status: partial`.
+- `git merge-base` unavailable → stop; log `status: degraded`.
+- Subagent returns empty / trivial suggestions → emit nothing, log `status: partial`.
+- Pattern candidate conflicts with existing pattern → flag in pattern comment, user decides merge strategy. Log `status: ok` (attempt made, decision deferred).
+
+## Explicitly out of scope
+
+- Refactoring code (that's a prior branch's job).
+- Modifying existing patterns (that's pattern-audit + user decision).
+- Creating PR (user-gated).
+- Updating MASTER_PLAN, ROADMAP, or docs (not pattern registry duty; docs-sync is separate).
