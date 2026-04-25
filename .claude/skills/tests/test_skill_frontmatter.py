@@ -680,6 +680,16 @@ class TestCompoundBehavior:
             "(marks writer-scoped limit: writes patterns, stops)."
         )
 
+    def test_body_declares_fallback(self):
+        """compound documents fallback to general-purpose if code-architect unavailable."""
+        _, body = read_skill("compound")
+        low = body.lower()
+        # Verify fallback is documented in the body
+        assert ("fallback" in low and "general-purpose" in low) or "general-purpose" in low, (
+            "compound body must document fallback to general-purpose subagent "
+            "when code-architect is unavailable."
+        )
+
 
 class TestPatternAuditBehavior:
     def test_body_mentions_patterns_directory(self):

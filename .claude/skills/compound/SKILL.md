@@ -3,6 +3,7 @@ name: compound
 description: Use when a branch has merged into main and multiple code patterns emerge worth capturing for reuse.
 allowed-tools:
   - Agent(subagent_type:code-architect)
+  - Agent(subagent_type:general-purpose)
   - Glob
   - Grep
   - Read
