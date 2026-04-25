@@ -5,8 +5,8 @@
 ## 1. Snapshot
 
 - Repo: `project-operating-system` (plugin `pos`).
-- Fase actual: **E2b en PR #22** (`feat/e2b-skill-compress-audit-plugin`, pendiente merge). Anterior: **E2a ✅ PR #21** (`9dc4620`). Siguiente tras merge E2b: **E3a — `feat/e3a-skill-compound-pattern-audit`** (primer par Fase E bloque patterns — `/pos:compound` + `/pos:pattern-audit`).
-- E2b entregó: `/pos:compress` (read-only log planner) + `/pos:audit-plugin` (read-only community-tool gate). Ambas advisory-only; enforcement deferred. Policy: `skills_allowed` 6→8.
+- Rama actual: **E3a ✅ PR #23** (`feat/e3a-skill-compound-pattern-audit`, en revisión docs-sync). Anterior: **E2b ✅ PR #22** (mergeada). Siguiente: **E3b — `feat/e3b-skill-test-scaffold-audit-coverage`** (skills `/pos:test-scaffold` + `/pos:test-audit` + `/pos:coverage-explain`).
+- E3a entregó: `/pos:compound` (writer-scoped pattern extraction, Agent delegation con fallback) + `/pos:pattern-audit` (read-only advisory, main-strict). Policy: `skills_allowed` 8→10.
 - Fuente de verdad ejecutable: [MASTER_PLAN.md](MASTER_PLAN.md).
 - Estado vivo: [ROADMAP.md](ROADMAP.md).
 - Arquitectura canonical: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).

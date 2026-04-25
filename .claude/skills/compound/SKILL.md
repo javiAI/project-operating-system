@@ -29,23 +29,29 @@ You MUST NOT:
 
 ## Pattern format
 
-Each `.claude/patterns/*.md` entry declares a reusable pattern with mandatory fields:
+Each `.claude/patterns/*.md` entry declares a reusable pattern with this structure:
 
 ```
-## <Pattern Name>
+# Pattern: <name>
 
-**Context**: [when this pattern is applicable; preconditions]
+## Context
+[when this pattern is applicable; preconditions]
 
-**Signal**: [observable markers that indicate this pattern should be used]
+## Signal
+[observable markers that indicate this pattern should be used]
 
-**Rule**: [the actual code snippet, abstraction, or idiom]
+## Rule
+[the actual code snippet, abstraction, or idiom]
 
-**Examples**: [2–3 code references from the codebase where it appears]
+## Examples
+- Branch/PR: <link or reference>
+- Files: <file paths where the pattern appears>
 
-**Last observed**: [ISO date; updated on every PR that touches the pattern]
+## Last observed
+<ISO date>; updated on every audit cycle
 ```
 
-Minimal: context, signal, rule, examples. Last observed auto-managed by pattern-audit.
+Mandatory fields: Context, Signal, Rule, Examples. Last observed auto-managed by pattern-audit.
 
 ## Steps
 
@@ -59,10 +65,12 @@ Minimal: context, signal, rule, examples. Last observed auto-managed by pattern-
    - List touched top-level dirs + file count.
    - Collect `.claude/patterns/*.md` existing entries (to avoid duplicates).
 
-3. **Delegate to `code-architect`** via Agent tool:
+3. **Delegate to `code-architect`** via Agent tool (with fallback):
    - Full diff: `git diff main...HEAD`.
    - Existing patterns (so subagent can avoid re-proposing).
    - Explicit task: "identify 1–3 patterns that repeat ≥2 times across the diff and would reduce future duplication. Output: pattern proposals (no code refactoring, no file changes)."
+   - Preferred subagent: `code-architect` (pattern extraction via architecture lens).
+   - Fallback if unavailable: `general-purpose` with same task (generic analysis acceptable).
    - Subagent returns a summary (not raw code).
 
 4. **Write pattern proposals** (if any):

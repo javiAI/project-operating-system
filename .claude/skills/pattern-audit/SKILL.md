@@ -2,7 +2,6 @@
 name: pattern-audit
 description: Use when you want to validate that existing `.claude/patterns/` entries remain consistent with the codebase and flag drift.
 allowed-tools:
-  - Agent(subagent_type:code-architect)
   - Glob
   - Grep
   - Read
@@ -14,17 +13,18 @@ allowed-tools:
 
 Read-only advisory skill: audit `.claude/patterns/` entries against the codebase to detect drift and inconsistency. Does not modify patterns or code.
 
-## Scope (read-only advisory)
+## Scope (read-only advisory, main-strict)
 
 You MAY:
 - Read `.claude/patterns/*.md` entries.
-- Search the codebase for pattern examples and signal indicators.
-- Delegate cross-file analysis to `code-architect` subagent (main prepares context, subagent analyzes, main reports).
+- Search the codebase for pattern examples and signal indicators (Grep, Bash git commands).
+- Analyze patterns locally for drift indicators.
 - Emit diagnostic reports (drift detected, signal changing, examples stale, etc.).
 
 You MUST NOT:
 - Modify `.claude/patterns/` or any other files (advisory-only).
 - Auto-apply fixes (user reviews and decides).
+- Use external AI analysis tools (main-strict analysis only).
 - Invoke `/pos:compound` (independent skill, user-driven).
 
 ## Drift detection targets
@@ -45,10 +45,12 @@ Audit for:
    - Collect all patterns + their signals and example file paths.
    - List candidate code files/dirs from Examples.
 
-3. **Delegate to `code-architect`** (if patterns exist):
-   - Send all patterns + their signals.
-   - Task: "Search the codebase for each pattern's signal. For each pattern, report: (a) signal found ≥2 times (✓), (b) signal drift (changed, found <2 times, no longer found), (c) example files changed/deleted, (d) rule inconsistency. Output format: structured drift report per pattern, no code changes. Return format: per-pattern findings with (✓ Clean | ⚠ Drift + details)."
-   - Subagent returns a summary (findings only, no mutations).
+3. **Analyze patterns locally** (if patterns exist, main-strict):
+   - For each pattern, search the codebase for its signal using Grep/Bash git commands.
+   - For each signal, count matches; flag if <2 occurrences.
+   - Verify Example file paths exist and haven't been refactored away.
+   - Compare Rule snippet against current usage patterns for consistency drift.
+   - Collect findings: (a) signal found ≥2 times (✓), (b) signal drift (changed, found <2 times, no longer found), (c) example files changed/deleted, (d) rule inconsistency.
 
 4. **Emit diagnostic report**:
    - Header: timestamp, patterns audited count, drift findings count.
@@ -76,7 +78,7 @@ Audit for:
 - `.claude/patterns/` missing or empty → log `status: partial` (nothing to audit).
 - `.claude/patterns/` entries malformed (missing Context/Signal/Rule) → log `status: ambiguous`, emit minimal report.
 - `git` or codebase read unavailable → log `status: degraded`.
-- Subagent returns empty findings → log `status: ok` (audit complete, all clean).
+- Local analysis returns no findings → log `status: ok` (audit complete, all clean).
 
 ## Explicitly out of scope
 

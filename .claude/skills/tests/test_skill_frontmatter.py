@@ -659,13 +659,16 @@ class TestCompoundBehavior:
         )
 
     def test_body_declares_pattern_format(self):
-        """compound must declare minimal pattern format (Context/Signal/Rule/Examples/Last observed)."""
+        """compound must use canonical pattern format: # Pattern: <name> + ## Context/Signal/Rule/Examples/Last observed."""
         _, body = read_skill("compound")
-        format_markers = ("context", "signal", "rule", "examples", "last observed")
-        count = sum(1 for marker in format_markers if marker in body.lower())
+        low = body.lower()
+        # Format signature: "# Pattern:" and the four mandatory sections
+        assert "# pattern:" in low, "compound body must declare pattern format with '# Pattern: <name>' heading."
+        mandatory_sections = ("## context", "## signal", "## rule", "## examples")
+        count = sum(1 for section in mandatory_sections if section in low)
         assert count >= 4, (
-            "compound body must declare minimal pattern format structure "
-            "(at least 4 of: Context, Signal, Rule, Examples, Last observed)."
+            "compound body must declare all 4 mandatory sections: "
+            "## Context, ## Signal, ## Rule, ## Examples (+ optional ## Last observed)."
         )
 
     def test_body_contains_stop_signal(self):
@@ -708,6 +711,16 @@ class TestPatternAuditBehavior:
         assert "does not modify" in low or "drift" in low or "diagnos" in low, (
             "pattern-audit body must state it does not modify patterns "
             "and emits drift/diagnostic reports instead."
+        )
+
+    def test_body_declares_main_strict_no_delegation(self):
+        """pattern-audit is main-strict: no Agent tool delegation in E3a."""
+        _, body = read_skill("pattern-audit")
+        low = body.lower()
+        delegation_tokens = ("delegate", "subagent", "code-architect", "agent(")
+        assert not any(tok in low for tok in delegation_tokens), (
+            "pattern-audit body must NOT mention Agent delegation or subagents; "
+            "analysis must be main-strict (local Grep/Bash only)."
         )
 
     def test_body_contains_stop_signal(self):

@@ -571,9 +571,23 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 
 ## FASE E3 — Skills patrones + tests
 
-### Rama E3a — `feat/e3a-skill-compound-pattern-audit`
+### Rama E3a — `feat/e3a-skill-compound-pattern-audit` ✅ PR #23
 
-**Scope**: `skills/compound/`, `skills/pattern-audit/`. Implementan el sistema de captura de patrones.
+**Scope**: `skills/compound/SKILL.md`, `skills/pattern-audit/SKILL.md`. Sistema de captura + auditoría de patrones reutilizables.
+
+**Decisiones ratificadas**:
+- **A1**: `compound` es writer-scoped strict (solo `.claude/patterns/`, no refactoring de código). ✅
+- **A2**: `pattern-audit` es read-only advisory, main-strict (sin delegación en E3a). ✅  
+- **A3**: `compound` delega a `code-architect` con fallback `general-purpose`. ✅
+
+**Entregables**:
+- `/pos:compound` — Extrae patrones post-merge via Agent-tool hybrid (preparación → delegación → escritura local a `.claude/patterns/`).
+- `/pos:pattern-audit` — Audita patrón registry por drift/inconsistencia (análisis local, reporte sin mutación).
+- Formato de patrón fijado: `# Pattern: <name>` con secciones `## Context/Signal/Rule/Examples/Last observed`.
+- Allowlist extendida: `skills_allowed` 8→10 entries en `policy.yaml`.
+- 9 behavior contract tests (5 compound + 4 pattern-audit) — all GREEN.
+
+**Criterio de salida**: PR #23 merged tras docs-sync (ROADMAP, HANDOFF, MASTER_PLAN, skills-map actualizadas).
 
 ### Rama E3b — `feat/e3b-skill-test-scaffold-audit-coverage`
 
