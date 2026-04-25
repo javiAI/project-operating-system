@@ -290,6 +290,9 @@ skills_allowed:
   - audit-plugin
   - compound
   - pattern-audit
+  - test-scaffold
+  - test-audit
+  - coverage-explain
 
 # ─────────────────────────────────────────────
 # Auditing

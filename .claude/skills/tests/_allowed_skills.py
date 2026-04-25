@@ -14,6 +14,7 @@ Delivered:
   E2a — pre-commit-review, simplify
   E2b — compress, audit-plugin
   E3a — compound, pattern-audit
+  E3b — test-scaffold, test-audit, coverage-explain
 """
 
 ALLOWED_SKILLS = [
@@ -27,4 +28,7 @@ ALLOWED_SKILLS = [
     "audit-plugin",
     "compound",
     "pattern-audit",
+    "test-scaffold",
+    "test-audit",
+    "coverage-explain",
 ]
