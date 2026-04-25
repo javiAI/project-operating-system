@@ -38,6 +38,11 @@ LOGGER = REPO_ROOT / ".claude" / "skills" / "_shared" / "log-invocation.sh"
 # module's sys.path mutation as a side effect of exec_module below.
 sys.path.insert(0, str(REPO_ROOT / "hooks"))
 
+# Import ALLOWED_SKILLS from the canonical location (skills test file)
+# to avoid duplication across test files.
+sys.path.insert(0, str(REPO_ROOT / ".claude" / "skills" / "tests"))
+from test_skill_frontmatter import ALLOWED_SKILLS  # noqa: E402
+
 _spec = importlib.util.spec_from_file_location("stop_policy_check", HOOK)
 assert _spec is not None and _spec.loader is not None
 sp = importlib.util.module_from_spec(_spec)
@@ -229,20 +234,11 @@ class TestEnforcementEndToEnd:
         log line per skill via the shared logger, invoke Stop, expect allow.
         Guards against a typo in either the policy, the logger, or the Stop
         hook silently breaking the full 8-skill contract."""
-        write_skills_allowed(
-            repo,
-            ["project-kickoff", "writing-handoff",
-             "branch-plan", "deep-interview",
-             "pre-commit-review", "simplify",
-             "compress", "audit-plugin"],
-        )
-        for skill in ("project-kickoff", "writing-handoff",
-                      "branch-plan", "deep-interview",
-                      "pre-commit-review", "simplify",
-                      "compress", "audit-plugin"):
+        write_skills_allowed(repo, ALLOWED_SKILLS)
+        for skill in ALLOWED_SKILLS:
             run_logger(repo, skill)
         result = run_stop_hook(repo)
         assert result.returncode == 0, (
-            f"expected allow for all 8 E1+E2a+E2b skills, got deny: "
+            f"expected allow for all {len(ALLOWED_SKILLS)} E1+E2a+E2b skills, got deny: "
             f"stdout={result.stdout!r}"
         )

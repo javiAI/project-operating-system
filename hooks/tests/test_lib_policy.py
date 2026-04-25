@@ -10,6 +10,12 @@ HOOKS_DIR = Path(__file__).resolve().parents[1]
 if str(HOOKS_DIR) not in sys.path:
     sys.path.insert(0, str(HOOKS_DIR))
 
+# Import ALLOWED_SKILLS from the canonical location (skills test file)
+# to avoid duplication across test files.
+SKILLS_TEST_DIR = Path(__file__).resolve().parents[3] / ".claude" / "skills" / "tests"
+sys.path.insert(0, str(SKILLS_TEST_DIR))
+from test_skill_frontmatter import ALLOWED_SKILLS  # noqa: E402
+
 FIXTURES_DIR = Path(__file__).parent / "fixtures" / "policy"
 
 
@@ -831,13 +837,4 @@ class TestRealRepoPolicy:
         """
         from _lib import policy
         repo_root = Path(__file__).resolve().parents[2]
-        assert policy.skills_allowed_list(repo_root) == (
-            "project-kickoff",
-            "writing-handoff",
-            "branch-plan",
-            "deep-interview",
-            "pre-commit-review",
-            "simplify",
-            "compress",
-            "audit-plugin",
-        )
+        assert policy.skills_allowed_list(repo_root) == tuple(ALLOWED_SKILLS)
