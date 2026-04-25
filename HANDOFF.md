@@ -5,8 +5,8 @@
 ## 1. Snapshot
 
 - Repo: `project-operating-system` (plugin `pos`).
-- Fase actual: **E2b en PR #22** (`feat/e2b-skill-compress-audit-plugin`, pendiente merge). Anterior: **E2a ✅ PR #21** (`9dc4620`). Siguiente tras merge E2b: **E3a — `feat/e3a-skill-compound-pattern-audit`** (primer par Fase E bloque patterns — `/pos:compound` + `/pos:pattern-audit`).
-- E2b entregó: `/pos:compress` (read-only log planner) + `/pos:audit-plugin` (read-only community-tool gate). Ambas advisory-only; enforcement deferred. Policy: `skills_allowed` 6→8.
+- Rama actual: **E3a ✅ PR #23** (`feat/e3a-skill-compound-pattern-audit`, en revisión docs-sync). Anterior: **E2b ✅ PR #22** (mergeada). Siguiente: **E3b — `feat/e3b-skill-test-scaffold-audit-coverage`** (skills `/pos:test-scaffold` + `/pos:test-audit` + `/pos:coverage-explain`).
+- E3a entregó: `/pos:compound` (writer-scoped pattern extraction, Agent delegation con fallback) + `/pos:pattern-audit` (read-only advisory, main-strict). Policy: `skills_allowed` 8→10.
 - Fuente de verdad ejecutable: [MASTER_PLAN.md](MASTER_PLAN.md).
 - Estado vivo: [ROADMAP.md](ROADMAP.md).
 - Arquitectura canonical: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -131,14 +131,18 @@ Hasta que `pos` tenga sus propias skills:
 
 ## 9. Próxima rama
 
-**E3a — `feat/e3a-skill-compound-pattern-audit`** (tras merge de E2b — primer par de Fase E bloque patterns; abre E3).
+**E3b — `feat/e3b-skill-test-scaffold-audit-coverage`** (tras merge de E3a — segundo bloque de Fase E).
 
-Scope (ver [MASTER_PLAN.md § Rama E3a](MASTER_PLAN.md)):
+Scope:
 
-- Primer par del bloque patterns + tests. `/pos:compound` (post-merge, extrae patrones reutilizables) + `/pos:pattern-audit` (valida no hay drift). Cierra el sistema de captura que D5 `post-action` sugería en advisory; ahora implementa la skill real.
-- Precedente E2a: delegación hybrid via Agent tool — `compound` puede ser candidata si necesita analizar múltiples archivos modificados (patrón: main prepara diff, subagent extrae patrones, main escribe al `.claude/patterns/`). Evaluación en Fase -1 si delega o main-strict.
+- Tercer, cuarto y quinto skill del bloque Calidad/Test:
+  - `/pos:test-scaffold`: genera skeleton de tests al crear archivo sin test pair.
+  - `/pos:test-audit`: on-demand/pre-release, detecta flaky/orphan/trivial assertions.
+  - `/pos:coverage-explain`: cuando coverage falla, explica por qué + targets mínimos.
+- Contrato esperado: test-scaffold writer-scoped (crea archivos), test-audit read-only advisory (análisis sin mutación), coverage-explain read-only advisory (diagnóstico).
+- Evaluation en Fase -1 de E3b si hay delegation o main-strict.
 
-## 10. Estado E2b (en PR #22, pendiente merge)
+## 10. Estado E2b (✅ merged PR #22)
 
 Entregables completados:
 
@@ -146,17 +150,15 @@ Entregables completados:
 - `/pos:audit-plugin`: read-only advisory gate. Audita community tools contra SAFETY_POLICY.md 6-item checklist. Retorna GO/NO-GO/NEEDS_MORE_INFO. No instala, no enforza, no modifica policy. E2b advisory-only (enforcement deferred).
 - Policy: `skills_allowed` extendido 6→8 (compress, audit-plugin).
 - Tests: parametrizados (8 skills) + behavior contracts (STOP signal, advisory keywords locked).
-- Docs: MASTER_PLAN § E2b (decisiones A1a-A5a ratificadas) + ROADMAP (✅) + HANDOFF (este, actualizado) + skills-map.md (descripción final).
+- Docs: MASTER_PLAN § E2b (decisiones A1a-A5a ratificadas) + ROADMAP (✅) + HANDOFF (actualizado) + skills-map.md (descripción final).
 
-**Próxima acción**: merge PR #22 → Fase N+7 context gate (§3) → Fase -1 de E3a (`feat/e3a-skill-compound-pattern-audit`).
-
-## 12. Estado D5 (cerrada en rama)
+## 11. Estado D5 (cerrada en rama)
 
 `post-action` vivo: en cada `PostToolUse(Bash)` aplica detección jerárquica 2 tiers. Tier 1 (`shlex.split`): matcher A `git merge <ref>` excluyendo flags de control `--abort/--quit/--continue/--skip`; matcher C `git pull` excluyendo `--rebase`/`-r`. Tier 2 (`git reflog HEAD -1 --format=%gs`): confirma `"merge "` (A) o `"pull:" | "pull "` sin `"pull --rebase"` (C) — evita disparar en `git merge --abort` o en pulls rebase-sin-flag. `gh pr merge` (matcher B) descartado en Fase -1 por ausencia de `tool_response.exit_code` garantizado en PostToolUse(Bash). Con ambos tiers confirmados: `git diff --name-only HEAD@{1} HEAD` + `fnmatch` contra `TRIGGER_GLOBS` / `SKIP_IF_ONLY_GLOBS` / `MIN_FILES_CHANGED=2` (mirror literal de `policy.yaml.lifecycle.post_merge.skills_conditional[0]`). Match → emite `additionalContext` sugiriendo `/pos:compound` (4 líneas, cap 3 paths + `(+N more)`); nunca dispatcha la skill (D5 advisory-only, E3a entrega la skill real). Exit 0 siempre — PostToolUse non-blocking (ni `permissionDecision` ni exit 2 bajo ningún camino). Double log: `post-action.jsonl` con 4 status (`tier2_unconfirmed`, `diff_unavailable`, `confirmed_no_triggers`, `confirmed_triggers_matched`) + `phase-gates.jsonl` evento `post_merge` sólo en los dos status confirmed — los advisory tier2/diff no cruzan la puerta del lifecycle. Pass-through (Tier 1 miss) silencioso (cero log, replica D1). 111 tests D5 (110 passed + 1 skip intencional — delegación interna entre integración y unit), 432 totales en `hooks/**`, 97% coverage sobre `post-action.py`; D1/D2/D3/D4 intactos. Hardcode de `policy.yaml` es la **segunda repetición tras D4** — regla #7 CLAUDE.md cumplida dos veces, precondición abierta para la rama policy-loader.
 
 **Detalle + deferrals + ajustes**: ver [ROADMAP.md § feat/d5](ROADMAP.md), [MASTER_PLAN.md § Rama D5](MASTER_PLAN.md) y [.claude/rules/hooks.md § Quinto hook](.claude/rules/hooks.md).
 
-## 13. Estado D5b (cerrada en rama)
+## 12. Estado D5b (cerrada en rama)
 
 `refactor/d5-policy-loader` — sub-rama que cumple la precondición CLAUDE.md regla #7 abierta por D4 + D5 (dos repeticiones hardcoded de `policy.yaml`). Entrega `hooks/_lib/policy.py` como **fuente única de verdad para los hooks D3/D4/D5** y migra los tres consumidores en el mismo PR.
 
@@ -183,7 +185,7 @@ Entregables completados:
 
 **Detalle + deferrals + ajustes**: ver [ROADMAP.md § refactor/d5-policy-loader](ROADMAP.md), [MASTER_PLAN.md § Rama D5b](MASTER_PLAN.md), [.claude/rules/hooks.md § Policy loader](.claude/rules/hooks.md) y [docs/ARCHITECTURE.md § 7](docs/ARCHITECTURE.md).
 
-## 12. Estado D6 (cerrada en rama, docs-sync en curso)
+## 13. Estado D6 (cerrada en rama, docs-sync en curso)
 
 `feat/d6-hook-pre-compact-stop` — sexto y séptimo hook Python, cierre de Fase D antes de arrancar Fase E (skills). Dos entregas en un PR deliberadamente (decisión Fase -1 "both-together"): ambos hooks comparten el mismo nuevo accessor pattern sobre el loader D5b (`pre_compact_rules` + `skills_allowed_list`) y se testean contra el mismo fixture set — separarlos habría generado churn sin beneficio.
 
@@ -199,7 +201,7 @@ Entregables completados:
 
 **Detalle + deferrals + ajustes**: ver [ROADMAP.md § feat/d6-hook-pre-compact-stop](ROADMAP.md), [MASTER_PLAN.md § Rama D6](MASTER_PLAN.md), [.claude/rules/hooks.md § Sexto hook + Séptimo hook](.claude/rules/hooks.md) y [docs/ARCHITECTURE.md § 7](docs/ARCHITECTURE.md).
 
-## 13. Estado E1a (cerrada en rama, docs-sync en curso)
+## 14. Estado E1a (cerrada en rama, docs-sync en curso)
 
 `feat/e1a-skill-kickoff-handoff` — **primera rama de Fase E y primera entrega de Claude Code Skills reales** del meta-repo. Cierra la asimetría pre-E (hooks D vivos pero skills referenciadas en `skills-map.md` inexistentes → invocaciones fallaban silenciosas) y activa el scaffold Stop entregado en D6 sin tocar código del hook.
 
@@ -234,7 +236,7 @@ Entregables completados:
 
 **Detalle + deferrals + ajustes**: ver [ROADMAP.md § feat/e1a-skill-kickoff-handoff](ROADMAP.md), [MASTER_PLAN.md § Rama E1a](MASTER_PLAN.md), [.claude/rules/skills-map.md](.claude/rules/skills-map.md) y [docs/ARCHITECTURE.md § 5 Skills](docs/ARCHITECTURE.md).
 
-## 14. Estado E1b (cerrada en rama, docs-sync en curso)
+## 15. Estado E1b (cerrada en rama, docs-sync en curso)
 
 `feat/e1b-skill-branch-plan-interview` — **segunda rama de Fase E**. Completa el par de skills de orquestación Fase -1 que E1a dejó abierto: `branch-plan` (producer de los seis entregables) + `deep-interview` (clarificador socrático opt-in). Ambas heredan el contrato primitive-minimal canonizado en E1a sin reabrirlo.
 
@@ -266,7 +268,7 @@ Entregables completados:
 
 **Detalle + deferrals + ajustes**: ver [ROADMAP.md § feat/e1b-skill-branch-plan-interview](ROADMAP.md), [MASTER_PLAN.md § Rama E1b](MASTER_PLAN.md), [.claude/rules/skills-map.md](.claude/rules/skills-map.md) y [.claude/rules/skills.md](.claude/rules/skills.md) (reconciliado en esta rama).
 
-## 15. Estado E2a (cerrada en rama, docs-sync en curso)
+## 16. Estado E2a (cerrada en rama, docs-sync en curso)
 
 `feat/e2a-skill-review-simplify` — **tercera rama de Fase E**, primer par del bloque calidad. Cierra el ciclo pre-PR con dos skills orquestadas en orden canónico `simplify → pre-commit-review`: primero reduce el diff, luego el review opera sobre el diff ya ligero. Ambas heredan íntegro el contrato primitive-minimal de E1a/E1b y lo extienden con patrones nuevos (writer-scoped-al-diff + Agent-tool hybrid delegation).
 

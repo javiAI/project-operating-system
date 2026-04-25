@@ -231,16 +231,16 @@ class TestEnforcementEndToEnd:
         result = run_stop_hook(repo)
         assert result.returncode == 0
 
-    def test_all_eight_e1_e2b_skills_end_to_end(self, repo: Path):
-        """E2b extends the allowlist to 8 entries (E1a+E1b+E2a+E2b). Emit one
+    def test_all_ten_e1_e3a_skills_end_to_end(self, repo: Path):
+        """E3a extends the allowlist to 10 entries (E1a+E1b+E2a+E2b+E3a). Emit one
         log line per skill via the shared logger, invoke Stop, expect allow.
         Guards against a typo in either the policy, the logger, or the Stop
-        hook silently breaking the full 8-skill contract."""
+        hook silently breaking the full 10-skill contract."""
         write_skills_allowed(repo, ALLOWED_SKILLS)
         for skill in ALLOWED_SKILLS:
             run_logger(repo, skill)
         result = run_stop_hook(repo)
         assert result.returncode == 0, (
-            f"expected allow for all {len(ALLOWED_SKILLS)} E1+E2a+E2b skills, got deny: "
+            f"expected allow for all {len(ALLOWED_SKILLS)} E1a+E1b+E2a+E2b+E3a skills, got deny: "
             f"stdout={result.stdout!r}"
         )

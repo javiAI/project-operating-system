@@ -52,11 +52,11 @@ Canonical order pre-PR: **`simplify → pre-commit-review`**. Reduce primero, re
 
 | Skill | Lifecycle | Modelo | Context | Qué hace |
 |---|---|---|---|---|
-| `/pos:compound` | post-merge (trigger by touched_paths) | opus | fork | Extrae patrones reutilizables |
-| `/pos:pattern-audit` | Fase N+3 | sonnet | fork | Valida no hay drift sobre patrones activos |
-| `/pos:test-scaffold` | al crear archivo sin test pair | sonnet | fork | Genera skeleton de tests |
-| `/pos:test-audit` | on-demand / pre-release | sonnet | fork | Detecta flaky, orphan, trivial assertions |
-| `/pos:coverage-explain` | cuando coverage falla | haiku | main | Explica por qué + targets mínimos |
+| `compound` | post-merge (trigger by touched_paths, policy-driven) | opus | main (writer-scoped strict) | Lee merged diff; delega análisis a `code-architect` subagent (fallback `general-purpose`); escribe patrones a `.claude/patterns/` (formato canónico: `# Pattern:` + secciones `##`). No refactoring de código, solo propuestas de patrones. **STOP**: usuario revisa + aprueba merge de patrón. |
+| `pattern-audit` | Fase N+3 post-merge (manual invoke) | sonnet | main (main-strict, no delegation) | Lee entradas `.claude/patterns/`; busca signals en codebase (Grep/Bash); detecta drift (signal/examples/rule inconsistency). Emite reporte diagnóstico sin mutar archivos. **STOP**: usuario revisa y decide acción (actualizar patrón / invocar compound). |
+| `test-scaffold` | al crear archivo sin test pair | sonnet | fork | Genera skeleton de tests |
+| `test-audit` | on-demand / pre-release | sonnet | fork | Detecta flaky, orphan, trivial assertions |
+| `coverage-explain` | cuando coverage falla | haiku | main | Explica por qué + targets mínimos |
 
 ## Audit + Release (entregado en F)
 
