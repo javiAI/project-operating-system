@@ -589,9 +589,53 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 
 **Criterio de salida**: PR #23 merged tras docs-sync (ROADMAP, HANDOFF, MASTER_PLAN, skills-map actualizadas).
 
-### Rama E3b — `feat/e3b-skill-test-scaffold-audit-coverage`
+### Rama E3b — `feat/e3b-skill-test-scaffold-audit-coverage` ✅ PR #24
 
-**Scope**: `skills/test-scaffold/`, `skills/test-audit/`, `skills/coverage-explain/`.
+**Scope**: `skills/test-scaffold/SKILL.md`, `skills/test-audit/SKILL.md`, `skills/coverage-explain/SKILL.md`. Tercer bloque de Fase E (calidad de tests). Tres skills primitive-minimal heredando contrato canonizado en E1a/E1b/E2a/E2b/E3a — sin reabrir el frontmatter.
+
+**Decisiones Fase -1 ratificadas** (tras una iteración de recorte de scope):
+
+- **A1**: las tres skills son **main-strict** (sin Agent delegation). Razón: ninguna requiere cross-file analysis pesado — la complejidad está en el static analysis local o en lectura puntual de archivos, no en cross-cutting reading. Precedente directo: `pattern-audit` (E3a) main-strict por la misma razón.
+- **A2**: `test-scaffold` es **writer-scoped strict** — tercera skill writer-scoped del repo (tras `writing-handoff` E1a y `simplify` E2a). Edita **solo** el test pair file derivado del source file que el usuario provee; **no modifica source**, **no toca otros archivos**. STOP boundary explícito cuando la convención del repo es ambigua (proporción <80% / split). Sigue patrón de scope-check en cada `Write` call.
+- **A3**: `test-audit` y `coverage-explain` son **read-only advisory** (precedente: `compress` y `audit-plugin` E2b, `pattern-audit` E3a). Declaran candidate signals / strategy; **no mutan** archivos.
+- **A4**: **No execution de tests/coverage**. Las tres skills tienen prohibido invocar `pytest`, `vitest`, `jest`, `npm run test-coverage`, `pytest --cov`, etc. Razón: ejecución de tests requiere environment válido (deps instaladas, fixtures preparadas) y puede introducir side effects — la skill no puede garantizar ese estado. Coverage execution sería duplicado de CI; coverage-explain opera sobre reportes ya generados.
+- **A5 wording lock**: `test-audit` declara "candidate signals" (no "detecta"); `coverage-explain` declara "lee y explica" / "declara strategy" (no "parsea"). Lock-down via behavior tests del body.
+- **A6 allowed-tools conservadores**: cada skill recibe solo el subset mínimo necesario. `test-scaffold`: `Glob`, `Grep`, `Read`, `Write`, `Bash(find:*)`, `Bash(git grep:*)`, logger. `test-audit`: `Glob`, `Grep`, `Read`, `Bash(find:*)`, `Bash(git grep:*)`, `Bash(wc:*)`, logger (sin `Write`). `coverage-explain`: `Glob`, `Grep`, `Read`, `Bash(find:*)`, logger (sin `Write`, sin `git grep`).
+
+**Entregables**:
+
+- `.claude/skills/test-scaffold/SKILL.md` — writer-scoped strict. Step 1 detecta convención (Glob sobre tests existentes); step 2 cuenta proporción; step 3 decide (≥80% → proceed, ambiguo → STOP + propose); step 4 escribe skeleton language-aware (vitest/jest shape para TS/JS, pytest shape para Python); step 5 reporta + STOP si conflict; step 6 logger.
+- `.claude/skills/test-audit/SKILL.md` — read-only advisory main-strict. Step 1 discover test files via Glob; step 2 analyze each (flaky risk via Grep para asserts en loops/conditionals; orphan via import-path verification; trivial via `assert True/False/etc.` patterns); step 3 declare candidate signals con file:line + reasoning; step 4 report capped a 10 findings con severity tier (orphan ≥ flaky > trivial); step 5 disclaim de no-exhaustividad; step 6 logger.
+- `.claude/skills/coverage-explain/SKILL.md` — read-only advisory main-strict. Step 1 locate report (lcov.json / coverage.json / htmlcov/ / .nyc_output / args path); step 2 parse con confidence-level disclaim; step 3 analyze gaps (red <50%, yellow 50–75%, green >75%); step 4 declare minimum target advisory (no mandatorio); step 5 report con table format; step 6 logger.
+- `policy.yaml.skills_allowed` extendido 10 → 13: `[..., test-scaffold, test-audit, coverage-explain]`. Comentario inline actualizado (`E3a 10 skills → E3b 13 skills`).
+- Tests behavior contract: `.claude/skills/tests/test_e3b_behavior.py` con 15 casos en 3 clases (`TestScaffoldBehavior` 5 + `TestAuditBehavior` 5 + `TestCoverageExplainBehavior` 5). Lock-down de los disclaim literales: writer-scoped, advisory-only, declares candidate, no execution, no mod, STOP boundary, types of signals (flaky/orphan/trivial), minimum targets framing.
+- `.claude/skills/tests/_allowed_skills.py` — `ALLOWED_SKILLS` extendida 10 → 13 + header docstring actualizado con línea E3b.
+- `hooks/tests/test_lib_policy.py::test_real_skills_allowed_populated_by_e3b` (rename desde `_by_e3a`) — tupla esperada crece 10 → 13.
+- `hooks/tests/test_skills_log_contract.py::test_all_thirteen_e1_e3b_skills_end_to_end` (rename desde `_ten_e1_e3a_`) — emite una línea JSONL por cada una de las 13 skills, invoca Stop, asserta allow.
+
+**Contrato fijado por la suite** (extiende E1..E3a sin reabrirlos):
+
+- Primitive frontmatter inmutable (`name` / `description` / `allowed-tools`); sin `skill.json`; sin prefijo `pos:`; sin campos inventados. Precedentes E1a + E1b + E2a + E2b + E3a intactos.
+- `test-scaffold` **nunca** modifica source code, **nunca** ejecuta tests, **nunca** modifica config/thresholds, **nunca** crea archivo si la convención es ambigua (STOP + propose).
+- `test-audit` **nunca** ejecuta `pytest`/`vitest`/`jest`, **nunca** modifica archivos, **nunca** garantiza exhaustividad. Wording locked: "declares candidate signals" (los tests fallarían si el body usase "detects" sin `candidate`/`signal`/`declares`).
+- `coverage-explain` **nunca** ejecuta `npm run test-coverage`/`pytest --cov`, **nunca** modifica `coverage.threshold`/`pyproject.toml`/`package.json`, **nunca** mandata un threshold (advisory, user decides).
+- `ALLOWED_SKILLS = 13` entries enforce vivo. Invocar una skill no listada sigue produciendo deny exit 2 (contrato D6 intacto).
+
+**Ajustes vs plan original (Fase -1 aprobada)**:
+
+- **Iteración de recorte (Fase -1 v1 → v2)**: la primera propuesta listaba `Bash(vitest:*)` y `Bash(pytest:*)` en allowed-tools de `test-audit`/`coverage-explain` y prometía "valid syntax/linting" como behavior test. Rechazado por el usuario: "hay que recortar scope para no prometer motores de análisis/generación que esta rama no implementa." V2 conservadora: cero ejecución, allowed-tools subset estricto, behavior tests verifican framing literal, no capabilities.
+- **Wording correction post-V2**: "declares candidate signals" (no "detects"), "reads and explains coverage report data" / "declares missing coverage strategy" (no "parses coverage reports"). Aplicado en `description` + body.
+- **YAML parse gotcha** (precedente E2a `simplify`): descripciones de `test-audit` y `coverage-explain` contenían colons dentro de paréntesis (`"declares candidate signals: flaky..."`) — el `: ` activaba YAML como mapping-separator. Fix: quote toda la description con `"..."`. Lección reforzada de E2a — generalizable: cuando una description tenga `palabra: palabra` sin comillas, fallará silently el frontmatter.
+
+**Resultado**:
+
+- Tests: ~720+ passed (baseline E3a + 22 parametrizados via `ALLOWED_SKILLS` 10→13 + 15 behavior contract + renames de 2 tests integration). Suite pasa sin regresión D1..D6 + E1a..E3a.
+- `policy.yaml.skills_allowed` extendido 10 → 13.
+- Bodies cierran contract via test assertions (writer-scoped, advisory keywords, no-execution disclaim).
+- Logging best-effort via `_shared/log-invocation.sh` sin cambios.
+- Docs-sync dentro del PR: `ROADMAP.md` (E3 ✅), `HANDOFF.md` (§1 + §9 actualizados + §17 Estado E3a + §18 Estado E3b nuevos), `MASTER_PLAN.md § Rama E3b` (esta sección expandida + cierre `✅ PR #24`), `.claude/rules/skills-map.md` (filas E3b finalizadas en sección Pattern + Test).
+
+**Criterio de salida**: PR #24 merged tras CI verde post-docs-sync. Cierre de Fase E (todas las skills core entregadas); siguiente rama F1 (`feat/f1-skill-audit-session`).
 
 ---
 
