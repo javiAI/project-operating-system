@@ -5,7 +5,8 @@ allowed-tools:
   - Glob
   - Grep
   - Read
-  - Bash(git log:*, git diff:*)
+  - Bash(git log:*)
+  - Bash(git diff:*)
   - Bash(.claude/skills/_shared/log-invocation.sh:*)
 ---
 

@@ -585,7 +585,7 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 - `/pos:pattern-audit` — Audita patrón registry por drift/inconsistencia (análisis local, reporte sin mutación).
 - Formato de patrón fijado: `# Pattern: <name>` con secciones `## Context/Signal/Rule/Examples/Last observed`.
 - Allowlist extendida: `skills_allowed` 8→10 entries en `policy.yaml`.
-- 9 behavior contract tests (5 compound + 4 pattern-audit) — all GREEN.
+- 10 behavior contract tests (6 compound + 5 pattern-audit) — all GREEN. Test added: compound fallback to general-purpose declared in allowed-tools.
 
 **Criterio de salida**: PR #23 merged tras docs-sync (ROADMAP, HANDOFF, MASTER_PLAN, skills-map actualizadas).
 

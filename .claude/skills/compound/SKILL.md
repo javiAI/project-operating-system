@@ -2,19 +2,20 @@
 name: compound
 description: Use when a branch has merged into main and multiple code patterns emerge worth capturing for reuse.
 allowed-tools:
-  - Agent(subagent_type:code-architect)
-  - Agent(subagent_type:general-purpose)
+  - Agent
   - Glob
   - Grep
   - Read
   - Write
-  - Bash(git log:main...HEAD, git diff:main...HEAD)
+  - Bash(git log:*)
+  - Bash(git diff:*)
+  - Bash(git merge-base:*)
   - Bash(.claude/skills/_shared/log-invocation.sh:*)
 ---
 
 # compound — Extract and register reusable code patterns
 
-Emit a pattern proposal PR when a merged branch exhibits extractable patterns. Writer-scoped strict: only .claude/patterns/ — does not touch code, tests, or docs.
+Extract and register reusable patterns when a merged branch exhibits extractable code or design repetitions. Writer-scoped strict: writes to .claude/patterns/ only — does not touch code, tests, or docs.
 
 ## Scope (writer-scoped strict)
 
@@ -52,7 +53,7 @@ Each `.claude/patterns/*.md` entry declares a reusable pattern with this structu
 <ISO date>; updated on every audit cycle
 ```
 
-Mandatory fields: Context, Signal, Rule, Examples. Last observed auto-managed by pattern-audit.
+Mandatory fields: Context, Signal, Rule, Examples. Last observed: timestamped by compound at creation, updated manually by the user or by future pattern-maintenance tools (pattern-audit is read-only advisory; it does not modify patterns).
 
 ## Steps
 

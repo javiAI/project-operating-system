@@ -241,6 +241,6 @@ class TestEnforcementEndToEnd:
             run_logger(repo, skill)
         result = run_stop_hook(repo)
         assert result.returncode == 0, (
-            f"expected allow for all {len(ALLOWED_SKILLS)} E1+E2a+E2b skills, got deny: "
+            f"expected allow for all {len(ALLOWED_SKILLS)} E1a+E1b+E2a+E2b+E3a skills, got deny: "
             f"stdout={result.stdout!r}"
         )
