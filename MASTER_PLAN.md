@@ -550,7 +550,22 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 
 ### Rama E2b — `feat/e2b-skill-compress-audit-plugin`
 
-**Scope**: `skills/compress/` (haiku, fork), `skills/audit-plugin/` (sonnet, fork). Este último implementa `docs/SAFETY_POLICY.md`.
+**Scope**: `skills/compress/` (read-only advisory), `skills/audit-plugin/` (read-only advisory gate). Ambas heredan primitive minimal de E1a/E1b/E2a (SKILL.md official). E2b entrega skills funcionales pero advisory-only — enforcement/hard blocker/audit logs diferidos a rama posterior.
+
+**Decisiones Fase -1 ratificadas**:
+- A1a: `/pos:compress` read-only (no writer-scoped).
+- A2a: `/pos:audit-plugin` read-only advisory gate (no hard enforcement).
+- A3a: `audit-plugin` main-strict (no delegation).
+- A4a: GO/NO-GO/NEEDS_MORE_INFO decision tri-estado basado en SAFETY_POLICY.md levels.
+- A5a: Disclaimer "E2b advisory-only; enforcement deferred" en ambos bodies.
+
+**Ajustes vs plan original**: ninguno — Fase -1 aprobada y se adhirió estrictamente.
+
+**Resultado**:
+- Tests: 668 (E2a baseline) + 22 parametrizados (8 skills × 11 tests) + 4 behavior ligeros = ~694 total, 1 skip. Suite pasa sin regresión.
+- `policy.yaml.skills_allowed` extendido 6 → 8 (compress, audit-plugin).
+- Bodies cierran contract via test assertions (advisory keywords presentes).
+- Logging best-effort via `_shared/log-invocation.sh` sin cambios.
 
 ---
 
