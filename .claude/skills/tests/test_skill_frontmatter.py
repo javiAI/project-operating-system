@@ -34,6 +34,7 @@ SKILLS_DIR = REPO_ROOT / ".claude" / "skills"
 #   E1a — project-kickoff, writing-handoff
 #   E1b — branch-plan, deep-interview
 #   E2a — pre-commit-review, simplify
+#   E2b — compress, audit-plugin
 ALLOWED_SKILLS = [
     "project-kickoff",
     "writing-handoff",
@@ -41,6 +42,8 @@ ALLOWED_SKILLS = [
     "deep-interview",
     "pre-commit-review",
     "simplify",
+    "compress",
+    "audit-plugin",
 ]
 
 # Officially supported SKILL.md frontmatter fields in Claude Code.
@@ -543,4 +546,66 @@ class TestSimplifyBehavior:
         assert any(tok in low for tok in skipped_tokens), (
             "simplify body must mention reporting what it chose NOT to "
             "touch (use 'qué decidió no tocar', 'what it chose not to touch')."
+        )
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Behavior-specific contracts (E2b — compress + audit-plugin)
+#
+# Advisory-only scope in E2b: no enforcement, no writing to files,
+# no modification of policy.yaml.
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class TestCompressBehavior:
+    def test_body_disclaims_writing_files(self):
+        """compress is read-only advisory: it proposes which logs to compress,
+        but does NOT write files, delete logs, or modify docs."""
+        _, body = read_skill("compress")
+        low = body.lower()
+        no_write_tokens = (
+            "does not write",
+            "does not edit",
+            "does not delete",
+            "does not modify",
+            "no escribe",
+            "no edita",
+            "no elimina",
+            "no modifica",
+            "read-only",
+            "advisory",
+        )
+        assert any(tok in low for tok in no_write_tokens), (
+            "compress body must disclaim writing/editing/deleting files "
+            "(use 'does not write', 'read-only', 'advisory', etc.)."
+        )
+
+    def test_body_mentions_advisory_and_user_decision(self):
+        """User decides whether to archive/summarize logs. Skill proposes."""
+        _, body = read_skill("compress")
+        low = body.lower()
+        assert "advisory" in low or "proposa" in low or "suggest" in low, (
+            "compress body must frame itself as advisory (proposes, suggests) "
+            "not as a directive (never writes on its own)."
+        )
+
+
+class TestAuditPluginBehavior:
+    def test_body_mentions_safety_policy(self):
+        """audit-plugin audits against SAFETY_POLICY.md checklist."""
+        _, body = read_skill("audit-plugin")
+        low = body.lower()
+        assert "safety_policy" in low or "checklist" in low, (
+            "audit-plugin body must reference SAFETY_POLICY.md or "
+            "the audit checklist it implements."
+        )
+
+    def test_body_disclaims_enforcement_and_installation(self):
+        """E2b is advisory-only: no hard enforcement, no tool installation,
+        no policy.yaml modification, no audit logs."""
+        _, body = read_skill("audit-plugin")
+        low = body.lower()
+        assert "advisory" in low or "does not install" in low, (
+            "audit-plugin body must disclaim enforcement and installation "
+            "(frame as advisory, reference E2b limitation)."
         )
