@@ -4,7 +4,7 @@ Scope:
   - Verify framing and scope boundaries declared in each SKILL.md body.
   - Test that behavior aligns with contrato E3b (no execution, read-only advisory where declared).
   - Lock-down wording: "declares", "proposes", "advises" (not "detects" or "parses").
-  - Ensure STOP boundaries are explicit when convictions ambiguous or output uncertain.
+  - Ensure STOP boundaries are explicit when confidence is ambiguous or output uncertain.
 """
 from __future__ import annotations
 
@@ -19,15 +19,13 @@ SKILLS_TEST_DIR = REPO_ROOT / ".claude" / "skills" / "tests"
 
 if str(SKILLS_TEST_DIR) not in sys.path:
     sys.path.insert(0, str(SKILLS_TEST_DIR))
-from _allowed_skills import ALLOWED_SKILLS  # noqa: E402
+from test_skill_frontmatter import read_skill  # noqa: E402
 
 
 def read_skill_body(slug: str) -> str:
     """Return only the body (post-frontmatter) of a SKILL.md."""
-    path = SKILLS_DIR / slug / "SKILL.md"
-    raw = path.read_text(encoding="utf-8")
-    parts = raw.split("---\n", 2)
-    return parts[2] if len(parts) >= 3 else ""
+    _, body = read_skill(slug)
+    return body
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -73,11 +71,20 @@ class TestScaffoldBehavior:
         )
 
     def test_scaffold_allowed_tools_includes_write(self):
-        """test-scaffold must include Write tool in allowed-tools."""
-        path = SKILLS_DIR / "test-scaffold" / "SKILL.md"
-        raw = path.read_text(encoding="utf-8")
-        # Check that Write appears in allowed-tools section.
-        assert "Write" in raw
+        """test-scaffold must include Write tool in its `allowed-tools` frontmatter
+        list (mirrors `simplify`'s assertion for `Edit`). Checking the parsed
+        frontmatter — not raw text — avoids false positives from body mentions
+        of the word 'Write'."""
+        fm, _ = read_skill("test-scaffold")
+        tools = fm.get("allowed-tools") or []
+        assert any(
+            isinstance(t, str) and (t == "Write" or t.startswith("Write("))
+            for t in tools
+        ), (
+            "test-scaffold frontmatter `allowed-tools` must include `Write` — "
+            "the skill writes the test pair skeleton. Got: "
+            f"{tools!r}"
+        )
 
 
 # ────────────────────────────────────────────────────────────────────────────

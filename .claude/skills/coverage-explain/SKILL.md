@@ -16,7 +16,8 @@ allowed-tools:
 **Read-only advisory.** This skill reads coverage reports and explains the gaps found. It does NOT execute coverage commands, modify thresholds, modify tests, or modify source code.
 
 ### You MAY:
-- Read coverage report files (lcov.json, .coverage, coverage.json, htmlcov/*, etc.).
+- Read coverage report files (`lcov.info` text, `coverage.json`, `htmlcov/index.html`, NYC `.nyc_output/coverage.json`, etc.).
+- Treat `.coverage` (coverage.py SQLite DB) as a hint that a JSON/XML report can be generated — do NOT parse the SQLite directly.
 - Analyze what lines/branches are uncovered.
 - Explain which files have the most gaps.
 - Declare a strategy for reaching minimum coverage targets.
@@ -40,13 +41,14 @@ When a coverage report shows a gap:
 ## Steps
 
 1. **Locate coverage report** (Glob + Bash + Read):
-   - Search canonical paths: `coverage/lcov.json`, `.coverage`, `coverage.json`, `coverage.html/`, `htmlcov/`, `.nyc_output/coverage.json`, `coverage/coverage.json`.
+   - Search canonical paths: `coverage/lcov.info`, `coverage/lcov-report/lcov.info`, `coverage.json`, `coverage.xml`, `htmlcov/index.html`, `.nyc_output/coverage.json`, `coverage/coverage.json`.
+   - `.coverage` (coverage.py SQLite DB) is a hint that a JSON/XML report can be generated — do NOT parse it directly; declare the gap and suggest `coverage json` / `coverage xml`.
    - If user provides a path arg, read that directly (Bash find to verify existence).
-   - If no report found, declare: "No coverage report detected in canonical locations. Run your test suite with coverage enabled first (e.g., `npm run test-coverage`, `pytest --cov`)."
-   - Declare which format was found (lcov.json, pytest-cov JSON, NYC, etc.).
+   - If no report found, declare: "No coverage report detected in canonical locations. Run your test suite with coverage enabled first (e.g., `npm run test-coverage`, `pytest --cov --cov-report=json`)."
+   - Declare which format was found (lcov.info, pytest-cov JSON, NYC, etc.).
 
 2. **Parse report** (Read + analyze):
-   - **lcov.json**: extract file entries (`SF:filename`, `LH:lines_hit`, `LF:lines_found`); compute per-file coverage %.
+   - **lcov.info (lcov text format)**: extract file entries (`SF:filename`, `LH:lines_hit`, `LF:lines_found`); compute per-file coverage %.
    - **JSON (pytest-cov, NYC format)**: extract top-level totals + per-file entries; compute %.
    - **HTML directory**: attempt to parse `index.html` for summary or look for embedded JSON data.
    - Declare confidence level: "Full data available" vs "Partial data (summary only)" vs "Heuristic extraction (low confidence)".
