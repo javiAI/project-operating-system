@@ -12,7 +12,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | D | Hooks (Python) | ✅ (D1..D6 + D5b) |
 | E1 | Skills orquestación | ✅ (E1a + E1b) |
 | E2 | Skills calidad | ✅ (E2a + E2b) |
-| E3 | Skills patterns + tests | ⏳ pendiente |
+| E3 | Skills patterns + tests | ✅ (E3a ✅, E3b ✅) |
 | F | Audit + selftest + marketplace | ⏳ pendiente |
 | G | Knowledge Plane (opcional) | ⏳ solo planificación (scope cerrado, sin implementación) |
 
@@ -41,7 +41,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | `feat/e2a-skill-review-simplify` | Skills `pre-commit-review` (delegación a `code-reviewer` subagent sobre `git diff main...HEAD`) + `simplify` (writer scoped al branch diff; no crea archivos, no cambia comportamiento, no busca bugs); `skills_allowed` a 6 entries; rename `E1_SKILLS_KNOWN` → `ALLOWED_SKILLS` | ✅ | — (PR pendiente) |
 | `feat/e2b-skill-compress-audit-plugin` | Read-only advisory skills: `/pos:compress` (context planner) + `/pos:audit-plugin` (community-tool gate); both E2b-scoped; enforcement deferred | ✅ | — (PR pendiente) |
 | `feat/e3a-skill-compound-pattern-audit` | `/pos:compound` (writer-scoped pattern extraction, Agent delegation with fallback), `/pos:pattern-audit` (read-only advisory, main-strict analysis) | ✅ | #23 |
-| `feat/e3b-skill-test-scaffold-audit-coverage` | `/pos:test-scaffold`, `/pos:test-audit`, `/pos:coverage-explain` | ⏳ | — |
+| `feat/e3b-skill-test-scaffold-audit-coverage` | `/pos:test-scaffold` (writer-scoped), `/pos:test-audit` (read-only advisory), `/pos:coverage-explain` (read-only advisory); `skills_allowed` 10→13 | ✅ | — (PR pendiente) |
 | `feat/f1-skill-audit-session` | `/pos:audit-session` | ⏳ | — |
 | `feat/f2-agents-subagents` | 3 subagents | ⏳ | — |
 | `feat/f3-selftest-end-to-end` | `bin/pos-selftest.sh` + escenarios | ⏳ | — |
