@@ -3,7 +3,8 @@ name: audit-plugin
 description: Use when about to install a community tool (MCP, plugin, package) that is not from Anthropic or an explicitly trusted source. Audits against docs/SAFETY_POLICY.md and returns GO / NO-GO / NEEDS_MORE_INFO. Advisory-only; does not enforce, modify policy, or block installation.
 allowed-tools:
   - Read
-  - Bash(cd:., grep:.)
+  - Bash(grep:*)
+  - Bash(.claude/skills/_shared/log-invocation.sh:*)
 ---
 
 ## Framing

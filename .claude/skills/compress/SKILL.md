@@ -3,7 +3,11 @@ name: compress
 description: Use when your conversation context is approaching ~120k tokens; suggests which `.claude/logs/*.jsonl` files could be archived or summarized to reclaim context space. Read-only advisory—does not modify files.
 allowed-tools:
   - Read
-  - Bash(cd:., find:., wc:., head:., ls:.claude/logs)
+  - Bash(ls:*)
+  - Bash(find:*)
+  - Bash(wc:*)
+  - Bash(head:*)
+  - Bash(.claude/skills/_shared/log-invocation.sh:*)
 ---
 
 ## Framing

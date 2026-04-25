@@ -589,6 +589,15 @@ class TestCompressBehavior:
             "not as a directive (never writes on its own)."
         )
 
+    def test_body_contains_stop_signal(self):
+        """compress is read-only advisory: it must signal STOP (skill halts,
+        user decides next steps)."""
+        _, body = read_skill("compress")
+        assert "STOP" in body, (
+            "compress body must contain uppercase STOP boundary "
+            "(marks advisory-only scope limit)."
+        )
+
 
 class TestAuditPluginBehavior:
     def test_body_mentions_safety_policy(self):
@@ -608,4 +617,13 @@ class TestAuditPluginBehavior:
         assert "advisory" in low or "does not install" in low, (
             "audit-plugin body must disclaim enforcement and installation "
             "(frame as advisory, reference E2b limitation)."
+        )
+
+    def test_body_contains_stop_signal(self):
+        """audit-plugin is advisory-only gate: it must signal STOP (skill returns
+        decision, user decides whether to install)."""
+        _, body = read_skill("audit-plugin")
+        assert "STOP" in body, (
+            "audit-plugin body must contain uppercase STOP boundary "
+            "(marks advisory-only scope limit)."
         )
