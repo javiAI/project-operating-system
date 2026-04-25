@@ -15,6 +15,7 @@ Integration with stop-policy-check + skills_allowed lives in
 """
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
@@ -25,6 +26,9 @@ SKILLS_DIR = REPO_ROOT / ".claude" / "skills"
 
 # Import canonical ALLOWED_SKILLS from shared module (E2b refactor).
 # Single source of truth for all test files to avoid duplication.
+SKILLS_TEST_DIR = REPO_ROOT / ".claude" / "skills" / "tests"
+if str(SKILLS_TEST_DIR) not in sys.path:
+    sys.path.insert(0, str(SKILLS_TEST_DIR))
 from _allowed_skills import ALLOWED_SKILLS  # noqa: E402
 
 # Officially supported SKILL.md frontmatter fields in Claude Code.
@@ -606,5 +610,111 @@ class TestAuditPluginBehavior:
         _, body = read_skill("audit-plugin")
         assert "STOP" in body, (
             "audit-plugin body must contain uppercase STOP boundary "
+            "(marks advisory-only scope limit)."
+        )
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Behavior-specific contracts (E3a — compound + pattern-audit)
+#
+# E3a introduces two skills with distinct scope:
+# - compound: writer-scoped (creates/updates .claude/patterns/*.md only)
+# - pattern-audit: read-only advisory (no file mutations)
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class TestCompoundBehavior:
+    def test_body_mentions_agent_and_delegation(self):
+        """compound uses Agent-tool hybrid delegation (main prepares diff,
+        subagent analyzes, main writes patterns)."""
+        _, body = read_skill("compound")
+        low = body.lower()
+        assert "agent" in low or "delegat" in low, (
+            "compound body must mention Agent tool and hybrid delegation pattern."
+        )
+
+    def test_body_mentions_patterns_directory(self):
+        """compound writes exclusively to .claude/patterns/."""
+        _, body = read_skill("compound")
+        low = body.lower()
+        assert "pattern" in low and (".claude/patterns/" in body or ".claude/patterns" in low), (
+            "compound body must reference .claude/patterns/ as write target."
+        )
+
+    def test_body_declares_writer_scoped_strict(self):
+        """compound is writer-scoped: only .claude/patterns/, no code/tests/docs."""
+        _, body = read_skill("compound")
+        low = body.lower()
+        no_write_tokens = (
+            "writer-scoped",
+            "only .claude/patterns",
+            "does not touch code",
+            "does not modify code",
+            "no refactor",
+            "does not apply refactor",
+        )
+        assert any(tok in low for tok in no_write_tokens), (
+            "compound body must disclaim that it only writes to .claude/patterns/ "
+            "and does not touch code, tests, or docs."
+        )
+
+    def test_body_declares_pattern_format(self):
+        """compound must declare minimal pattern format (Context/Signal/Rule/Examples/Last observed)."""
+        _, body = read_skill("compound")
+        format_markers = ("context", "signal", "rule", "examples", "last observed")
+        count = sum(1 for marker in format_markers if marker in body.lower())
+        assert count >= 4, (
+            "compound body must declare minimal pattern format structure "
+            "(at least 4 of: Context, Signal, Rule, Examples, Last observed)."
+        )
+
+    def test_body_contains_stop_signal(self):
+        """compound is writer-scoped: it must signal STOP (skill writes patterns,
+        user decides further action)."""
+        _, body = read_skill("compound")
+        assert "STOP" in body, (
+            "compound body must contain uppercase STOP boundary "
+            "(marks writer-scoped limit: writes patterns, stops)."
+        )
+
+
+class TestPatternAuditBehavior:
+    def test_body_mentions_patterns_directory(self):
+        """pattern-audit reads and analyzes .claude/patterns/."""
+        _, body = read_skill("pattern-audit")
+        assert ".claude/patterns/" in body or "patterns" in body.lower(), (
+            "pattern-audit body must reference .claude/patterns/ as analysis target."
+        )
+
+    def test_body_declares_read_only_advisory(self):
+        """pattern-audit is read-only advisory: no file mutations."""
+        _, body = read_skill("pattern-audit")
+        low = body.lower()
+        advisory_tokens = (
+            "read-only",
+            "advisory",
+            "does not modify",
+            "no modifica",
+            "does not write",
+        )
+        assert any(tok in low for tok in advisory_tokens), (
+            "pattern-audit body must declare read-only/advisory scope."
+        )
+
+    def test_body_disclaims_modifying_patterns(self):
+        """pattern-audit never modifies patterns; it reports drift/candidates."""
+        _, body = read_skill("pattern-audit")
+        low = body.lower()
+        assert "does not modify" in low or "drift" in low or "diagnos" in low, (
+            "pattern-audit body must state it does not modify patterns "
+            "and emits drift/diagnostic reports instead."
+        )
+
+    def test_body_contains_stop_signal(self):
+        """pattern-audit is read-only advisory: it must signal STOP (skill diagnoses,
+        user decides action)."""
+        _, body = read_skill("pattern-audit")
+        assert "STOP" in body, (
+            "pattern-audit body must contain uppercase STOP boundary "
             "(marks advisory-only scope limit)."
         )

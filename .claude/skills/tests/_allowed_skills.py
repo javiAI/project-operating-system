@@ -13,6 +13,7 @@ Delivered:
   E1b — branch-plan, deep-interview
   E2a — pre-commit-review, simplify
   E2b — compress, audit-plugin
+  E3a — compound, pattern-audit
 """
 
 ALLOWED_SKILLS = [
@@ -24,4 +25,6 @@ ALLOWED_SKILLS = [
     "simplify",
     "compress",
     "audit-plugin",
+    "compound",
+    "pattern-audit",
 ]
