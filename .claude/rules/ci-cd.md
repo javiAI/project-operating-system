@@ -18,11 +18,10 @@ El hook `pre-push.sh` corre la suite local; GitHub Actions corre la misma suite 
 ## Workflows obligatorios (meta-repo)
 
 1. **`.github/workflows/ci.yml`** — por PR y push a `main`. Entregado de forma incremental, rama a rama. La versión actual cubre:
-   - **Aterrizado**: typecheck generator (`tsc --noEmit`), validación cuestionario + profiles, render generator dry-run, unit tests generator (vitest con coverage), unit tests hooks (pytest, matriz ubuntu + macos × Python 3.10/3.11).
+   - **Aterrizado**: typecheck generator (`tsc --noEmit`), validación cuestionario + profiles, render generator dry-run, unit tests generator (vitest con coverage), unit tests hooks (pytest, matriz ubuntu + macos × Python 3.10/3.11), integración end-to-end (`pytest bin/tests` — smoke wrapper + 5 escenarios funcionales-críticos vía `bin/pos-selftest.sh`, ubuntu × Python 3.11) **(F3)**.
    - **Diferidos a rama dedicada** (declarados en `policy.yaml.pre_push.checks_required` como `command_meta`, no enforzados aún):
      - Lint + format check (`eslint`, `prettier`, `ruff`).
      - Typecheck hooks (`mypy hooks/`).
-     - Integración (`./bin/pos-selftest.sh`).
      - Snapshot diff check (valida templates deterministic).
    - **Invariante**: cuando una rama añade un check al workflow, también mueve su bullet de "Diferidos" a "Aterrizado" y ajusta el bloque `command_meta` en `policy.yaml` si procede.
 
@@ -35,6 +34,26 @@ El hook `pre-push.sh` corre la suite local; GitHub Actions corre la misma suite 
    - Valida versión en `plugin.json` = tag.
    - Publica release en GitHub con assets (plugin bundle).
    - Actualiza `javiAI/pos-marketplace` vía PR automático (cuando exista).
+
+### Job `selftest` (entregado en F3)
+
+Job dedicado a integración end-to-end del propio plugin `pos`. Corre en `ubuntu-latest` × Python 3.11 (sin matriz extendida — los gates funcionales que cubre son platform-agnostic y la generación del proyecto sintético es la operación más cara). Setup: Node (`npx tsx generator/run.ts`) + Python (`pytest bin/tests`). El comando único es `pytest bin/tests -q`, que ejecuta:
+
+- **Smoke** (`bin/tests/test_selftest_smoke.py`): contrato del wrapper (`bin/pos-selftest.sh` existe, ejecutable, delega a `python3 bin/_selftest.py`, exit 0 al correr). Bloquea regresiones en la forma del entrypoint.
+- **Scenarios** (`bin/tests/test_selftest_scenarios.py`): 5 escenarios funcionales-críticos contra un proyecto sintético generado por scenario:
+  - **D1 pre-branch-gate** — deny `git checkout -b` sin marker → allow tras `touch <marker>`.
+  - **D3 pre-write-guard** — deny `Write hooks/foo.py` sin test pair → allow tras crear `hooks/tests/test_foo.py`.
+  - **D4 pre-pr-gate** — deny `gh pr create` sin docs-sync (ROADMAP + HANDOFF) en el diff → allow tras commit de docs.
+  - **D5 post-action** — `git merge` confirmado por reflog cuyo diff matchea trigger emite advisory `Consider running /pos:compound`.
+  - **D6 stop-policy-check** — Stop con `session_id` rogue (allowlist + `skills.jsonl` seeded) deniega; `session_id` clean allow.
+
+**Out of scope** (ratificado en F3 Fase -1):
+
+- D2 session-start (informative, exit 0 sin enforcement) y D6 pre-compact (informative). No tienen contrato deny/allow a verificar; el patrón se cubre vía sus tests unitarios en `hooks/tests/`.
+- Claude Code runtime: el selftest no instancia Claude Code, no invoca skills/agents reales, no dispatchea `/pos:compound`. Skills/agents se verifican por presencia estática en sus tests dedicados.
+- D5b loader: cubierto indirectamente — los hooks D3/D4/D5 lo consumen y los escenarios sobre-escriben `policy.yaml` del sintético para ejercitar el accessor live.
+
+**Drift sintético ↔ meta-repo**: el `policy.yaml` que emite la generación cli-tool todavía tiene el shape pre-D5b (template no migrado). Cada escenario reescribe la sección que necesita (`pre_write` / `pre_pr` / `post_merge` / `skills_allowed`) directamente en `synthetic/policy.yaml`. Esto desacopla la cobertura de D5b de la migración del template (rama propia post-F3).
 
 ## Workflows generados (proyecto destino)
 
