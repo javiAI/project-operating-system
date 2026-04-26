@@ -313,9 +313,11 @@ class TestDeepInterviewBehavior:
 # Behavior-specific contracts (E2a — pre-commit-review + simplify)
 #
 # Lock down the Fase -1 decisions ratified by the user:
-#   - `pre-commit-review` delegates to the `code-reviewer` subagent over the
+#   - `pre-commit-review` delegates to the `pos-code-reviewer` plugin subagent
+#     (post-F2; pre-F2 was the `code-reviewer` built-in default) over the
 #     branch diff, produces prioritized findings, never rewrites code, never
-#     applies fixes, never replaces `simplify`.
+#     applies fixes, never replaces `simplify`. Fallback to `general-purpose`
+#     mandatory if the runtime does not expose plugin agents.
 #   - `simplify` is a writer scoped strictly to files already in the branch
 #     diff: can Edit, cannot create new files, cannot touch files outside the
 #     diff. Frames itself as a reducer (not a bug finder) and reports what it
@@ -348,7 +350,8 @@ class TestPreCommitReviewBehavior:
 
     def test_scope_is_branch_diff(self):
         """Review operates on the branch diff, not the full tree. Body must
-        show the exact git invocation (`git diff ... main..HEAD`)."""
+        show the exact git invocation (`git diff ... main...HEAD` —
+        triple-dot, merge-base relative)."""
         _, body = read_skill("pre-commit-review")
         low = body.lower()
         assert "git diff" in low, (
@@ -416,8 +419,8 @@ class TestSimplifyBehavior:
     def test_scope_limited_to_branch_diff_no_new_files(self):
         """Writer scope is strict: files already in the diff only, no new
         files, nothing outside the diff. Body must show the exact command
-        that derives the scope (`git diff --name-only main..HEAD`) and the
-        three explicit disclaims."""
+        that derives the scope (`git diff --name-only main...HEAD` —
+        triple-dot, merge-base relative) and the three explicit disclaims."""
         _, body = read_skill("simplify")
         low = body.lower()
         assert "git diff --name-only" in low and "main...head" in low, (

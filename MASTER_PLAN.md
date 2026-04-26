@@ -691,7 +691,7 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 
 - `agents/pos-code-reviewer.md` (NEW) — frontmatter primitive-correct (`name` + `description` + `tools` comma-separated string + `model: sonnet`); body declara 5 capacidades (bugs, logic, security, scope, invariants); output contract findings agrupados por severidad. Hard limits explícitos.
 - `agents/pos-architect.md` (NEW) — mismo shape; body declara 3 dimensiones (pattern extraction, architectural design, cross-file consistency); output contract pattern proposals canonical-format.
-- `agents/tests/test_agent_frontmatter.py` (NEW) — 24 contract tests parametrizados por `ALLOWED_AGENTS = ["pos-code-reviewer", "pos-architect"]`. 4 clases: structure, frontmatter, body, capability surfaces.
+- `agents/tests/test_agent_frontmatter.py` (NEW) — 26 contract tests parametrizados por `ALLOWED_AGENTS = ["pos-code-reviewer", "pos-architect"]` (13 métodos × 2 slugs). 4 clases: structure, frontmatter, body, capability surfaces.
 - `.claude/skills/pre-commit-review/SKILL.md` — flip `code-reviewer` → `pos-code-reviewer` (description + body + steps + failure modes). Fallback `general-purpose` literal intacto.
 - `.claude/skills/compound/SKILL.md` — flip `code-architect` → `pos-architect`. Fallback `general-purpose` intacto.
 - `.claude/skills/tests/test_skill_frontmatter.py` — `TestPreCommitReviewBehavior::test_delegates_to_pos_code_reviewer` + `TestCompoundBehavior::test_body_delegates_to_pos_architect_with_fallback` flippean nombres + asertan fallback. Negation lists de `pattern-audit` + `audit-session` extendidas con `pos-*` (forward-compat).
@@ -719,7 +719,7 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 - `policy.yaml § skills_allowed` (líneas 263-296 — no se toca, pero confirmar para argumentar deferral de `agents_allowed`).
 - `hooks/_lib/policy.py` (no se toca; confirmar superficie del loader para argumentar no-extensión).
 
-**Criterio de salida**: **819 passed + 1 skipped** (baseline F1 793 + 24 agents contract + 2 skill flips + 2 hardening tests añadidos en revisión PR: `tools`/`model` requeridos + `model == "sonnet"` lockeado). E1a..F1 + D1..D6 regression intacta. `stop-policy-check.py` sigue en enforcement live con `ALLOWED_SKILLS = 14` (F2 no añade skills, solo agents). Docs-sync dentro del PR incluye `docs/ARCHITECTURE.md § 6 Agents` (reescrita post-revisión). El hook `pre-pr-gate.py` aprueba este mismo PR (segundo dogfooding D4 sobre Fase F).
+**Criterio de salida**: **819 passed + 1 skipped** (baseline F1 793 + 26 netos del nuevo `agents/tests/test_agent_frontmatter.py` parametrizado [2 slugs × 13 métodos = 26 casos, incluyendo los 2 hardening añadidos en revisión PR: `tools`/`model` requeridos + `model == "sonnet"` lockeado]. Las behavior flips de `test_skill_frontmatter.py` actualizan assertions de tests existentes — sin delta de count.). E1a..F1 + D1..D6 regression intacta. `stop-policy-check.py` sigue en enforcement live con `ALLOWED_SKILLS = 14` (F2 no añade skills, solo agents). Docs-sync dentro del PR incluye `docs/ARCHITECTURE.md § 6 Agents` (reescrita post-revisión). El hook `pre-pr-gate.py` aprueba este mismo PR (segundo dogfooding D4 sobre Fase F).
 
 **Carry-overs a F3..F4**:
 

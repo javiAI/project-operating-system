@@ -618,7 +618,7 @@ Entregables:
 - `agents/tests/test_agent_frontmatter.py` (NEW) — 26 contract tests parametrizados por `ALLOWED_AGENTS = ["pos-code-reviewer", "pos-architect"]`: structure (file exists + parses) + frontmatter (todos los 4 keys requeridos `{name, description, tools, model}`, name match filename, namespace `pos-*`, description non-empty, tools comma-separated string con validación de tokens no vacíos y sin whitespace antes de `(...)`, model valid `{sonnet, opus, haiku}` + `model == "sonnet"` lockeado por F2 Fase -1 (1)) + body substantive (>100 chars) + capability surfaces (bug/security/scope/invariant para `pos-code-reviewer`; pattern/design/cross-file consistency para `pos-architect`).
 - `.claude/skills/tests/test_skill_frontmatter.py` — `TestPreCommitReviewBehavior::test_delegates_to_pos_code_reviewer` + `TestCompoundBehavior::test_body_delegates_to_pos_architect_with_fallback` flippean a los nuevos nombres + asertan literalmente fallback `general-purpose`. `pattern-audit` + `audit-session` negation lists incluyen ahora `pos-architect` / `pos-code-reviewer` (forward-compat: main-strict skills nunca deben referenciar plugin subagents).
 
-Suite global post-F2: **819 passed + 1 skipped** (baseline F1: 793; +26 agents + 2 skill flips). Sin regresión D1..D6 / E1a..E3b / F1.
+Suite global post-F2: **819 passed + 1 skipped** (baseline F1: 793; +26 contract cases del nuevo `agents/tests/test_agent_frontmatter.py`. Las behavior flips de `test_skill_frontmatter.py` son renames/updates de tests existentes — sin delta de count). Sin regresión D1..D6 / E1a..E3b / F1.
 
 Contrato fijado por la suite (extiende E1..F1 sin reabrirlos):
 
