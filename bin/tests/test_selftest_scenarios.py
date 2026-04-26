@@ -48,3 +48,6 @@ class TestScenarios:
 
     def test_d5_post_action(self, selftest_run):
         assert "[ok] D5 post-action" in selftest_run.stdout, _scenario_diag("D5", selftest_run)
+
+    def test_d6_stop_policy_check(self, selftest_run):
+        assert "[ok] D6 stop-policy-check" in selftest_run.stdout, _scenario_diag("D6", selftest_run)
