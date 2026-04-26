@@ -44,7 +44,8 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | `feat/e3b-skill-test-scaffold-audit-coverage` | `/pos:test-scaffold` (writer-scoped), `/pos:test-audit` (read-only advisory), `/pos:coverage-explain` (read-only advisory); `skills_allowed` 10→13 | ✅ | — (PR pendiente) |
 | `feat/f1-skill-audit-session` | `/pos:audit-session` (read-only advisory main-strict) — compara 3 superficies de `policy.yaml` (`skills_allowed`, `lifecycle.*.hooks_required`, `audit.required_logs`) vs `.claude/logs/`; `skills_allowed` 13→14 | ✅ | — (PR pendiente) |
 | `feat/f2-agents-subagents` | 2 plugin subagents en `agents/` con namespace `pos-*`: `pos-code-reviewer` (consumido por `pre-commit-review`), `pos-architect` (consumido por `compound`); `auditor` diferido (sin consumer real); `agents_allowed` diferido (sin enforcement consumer) | ✅ | — (PR pendiente) |
-| `feat/f3-selftest-end-to-end` | `bin/pos-selftest.sh` + orquestador Python + 5 escenarios funcionales-críticos (D1/D3/D4/D5/D6) sobre proyecto sintético | ✅ | — (PR pendiente) |
+| `feat/f3-selftest-end-to-end` | `bin/pos-selftest.sh` + orquestador Python + 5 escenarios funcionales-críticos (D1/D3/D4/D5/D6) sobre proyecto sintético | ✅ | #27 |
+| `refactor/template-policy-d5b-migration` | Migrar `templates/policy.yaml.hbs` + renderer + snapshots al shape post-D5b; cerrar drift documentado en D5b/F3 | ⏳ | — |
 | `feat/f4-marketplace-public-repo` | `javiAI/pos-marketplace` + release flow | ⏳ | — |
 | `feat/fx-knowledge-plane-plan` | Docs-only: abre FASE G en MASTER_PLAN (capa opcional knowledge plane) | ⏳ | — |
 | `feat/g1-knowledge-plane-contract` | Contrato tool-agnostic (raw/wiki/schema) + opt-in questionnaire | ⏳ | — |

@@ -774,7 +774,47 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 **Carry-overs a F4**:
 
 - `.github/workflows/release.yml` queda como entrega de F4 (no F3). El `selftest` job se reusará en `release.yml` como gate antes de publicar tag.
-- Drift `templates/policy.yaml.hbs` → shape post-D5b queda diferido (no bloquea F4 ni Fase G).
+- Drift `templates/policy.yaml.hbs` → shape post-D5b queda diferido (no bloquea F4 ni Fase G). Stub abierto en `refactor/template-policy-d5b-migration` (ver siguiente sección).
+
+### Rama F3b — `refactor/template-policy-d5b-migration` (stub)
+
+**Status**: stub abierto post-F3. Sub-rama refactor que cierra el drift `meta-repo ↔ template` documentado en D5b (rama D5b decidió explícitamente no migrar el template) y reforzado en F3 (cada escenario sobre-escribe `synthetic/policy.yaml` para evadir el drift). No bloquea F4 ni Fase G — se programa cuando un consumer real (`pos:audit-session` corriendo sobre proyecto generado, o futuro test contractual del template) requiera el shape post-D5b en el output del generator.
+
+**Scope previsto**:
+
+- `templates/policy.yaml.hbs` — migrar a shape post-D5b: bloque `pre_write.enforced_patterns` (lista, no flat) + `lifecycle.pre_pr.docs_sync_conditional[].excludes` + cualquier otra sección que el loader (`hooks/_lib/policy.py`) consuma vía dataclass tipada.
+- `generator/renderers/policy.ts` — adaptar el render para emitir el shape nuevo. Validar que las 3 ramas del profile (`nextjs-app` / `cli-tool` / `agent-sdk`) compilan sin patches manuales.
+- `generator/__snapshots__/<profile>/policy.yaml.snap` — re-snapshotear los 3 perfiles canónicos.
+- `templates/requirements-dev.txt.hbs` (o equivalente del stack Python emitido) — añadir `pyyaml==6.0.2` cuando el profile sea Python, consistente con el meta-repo (loader depende de pyyaml).
+- `bin/_selftest.py` — limpieza opcional: una vez el template emite shape post-D5b, los escenarios D3/D4/D5 pueden simplificarse (sólo override del campo específico, no la sección entera). Reabrir las constants `POLICY_PRE_WRITE_ONLY` / `POLICY_DOCS_SYNC_ONLY` / `POLICY_POST_MERGE_ONLY` para reducir.
+- Tests:
+  - `generator/lib/__tests__/policy.test.ts` — actualizar fixtures + asserciones del renderer.
+  - `bin/tests/test_selftest_scenarios.py` — debe seguir verde sin cambios (los hooks consumen el loader, no el shape literal). Si rompe, ahí está la regresión que justifica la rama.
+  - Considerar añadir un test contractual nuevo: render del policy del profile X parsea limpio con `hooks/_lib/policy.py.load_policy` (cierra el drift por construcción).
+
+**Contexto a leer**:
+
+- `policy.yaml` (meta-repo, shape post-D5b) vs `templates/policy.yaml.hbs` (shape pre-D5b) — diff manual.
+- `hooks/_lib/policy.py § dataclasses + accessors` — contrato que el template debe cumplir.
+- `bin/_selftest.py § POLICY_*_ONLY constants` — overrides actuales por escenario, son la referencia de qué shape espera cada hook.
+- `MASTER_PLAN.md § Rama D5b` — decisiones (b.1 strings/globs en YAML, c.2 failure mode `None`).
+- `generator/renderers/policy.ts` + sus tests + snapshots actuales.
+
+**Decisiones a cerrar en Fase -1**:
+
+- Ámbito: ¿migrar todos los profiles a la vez o uno por commit (pattern incremental F3)? Probablemente uno por commit: `cli-tool` primero (es el que usa el selftest), luego `nextjs-app` y `agent-sdk` con re-snapshot.
+- ¿Añadir test contractual `template render → loader parse` o dejarlo implícito por el selftest? El test contractual cierra el drift por construcción y pertenece a `generator/lib/__tests__/`.
+- ¿Limpieza de overlays en `bin/_selftest.py` se hace en esta rama o se difiere? Probablemente en esta rama — la justificación de la rama es exactamente que los overlays dejen de ser necesarios.
+
+**Criterio de salida (preliminar)**:
+
+- Los 3 profiles canónicos generan `policy.yaml` que parsea con `hooks/_lib/policy.py` sin warnings ni `policy_unavailable`.
+- `bin/tests/test_selftest_scenarios.py` verde sin cambios funcionales (sólo simplificación de overlays si se hace).
+- Snapshots actualizados con diff revisado.
+- Drift `meta-repo ↔ template` cerrado en HANDOFF + ARCHITECTURE.
+- Sin regresión en tests del generator ni de los 3 hooks D3/D4/D5.
+
+**Razón para no entregarlo en F3**: F3 es selftest. Mezclar migración del template inflaría el scope, retrasaría la cobertura D-gates, y los overlays por escenario son una solución limpia y auto-contenida que **prueba** la independencia hook/loader respecto al template. Documentar el drift como abierto + abrir stub explícito (este §) es la decisión correcta.
 
 ### Rama F4 — `feat/f4-marketplace-public-repo`
 
