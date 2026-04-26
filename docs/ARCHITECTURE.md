@@ -391,13 +391,31 @@ E1a flippa de "Ausente" a "Lista poblada" sin tocar código del hook — puro ca
 
 `$ARGUMENTS`, `$1..$N`, `${CLAUDE_SESSION_ID}`, `${CLAUDE_SKILL_DIR}`, `` !`command` `` (shell injection, requiere `shell: true` en frontmatter).
 
-## 6. Agents (subagents)
+## 6. Agents (plugin-owned subagents)
 
-- `agents/code-reviewer.md` — review de diffs.
-- `agents/architect.md` — decisiones arquitectónicas (branch-plan, deep-interview, compound).
-- `agents/auditor.md` — audit de plugins, policy check, session audit.
+Top-level superficie del plugin: `agents/<slug>.md`. Cada archivo es un subagent definido en el primitive oficial de Claude Code (`name` + `description` + `tools` + `model`); el body Markdown actúa como system prompt. Los skills consumidoras los invocan vía `Agent(subagent_type="<slug>", ...)` con fallback a `general-purpose` si el runtime no los expone.
 
-Cada agent declara sus tools permitidas (`allowed-tools:`) — subset mínimo. Un agente reviewer no debe tener `Write`. Un auditor no debe tener `Bash(git push)`.
+**Shape distinto al skill primitive** (Fase F2):
+
+| Aspecto | Skill (`.claude/skills/<slug>/SKILL.md`) | Agent (`agents/<slug>.md`) |
+|---|---|---|
+| Tools | `allowed-tools:` YAML list | `tools:` comma-separated string |
+| Modelo | No campo en frontmatter (corre en orchestrator) | `model:` requerido (sonnet por defecto en F2) |
+| Body | Body es la skill instructions | Body es el system prompt del subagent |
+
+**Namespace `pos-*` obligatorio** para evitar colisión con built-in defaults de Claude Code (`code-reviewer`, `code-architect`, `Plan`, `Explore`, `general-purpose`) y con user/project agents externos. Validado por `agents/tests/test_agent_frontmatter.py::TestFrontmatter::test_name_uses_pos_namespace`.
+
+**Agents entregados (F2)**:
+
+- `agents/pos-code-reviewer.md` — branch-diff review (bugs / logic / security / scope / invariants). Consumido por `pre-commit-review` (E2a). `tools: Read, Grep, Glob, Bash`. Hard limits: no `Edit`, no `Write`, no PR.
+- `agents/pos-architect.md` — pattern extraction + cross-file design. Consumido por `compound` (E3a). `tools: Read, Grep, Glob, Bash`. Hard limits: no refactor, no overwriting de patterns existentes.
+
+**Diferidos en F2 (regla #7 CLAUDE.md — ≥2 repeticiones antes de abstraer)**:
+
+- `pos-auditor` — sin consumer real hoy. Reabrir cuando una skill futura lo requiera.
+- `policy.yaml.agents_allowed` — sin enforcement consumer (Stop hook lee `skills.jsonl`, no hay log de invocaciones de subagents). Reabrir cuando un hook futuro requiera enforcement.
+
+**Forward-compat negation**: skills main-strict (`pattern-audit` E3a, `audit-session` F1) **nunca** referencian plugin subagents — los tests `test_skill_frontmatter.py` lockean esto vía negation lists.
 
 ## 7. Determinismo — tres capas
 

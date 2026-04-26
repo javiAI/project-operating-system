@@ -21,7 +21,7 @@ Extract and register reusable patterns when a merged branch exhibits extractable
 
 You MAY:
 - Read the merged diff (`main...HEAD`).
-- Delegate deep pattern analysis to `code-architect` subagent via Agent tool (hybrid pattern: main prepares context, subagent analyzes, main writes).
+- Delegate deep pattern analysis to `pos-architect` subagent via Agent tool (hybrid pattern: main prepares context, subagent analyzes, main writes).
 - Create `.claude/patterns/<name>.md` with pattern entries (write-only, strict scope).
 
 You MUST NOT:
@@ -67,11 +67,11 @@ Mandatory fields: Context, Signal, Rule, Examples. Last observed: timestamped by
    - List touched top-level dirs + file count.
    - Collect `.claude/patterns/*.md` existing entries (to avoid duplicates).
 
-3. **Delegate to `code-architect`** via Agent tool (with fallback):
+3. **Delegate to `pos-architect`** via Agent tool (with fallback):
    - Full diff: `git diff main...HEAD`.
    - Existing patterns (so subagent can avoid re-proposing).
    - Explicit task: "identify 1–3 patterns that repeat ≥2 times across the diff and would reduce future duplication. Output: pattern proposals (no code refactoring, no file changes)."
-   - Preferred subagent: `code-architect` (pattern extraction via architecture lens).
+   - Preferred subagent: `pos-architect` (pattern extraction via architecture lens).
    - Fallback if unavailable: `general-purpose` with same task (generic analysis acceptable).
    - Subagent returns a summary (not raw code).
 

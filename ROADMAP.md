@@ -13,7 +13,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | E1 | Skills orquestación | ✅ (E1a + E1b) |
 | E2 | Skills calidad | ✅ (E2a + E2b) |
 | E3 | Skills patterns + tests | ✅ (E3a ✅, E3b ✅) |
-| F | Audit + selftest + marketplace | 🔄 (F1 ✅, F2..F4 ⏳) |
+| F | Audit + selftest + marketplace | 🔄 (F1 ✅, F2 ✅, F3..F4 ⏳) |
 | G | Knowledge Plane (opcional) | ⏳ solo planificación (scope cerrado, sin implementación) |
 
 ## Ramas
@@ -43,7 +43,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | `feat/e3a-skill-compound-pattern-audit` | `/pos:compound` (writer-scoped pattern extraction, Agent delegation with fallback), `/pos:pattern-audit` (read-only advisory, main-strict analysis) | ✅ | #23 |
 | `feat/e3b-skill-test-scaffold-audit-coverage` | `/pos:test-scaffold` (writer-scoped), `/pos:test-audit` (read-only advisory), `/pos:coverage-explain` (read-only advisory); `skills_allowed` 10→13 | ✅ | — (PR pendiente) |
 | `feat/f1-skill-audit-session` | `/pos:audit-session` (read-only advisory main-strict) — compara 3 superficies de `policy.yaml` (`skills_allowed`, `lifecycle.*.hooks_required`, `audit.required_logs`) vs `.claude/logs/`; `skills_allowed` 13→14 | ✅ | — (PR pendiente) |
-| `feat/f2-agents-subagents` | 3 subagents | ⏳ | — |
+| `feat/f2-agents-subagents` | 2 plugin subagents en `agents/` con namespace `pos-*`: `pos-code-reviewer` (consumido por `pre-commit-review`), `pos-architect` (consumido por `compound`); `auditor` diferido (sin consumer real); `agents_allowed` diferido (sin enforcement consumer) | ✅ | — (PR pendiente) |
 | `feat/f3-selftest-end-to-end` | `bin/pos-selftest.sh` + escenarios | ⏳ | — |
 | `feat/f4-marketplace-public-repo` | `javiAI/pos-marketplace` + release flow | ⏳ | — |
 | `feat/fx-knowledge-plane-plan` | Docs-only: abre FASE G en MASTER_PLAN (capa opcional knowledge plane) | ⏳ | — |
@@ -604,6 +604,40 @@ Contrato fijado por la suite (extiende E1..E3b sin reabrirlos):
 - **Decisiones A1.a..A6.a ratificadas en Fase -1**: A1.a = 3 surfaces explícitas (no exhaustive auditor, advisor pattern-seeking); A2.a = review window default 30 days textual; A3.a = prefijo normalization explícito; A4.a = pre-existing drift `hooks.jsonl` reportado, no auto-fixed; A5.a = report estructurado por surface (3 sections + summary); A6.a = `audit.session_audit.schedule` documental, no enforcement (cron / CI hook diferido).
 
 **Criterio de salida**: 793 verdes + 1 skip intencional. E1a..E3b + D1..D6 regression intacta. `test_real_skills_allowed_populated_by_f1` flippa el pinpoint de la tupla 13→14. `stop-policy-check.py` sigue en enforcement live sin cambio de código — sólo con allowlist ampliada. Docs-sync dentro del PR (ROADMAP § F1 + HANDOFF §1/§9 + §19 nuevo + MASTER_PLAN § Rama F1 expandida + `.claude/rules/skills-map.md` fila `/pos:audit-session` populada). `docs/ARCHITECTURE.md` **no** requerido (F1 no toca `generator/` ni `hooks/`). El hook `pre-pr-gate.py` aprueba este mismo PR (dogfooding D4 sobre F1 — primer enforcement docs-sync sobre Fase F).
+
+### `feat/f2-agents-subagents` — ✅ (PR pendiente)
+
+Segunda rama de Fase F — entrega los **subagents oficiales del plugin** que cierran la asimetría "skills propias del plugin pero subagents prestados de Claude Code defaults". Tras F2, el plugin tiene primitive-correct ownership de toda su superficie (skills + hooks + agents + policy).
+
+Entregables:
+
+- `agents/pos-code-reviewer.md` — plugin subagent para branch-diff review. Consumido por `pre-commit-review` (E2a). Frontmatter primitive-correct (`name` + `description` + `tools` comma-separated + `model: sonnet`). Body declara las 5 capacidades explícitas: bugs / logic errors / security vulnerabilities / scope adherence / invariant violations. Output contract: findings agrupados por severidad (blocker/high/medium/nit), confidence-filtered, `file:line` refs. Hard limits: no `Edit`, no `Write`, no PR, no invocación de otras skills/subagents.
+- `agents/pos-architect.md` — plugin subagent para pattern extraction + cross-file design. Consumido por `compound` (E3a). Frontmatter primitive-correct. Body declara 3 dimensiones: pattern extraction (≥2 repeticiones, regla #7 CLAUDE.md), architectural design (cohesión + tradeoffs), cross-file consistency. Output contract: patterns en formato canónico (Name/Context/Signal/Rule/Examples/Rationale) listo para fold en `.claude/patterns/<slug>.md`. Hard limits: no refactor, no `Edit`, no overwriting de patterns existentes.
+- `.claude/skills/pre-commit-review/SKILL.md` — flip `code-reviewer` → `pos-code-reviewer` (description + body + steps + failure modes). Fallback a `general-purpose` se mantiene literal.
+- `.claude/skills/compound/SKILL.md` — flip `code-architect` → `pos-architect` (description + body + steps + failure modes). Fallback a `general-purpose` intacto.
+- `agents/tests/test_agent_frontmatter.py` (NEW) — 26 contract tests parametrizados por `ALLOWED_AGENTS = ["pos-code-reviewer", "pos-architect"]`: structure (file exists + parses) + frontmatter (todos los 4 keys requeridos `{name, description, tools, model}`, name match filename, namespace `pos-*`, description non-empty, tools comma-separated string con validación de tokens no vacíos y sin whitespace antes de `(...)`, model valid `{sonnet, opus, haiku}` + `model == "sonnet"` lockeado por F2 Fase -1 (1)) + body substantive (>100 chars) + capability surfaces (bug/security/scope/invariant para `pos-code-reviewer`; pattern/design/cross-file consistency para `pos-architect`).
+- `.claude/skills/tests/test_skill_frontmatter.py` — `TestPreCommitReviewBehavior::test_delegates_to_pos_code_reviewer` + `TestCompoundBehavior::test_body_delegates_to_pos_architect_with_fallback` flippean a los nuevos nombres + asertan literalmente fallback `general-purpose`. `pattern-audit` + `audit-session` negation lists incluyen ahora `pos-architect` / `pos-code-reviewer` (forward-compat: main-strict skills nunca deben referenciar plugin subagents).
+
+Suite global post-F2: **819 passed + 1 skipped** (baseline F1: 793; +26 contract cases del nuevo `agents/tests/test_agent_frontmatter.py`. Las behavior flips de `test_skill_frontmatter.py` son renames/updates de tests existentes — sin delta de count). Sin regresión D1..D6 / E1a..E3b / F1.
+
+Contrato fijado por la suite (extiende E1..F1 sin reabrirlos):
+
+- Plugin agent primitive: `agents/<slug>.md` + frontmatter `{name, description, tools, model}` (oficial Claude Code subagent shape — `tools` es comma-separated string, **shape distinto al skill primitive** que usa YAML list `allowed-tools`). **No campos inventados**.
+- Namespace obligatorio `pos-*` para evitar colisión con built-in defaults de Claude Code (`code-reviewer`, `code-architect`, `Plan`, `Explore`, `general-purpose`) y con user/project agents externos.
+- Hardcode del nombre `pos-code-reviewer` / `pos-architect` en los bodies de las skills consumidoras **con fallback explícito a `general-purpose`** — protege contra runtimes que no exponen agents del plugin (p.ej. Claude Code antes de discovery del directorio `agents/`).
+- `auditor` **diferido**: no tiene consumer real hoy; entregarlo violaría regla #7 CLAUDE.md (≥2 repeticiones documentadas). Reabrir en rama dedicada (F2b o post-F4) si una skill futura lo requiere.
+- `policy.yaml.agents_allowed` **diferido**: no hay enforcement consumer (Stop hook lee `skills.jsonl`, no agents.jsonl; no hay log de invocaciones de subagents). Documentado como deferred — reabrir cuando un hook futuro requiera enforcement.
+
+**Decisiones cerradas en Fase -1 (ratificadas por el usuario)**:
+
+- (1) Shape primitive: oficial Claude Code subagent format (`name`/`description`/`tools` comma-separated/`model`); body Markdown como system prompt; `model: sonnet` para ambos. Sin campos inventados (precedente E1a `feedback_skill_primitive_minimal.md` aplicado a primitive paralelo).
+- (2) Scope: 2 agents (no 3). `auditor` diferido por falta de consumer (regla #7).
+- (3) Naming: namespace `pos-*` (no override silencioso de built-ins, no nombres a secas).
+- (4) Policy: `agents_allowed` no añadido en F2 (no enforcement consumer hoy).
+- (5) Tests: contract tests parametrizados + behavior flips de skills consumidoras + forward-compat negation en main-strict skills.
+- (6) Docs-sync: ROADMAP + HANDOFF + MASTER_PLAN § F2 + `.claude/rules/skills.md` + `.claude/rules/skills-map.md` + `docs/ARCHITECTURE.md` (nuevo top-level `agents/` justifica sub-sección aunque no esté enforced por el pre-PR gate).
+
+**Criterio de salida**: 819 verdes + 1 skip intencional. Sin regresión sobre F1. Docs-sync completo dentro del PR (incluye `docs/ARCHITECTURE.md § 6 Agents` reescrita post-revisión). `pre-pr-gate.py` aprueba este mismo PR — el conditional `skills/**` (porque tocamos dos `SKILL.md`) exige `skills-map.md`, satisfecho. `agents/**` no está en `policy.yaml.lifecycle.pre_pr.docs_sync_conditional` hoy (drift abierto deliberadamente — reabrir cuando un consumer enforcement justifique extender el gate).
 
 ## Convenciones de este archivo
 

@@ -5,8 +5,9 @@
 ## 1. Snapshot
 
 - Repo: `project-operating-system` (plugin `pos`).
-- Rama actual: **F1 ✅ PR pendiente** (`feat/f1-skill-audit-session`, en revisión docs-sync). Anterior: **E3b ✅ PR #24** (mergeada). Siguiente: **F2 — `feat/f2-agents-subagents`** (3 subagents: `code-reviewer`, `architect`, `auditor`).
-- F1 entregó: `/pos:audit-session` (read-only advisory main-strict) — compara 3 superficies explícitas de `policy.yaml` (`skills_allowed`, `lifecycle.<gate>.hooks_required`, `audit.required_logs`) vs `.claude/logs/` reales; reporta drift candidates por bucket sin auto-fix. Policy: `skills_allowed` 13→14. Fase F abierta (1/4 ramas).
+- Rama actual: **F2 ✅ PR pendiente** (`feat/f2-agents-subagents`, en revisión docs-sync). Anterior: **F1 ✅ PR #25** (mergeada). Siguiente: **F3 — `feat/f3-selftest-end-to-end`** (`bin/pos-selftest.sh` + escenarios end-to-end).
+- F2 entregó: `agents/pos-code-reviewer.md` + `agents/pos-architect.md` (plugin subagents primitive-correct con namespace `pos-*`); flips de `pre-commit-review` y `compound` a los nuevos consumidores; 26 contract tests parametrizados (`agents/tests/test_agent_frontmatter.py`). Behavior tests del consumer flippean assertions (sin delta de count). **No** toca `policy.yaml` (`agents_allowed` diferido). `auditor` diferido (sin consumer real, regla #7).
+- F1 entregó: `/pos:audit-session` (read-only advisory main-strict) — compara 3 superficies explícitas de `policy.yaml` (`skills_allowed`, `lifecycle.<gate>.hooks_required`, `audit.required_logs`) vs `.claude/logs/` reales; reporta drift candidates por bucket sin auto-fix. Policy: `skills_allowed` 13→14. Fase F abierta (2/4 ramas).
 - Fuente de verdad ejecutable: [MASTER_PLAN.md](MASTER_PLAN.md).
 - Estado vivo: [ROADMAP.md](ROADMAP.md).
 - Arquitectura canonical: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -123,21 +124,22 @@ Ver detalle: `.claude/rules/generator.md` (Deferrals), `MASTER_PLAN § Rama C3` 
 
 ## 8. Skills / subagents del entorno Claude Code (no plugin)
 
-Hasta que `pos` tenga sus propias skills:
+Hasta F1 el plugin reusaba subagents built-in; desde F2 los críticos son propios:
 
-- `Explore` (>3 queries de búsqueda cross-archivo).
-- `code-reviewer`, `code-architect`, `Plan` — subagents built-in.
+- `pos-code-reviewer` (plugin, F2) — consumido por `pre-commit-review`. Fallback `general-purpose` si runtime no expone agents del plugin.
+- `pos-architect` (plugin, F2) — consumido por `compound`. Fallback `general-purpose`.
+- Built-in residuales (sólo si `branch-plan` requiere lectura ≥3 archivos): `Plan`, `Explore`, `code-architect`. Mismos fallback rules.
 - Skills globales del usuario (si las tiene en `~/.claude/skills/`).
 
 ## 9. Próxima rama
 
-**F2 — `feat/f2-agents-subagents`** (tras merge de F1 — segundo bloque de Fase F: subagents oficiales del plugin).
+**F3 — `feat/f3-selftest-end-to-end`** (tras merge de F2 — tercer bloque de Fase F: selftest end-to-end del plugin).
 
 Scope:
 
-- 3 subagent definitions en `agents/`: `code-reviewer.md`, `architect.md`, `auditor.md`. Hoy las skills E2a (`pre-commit-review`) y E3a (`compound`) referencian `subagent_type="code-reviewer"` y `code-architect` con disclaimer de fallback a `general-purpose`; F2 los entrega como contratos canónicos del plugin (no defaults de Claude Code).
-- Decisión Fase -1: ¿shape de subagent definition primitive-correct (Markdown body + frontmatter `name`/`description`/`tools`)?, ¿cómo se descubren desde el plugin (`agents/` directory en plugin root vs registro en `policy.yaml`)?, ¿naming conflict con `code-reviewer` default de Claude Code (resolver vía namespace o aceptar override)?
-- Sin cambios a `skills_allowed` (subagents no son skills); evaluar si `policy.yaml.agents_allowed` aparece como nuevo top-level (precedente: `skills_allowed`).
+- `bin/pos-selftest.sh` + escenarios. Valida los gates principales (kickoff, Fase -1 marker, pre-write, pre-pr-gate, stop-policy-check, post-action) sobre un proyecto sintético generado por `npx tsx generator/run.ts`.
+- Decisión Fase -1: ¿qué subset de gates entran en F3 vs diferimos?, ¿cómo aislar el repo sintético (tmpdir vs fixture committeado)?, ¿qué profile canónico se usa para el smoke (`nextjs-app` / `cli-tool` / `agent-sdk`)?, ¿cómo se ejecuta el selftest en CI (mismo workflow que vitest+pytest o workflow propio)?
+- F3 puede dogfooding F2: el selftest invoca `pre-commit-review` y `compound` reales, lo que ejercita el resolution `pos-code-reviewer` / `pos-architect` con fallback `general-purpose` cuando el runtime sintético no expone los agents.
 
 ## 10. Estado E2b (✅ merged PR #22)
 
@@ -384,3 +386,42 @@ Entregables completados:
 **Resultado**: suite conjunta `hooks/tests` + `.claude/skills/tests` arroja **793 passed + 1 skipped** (sin regresión D1..D6 + E1a..E3b; +5 behavior + 22 parametrizados via `ALLOWED_SKILLS` 13→14 + 2 renames integration). El skip es el D5 intencional `TestIntegrationDiffUnavailable` por subprocess-no-cover. CI verde tras docs-sync (`ROADMAP.md` Fase F abierta + § F1 detallado, `HANDOFF.md` §1+§9+§19 nuevos, `MASTER_PLAN.md § Rama F1` expandida + cierre `✅ PR pendiente`, `.claude/rules/skills-map.md` fila `/pos:audit-session` populada).
 
 **Detalle + deferrals + ajustes**: ver [ROADMAP.md § feat/f1-skill-audit-session](ROADMAP.md), [MASTER_PLAN.md § Rama F1](MASTER_PLAN.md), [.claude/rules/skills-map.md](.claude/rules/skills-map.md).
+
+## 20. Estado F2 (cerrada en rama, docs-sync en curso)
+
+`feat/f2-agents-subagents` — **segunda rama de Fase F**. Cierra la asimetría heredada de E2a/E3a: hasta F1 las skills `pre-commit-review` y `compound` delegaban a `code-reviewer` / `code-architect` (defaults de Claude Code, no propiedad del plugin). F2 entrega los subagents como contratos del plugin con namespace `pos-*` y flippea las skills consumidoras al nuevo nombre, sin tocar el shape ni el flujo. Tras F2, el plugin tiene primitive-correct ownership de toda su superficie (skills + hooks + agents + policy).
+
+**Entregables**:
+
+- `agents/pos-code-reviewer.md` — plugin subagent para branch-diff review. Consumido por `pre-commit-review` (E2a). Frontmatter primitive-correct (`name` + `description` + `tools` comma-separated string + `model: sonnet`). Body declara las 5 capacidades: bugs / logic errors / security vulnerabilities / scope adherence / invariant violations. Output contract: findings agrupados por severidad (blocker/high/medium/nit), confidence-filtered, `file:line` refs. Hard limits: no `Edit`, no `Write`, no PR, no invocación de otras skills/subagents.
+- `agents/pos-architect.md` — plugin subagent para pattern extraction + cross-file design. Consumido por `compound` (E3a). Frontmatter primitive-correct. Body declara 3 dimensiones: pattern extraction (≥2 repeticiones, regla #7 CLAUDE.md), architectural design (cohesión + tradeoffs), cross-file consistency. Output contract: patterns en formato canónico (Name/Context/Signal/Rule/Examples/Rationale) listo para que `compound` los folde en `.claude/patterns/<slug>.md`. Hard limits: no refactor, no `Edit`, no overwriting de patterns existentes.
+- `.claude/skills/pre-commit-review/SKILL.md` — flip `code-reviewer` → `pos-code-reviewer` (description + body + steps + failure modes). Fallback a `general-purpose` se mantiene literal — protege contra runtimes que no expongan agents del plugin.
+- `.claude/skills/compound/SKILL.md` — flip `code-architect` → `pos-architect` (mismo patrón). Fallback `general-purpose` intacto.
+- `agents/tests/test_agent_frontmatter.py` (NEW) — 26 contract tests parametrizados por `ALLOWED_AGENTS = ["pos-code-reviewer", "pos-architect"]`: 4 clases (`TestStructure`, `TestFrontmatter`, `TestBody`, `TestCodeReviewerCapability` + `TestArchitectCapability`). `ALLOWED_FRONTMATTER_KEYS = REQUIRED_FRONTMATTER_KEYS = {name, description, tools, model}` (todos requeridos post-revisión PR); `VALID_MODELS = {sonnet, opus, haiku}`; `F2_REQUIRED_MODEL = "sonnet"`. Validan: file exists + parses; keys ⊆ allowed; todos los 4 keys requeridos; `name` == filename slug; namespace `pos-*`; `tools` comma-separated string (NO YAML list — diferencia con skill primitive — con validación de tokens no vacíos y sin whitespace en el nombre antes de `(...)`); `model` válido + `model == "sonnet"` lockeado por F2 Fase -1 (1); body >100 chars; capability surfaces (bug/security/scope/invariant para `pos-code-reviewer`; pattern/design/cross-file consistency para `pos-architect`).
+- `.claude/skills/tests/test_skill_frontmatter.py` — `TestPreCommitReviewBehavior::test_delegates_to_pos_code_reviewer` + `TestCompoundBehavior::test_body_delegates_to_pos_architect_with_fallback` flippean a los nuevos nombres + asertan literalmente fallback `general-purpose`. `pattern-audit` + `audit-session` negation lists incluyen ahora `pos-architect` / `pos-code-reviewer` (forward-compat: main-strict skills nunca deben referenciar plugin subagents).
+
+**Contrato fijado por la suite** (extiende E1..F1 sin reabrirlos):
+
+- **Plugin agent primitive**: `agents/<slug>.md` + frontmatter `{name, description, tools, model}`. **Shape distinto al skill primitive** — `tools` es comma-separated string (oficial Claude Code subagent format), no YAML list `allowed-tools`. Sin campos inventados (precedente E1a `feedback_skill_primitive_minimal.md` aplicado a primitive paralelo).
+- **Namespace `pos-*` obligatorio** para evitar colisión con built-in defaults de Claude Code (`code-reviewer`, `code-architect`, `Plan`, `Explore`, `general-purpose`) y con user/project agents externos. Test `test_name_uses_pos_namespace` lockea esto.
+- **Fallback `general-purpose` explícito** en bodies de skills consumidoras — protege contra runtimes que no exponen agents del plugin (Claude Code antes de discovery del directorio `agents/`, entornos minimal, etc.).
+- **`auditor` diferido**: no tiene consumer real hoy; entregarlo violaría regla #7 CLAUDE.md (≥2 repeticiones documentadas). Reabrir en rama dedicada (F2b o post-F4) si una skill futura lo requiere.
+- **`policy.yaml.agents_allowed` diferido**: no hay enforcement consumer (Stop hook lee `skills.jsonl`, no `agents.jsonl`; no hay log de invocaciones de subagents). Documentado como deferred — reabrir cuando un hook futuro requiera enforcement.
+
+**Decisiones cerradas en Fase -1 (ratificadas por el usuario)**:
+
+- (1) **Shape primitive**: oficial Claude Code subagent format (`name` + `description` + `tools` comma-separated + `model: sonnet`); body Markdown como system prompt. Sin campos inventados.
+- (2) **Scope**: 2 agents (no 3). `auditor` diferido por falta de consumer.
+- (3) **Naming**: namespace `pos-*` (no override silencioso de built-ins, no nombres a secas).
+- (4) **Policy**: `agents_allowed` no añadido en F2 (no enforcement consumer hoy). Sin tocar `policy.yaml`, `hooks/_lib/policy.py`, ni extender `audit-session`.
+- (5) **Tests**: contract tests parametrizados por `ALLOWED_AGENTS` + behavior flips de skills consumidoras + forward-compat negation en main-strict skills (`pattern-audit` + `audit-session` no deben mencionar plugin subagents).
+- (6) **Docs-sync**: ROADMAP fila F2 + sección F + nuevo bloque ✅; HANDOFF §1+§8+§9+§20; MASTER_PLAN § Rama F2 expandida; `.claude/rules/skills.md § Fork / delegación` actualiza precedentes a plugin agents; `.claude/rules/skills-map.md` añade sección "Subagents del plugin"; `docs/ARCHITECTURE.md § 6 Agents` reescrita post-revisión PR (nuevo top-level `agents/` es superficie arquitectónica del plugin aunque no esté enforced por el `pre-pr-gate` conditional).
+
+**Ajustes vs plan original**:
+
+- **Recorte v1 → v2 (decisión usuario)**: la primera Fase -1 listaba 3 agents (`code-reviewer`, `architect`, `auditor`) sin namespace + extensión de `policy.yaml.agents_allowed` + cambios en `hooks/_lib/policy.py`. El usuario rechazó: scope a 2 agents (regla #7 sobre `auditor`), namespace `pos-*` obligatorio, **no** tocar `policy.yaml` ni hooks (sin enforcement consumer hoy). El v2 aprobado es el que se implementó.
+- **Hardcode literal con disclaimer** (precedente E2a A5): los bodies hardcodean `pos-code-reviewer` / `pos-architect` con fallback `general-purpose`. Una sola consumidora por agent hoy → no justifica helper runtime (regla #7). Reabrir si una segunda skill aporta repetición.
+
+**Resultado**: **819 passed + 1 skipped** (vs baseline F1 de 793; +26 netos del nuevo `agents/tests/test_agent_frontmatter.py` parametrizado por 2 slugs × 13 métodos. Las behavior flips de `test_skill_frontmatter.py` actualizan assertions de tests existentes — no añaden count). Sin regresión D1..D6 / E1a..E3b / F1. `stop-policy-check.py` sigue en enforcement live con `ALLOWED_SKILLS = 14` (F2 no añade skills, solo agents). El skip es el D5 intencional `TestIntegrationDiffUnavailable` por subprocess-no-cover.
+
+**Detalle + deferrals + ajustes**: ver [ROADMAP.md § feat/f2-agents-subagents](ROADMAP.md), [MASTER_PLAN.md § Rama F2](MASTER_PLAN.md), [.claude/rules/skills-map.md § Subagents del plugin](.claude/rules/skills-map.md), [.claude/rules/skills.md § Fork / delegación](.claude/rules/skills.md).
