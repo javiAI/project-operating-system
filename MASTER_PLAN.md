@@ -703,7 +703,7 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 - (3) **Naming** — namespace `pos-*` obligatorio. Evita colisión con built-in defaults de Claude Code (`code-reviewer`, `code-architect`, `Plan`, `Explore`, `general-purpose`) y con user/project agents externos. NO override silencioso, NO nombres a secas.
 - (4) **Policy** — `agents_allowed` NO añadido en F2. Sin enforcement consumer hoy (`stop-policy-check.py` lee `skills.jsonl`, no hay log de invocaciones de subagents). Sin tocar `policy.yaml`, `hooks/_lib/policy.py`, ni extender `audit-session`. Reabrir cuando un hook futuro requiera enforcement.
 - (5) **Tests** — contract tests parametrizados por `ALLOWED_AGENTS` + behavior flips de skills consumidoras + forward-compat negation en main-strict skills.
-- (6) **Docs-sync** — ROADMAP, HANDOFF (§1 + §8 + §9 + §20 nuevo), MASTER_PLAN § Rama F2 (este bloque), `.claude/rules/skills.md § Fork / delegación` (precedentes a plugin agents), `.claude/rules/skills-map.md` (sección "Subagents del plugin"). `docs/ARCHITECTURE.md` no requerido (F2 no toca `generator/` ni `hooks/`; el `pre-pr-gate` no exige sync de architecture para esta rama).
+- (6) **Docs-sync** — ROADMAP, HANDOFF (§1 + §8 + §9 + §20 nuevo), MASTER_PLAN § Rama F2 (este bloque), `.claude/rules/skills.md § Fork / delegación` (precedentes a plugin agents), `.claude/rules/skills-map.md` (sección "Subagents del plugin"), `docs/ARCHITECTURE.md § 6 Agents` (reescrita post-revisión PR — el nuevo top-level `agents/` es superficie arquitectónica del plugin, aunque el `pre-pr-gate` conditional no la exija para esta rama).
 
 **Ajustes vs plan v1 (rechazado por el usuario)**:
 
@@ -719,7 +719,7 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 - `policy.yaml § skills_allowed` (líneas 263-296 — no se toca, pero confirmar para argumentar deferral de `agents_allowed`).
 - `hooks/_lib/policy.py` (no se toca; confirmar superficie del loader para argumentar no-extensión).
 
-**Criterio de salida**: **817 passed + 1 skipped** (baseline F1 793 + 24 agents contract + 2 skill flips). E1a..F1 + D1..D6 regression intacta. `stop-policy-check.py` sigue en enforcement live con `ALLOWED_SKILLS = 14` (F2 no añade skills, solo agents). Docs-sync dentro del PR. `docs/ARCHITECTURE.md` **no** requerido. El hook `pre-pr-gate.py` aprueba este mismo PR (segundo dogfooding D4 sobre Fase F).
+**Criterio de salida**: **819 passed + 1 skipped** (baseline F1 793 + 24 agents contract + 2 skill flips + 2 hardening tests añadidos en revisión PR: `tools`/`model` requeridos + `model == "sonnet"` lockeado). E1a..F1 + D1..D6 regression intacta. `stop-policy-check.py` sigue en enforcement live con `ALLOWED_SKILLS = 14` (F2 no añade skills, solo agents). Docs-sync dentro del PR incluye `docs/ARCHITECTURE.md § 6 Agents` (reescrita post-revisión). El hook `pre-pr-gate.py` aprueba este mismo PR (segundo dogfooding D4 sobre Fase F).
 
 **Carry-overs a F3..F4**:
 

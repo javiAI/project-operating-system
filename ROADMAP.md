@@ -615,10 +615,10 @@ Entregables:
 - `agents/pos-architect.md` — plugin subagent para pattern extraction + cross-file design. Consumido por `compound` (E3a). Frontmatter primitive-correct. Body declara 3 dimensiones: pattern extraction (≥2 repeticiones, regla #7 CLAUDE.md), architectural design (cohesión + tradeoffs), cross-file consistency. Output contract: patterns en formato canónico (Name/Context/Signal/Rule/Examples/Rationale) listo para fold en `.claude/patterns/<slug>.md`. Hard limits: no refactor, no `Edit`, no overwriting de patterns existentes.
 - `.claude/skills/pre-commit-review/SKILL.md` — flip `code-reviewer` → `pos-code-reviewer` (description + body + steps + failure modes). Fallback a `general-purpose` se mantiene literal.
 - `.claude/skills/compound/SKILL.md` — flip `code-architect` → `pos-architect` (description + body + steps + failure modes). Fallback a `general-purpose` intacto.
-- `agents/tests/test_agent_frontmatter.py` (NEW) — 24 contract tests parametrizados por `ALLOWED_AGENTS = ["pos-code-reviewer", "pos-architect"]`: structure (file exists + parses) + frontmatter (keys subset `{name, description, tools, model}`, name match filename, namespace `pos-*`, description non-empty, tools comma-separated string, model valid `{sonnet, opus, haiku}`) + body substantive (>100 chars) + capability surfaces (bug/security/scope/invariant para `pos-code-reviewer`; pattern/design/cross-file consistency para `pos-architect`).
+- `agents/tests/test_agent_frontmatter.py` (NEW) — 26 contract tests parametrizados por `ALLOWED_AGENTS = ["pos-code-reviewer", "pos-architect"]`: structure (file exists + parses) + frontmatter (todos los 4 keys requeridos `{name, description, tools, model}`, name match filename, namespace `pos-*`, description non-empty, tools comma-separated string con validación de tokens no vacíos y sin whitespace antes de `(...)`, model valid `{sonnet, opus, haiku}` + `model == "sonnet"` lockeado por F2 Fase -1 (1)) + body substantive (>100 chars) + capability surfaces (bug/security/scope/invariant para `pos-code-reviewer`; pattern/design/cross-file consistency para `pos-architect`).
 - `.claude/skills/tests/test_skill_frontmatter.py` — `TestPreCommitReviewBehavior::test_delegates_to_pos_code_reviewer` + `TestCompoundBehavior::test_body_delegates_to_pos_architect_with_fallback` flippean a los nuevos nombres + asertan literalmente fallback `general-purpose`. `pattern-audit` + `audit-session` negation lists incluyen ahora `pos-architect` / `pos-code-reviewer` (forward-compat: main-strict skills nunca deben referenciar plugin subagents).
 
-Suite global post-F2: **817 passed + 1 skipped** (baseline F1: 793; +24 agents + 2 skill flips). Sin regresión D1..D6 / E1a..E3b / F1.
+Suite global post-F2: **819 passed + 1 skipped** (baseline F1: 793; +26 agents + 2 skill flips). Sin regresión D1..D6 / E1a..E3b / F1.
 
 Contrato fijado por la suite (extiende E1..F1 sin reabrirlos):
 
@@ -637,7 +637,7 @@ Contrato fijado por la suite (extiende E1..F1 sin reabrirlos):
 - (5) Tests: contract tests parametrizados + behavior flips de skills consumidoras + forward-compat negation en main-strict skills.
 - (6) Docs-sync: ROADMAP + HANDOFF + MASTER_PLAN § F2 + `.claude/rules/skills.md` + `.claude/rules/skills-map.md` + `docs/ARCHITECTURE.md` (nuevo top-level `agents/` justifica sub-sección aunque no esté enforced por el pre-PR gate).
 
-**Criterio de salida**: 817 verdes + 1 skip intencional. Sin regresión sobre F1. Docs-sync completo dentro del PR. `pre-pr-gate.py` aprueba este mismo PR — el conditional `skills/**` (porque tocamos dos `SKILL.md`) exige `skills-map.md`, satisfecho. `agents/**` no está en `policy.yaml.lifecycle.pre_pr.docs_sync_conditional` hoy (drift abierto deliberadamente — reabrir cuando un consumer enforcement justifique extender el gate).
+**Criterio de salida**: 819 verdes + 1 skip intencional. Sin regresión sobre F1. Docs-sync completo dentro del PR (incluye `docs/ARCHITECTURE.md § 6 Agents` reescrita post-revisión). `pre-pr-gate.py` aprueba este mismo PR — el conditional `skills/**` (porque tocamos dos `SKILL.md`) exige `skills-map.md`, satisfecho. `agents/**` no está en `policy.yaml.lifecycle.pre_pr.docs_sync_conditional` hoy (drift abierto deliberadamente — reabrir cuando un consumer enforcement justifique extender el gate).
 
 ## Convenciones de este archivo
 

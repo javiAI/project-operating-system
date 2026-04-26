@@ -5,8 +5,8 @@ Scope:
   - No invented fields beyond {name, description, tools, model}.
   - `name` matches the filename without `.md`.
   - description non-empty.
-  - tools, when present, is a comma-separated string (per official subagent docs).
-  - model, when present, is one of the supported values.
+  - tools is REQUIRED and is a comma-separated string (per official subagent docs).
+  - model is REQUIRED and one of the supported values; F2 agents declare `sonnet`.
   - Body (system prompt) is substantive.
 
 F2 Fase -1 ratified decisions:
@@ -33,8 +33,9 @@ AGENTS_DIR = REPO_ROOT / "agents"
 ALLOWED_AGENTS = ["pos-code-reviewer", "pos-architect"]
 
 ALLOWED_FRONTMATTER_KEYS = {"name", "description", "tools", "model"}
-REQUIRED_FRONTMATTER_KEYS = {"name", "description"}
+REQUIRED_FRONTMATTER_KEYS = {"name", "description", "tools", "model"}
 VALID_MODELS = {"sonnet", "opus", "haiku"}
+F2_REQUIRED_MODEL = "sonnet"
 
 
 def read_agent(slug: str) -> tuple[dict, str]:
@@ -133,8 +134,6 @@ class TestFrontmatter:
     @pytest.mark.parametrize("slug", ALLOWED_AGENTS)
     def test_tools_is_comma_separated_string(self, slug: str):
         fm, _ = read_agent(slug)
-        if "tools" not in fm:
-            return  # tools is optional
         tools = fm["tools"]
         assert isinstance(tools, str), (
             f"Agent {slug} tools must be a comma-separated string per "
@@ -142,19 +141,36 @@ class TestFrontmatter:
             f"{type(tools).__name__}. (Skill primitive uses YAML list, but "
             f"agent primitive uses comma-separated string — different shapes.)"
         )
-        assert tools.strip(), (
-            f"Agent {slug} tools, when present, must be non-empty"
+        assert tools.strip(), f"Agent {slug} tools must be non-empty"
+        tokens = [t.strip() for t in tools.split(",")]
+        assert all(tokens), (
+            f"Agent {slug} tools={tools!r} has empty token after split — "
+            f"comma-separated format requires non-empty tokens between commas."
+        )
+        assert all(" " not in t.split("(", 1)[0] for t in tokens), (
+            f"Agent {slug} tools={tools!r} contains a token with whitespace "
+            f"in its tool name (before any `(...)` scope). Format must be "
+            f"`Tool1, Tool2, Bash(cmd:*)` — comma-separated, not space-separated."
         )
 
     @pytest.mark.parametrize("slug", ALLOWED_AGENTS)
-    def test_model_valid_if_present(self, slug: str):
+    def test_model_valid(self, slug: str):
         fm, _ = read_agent(slug)
-        if "model" not in fm:
-            return
         model = fm["model"]
         assert model in VALID_MODELS, (
             f"Agent {slug} model={model!r} must be one of "
             f"{sorted(VALID_MODELS)}"
+        )
+
+    @pytest.mark.parametrize("slug", ALLOWED_AGENTS)
+    def test_model_is_sonnet_for_f2(self, slug: str):
+        """F2 Fase -1 decision (1) ratified `model: sonnet` for both agents.
+        Lock that decision here so a future drift to opus/haiku is explicit."""
+        fm, _ = read_agent(slug)
+        assert fm["model"] == F2_REQUIRED_MODEL, (
+            f"Agent {slug} model={fm['model']!r} must be "
+            f"{F2_REQUIRED_MODEL!r} per F2 Fase -1 decision (1). Bumping to "
+            f"opus/haiku requires a new branch + ratification."
         )
 
 
