@@ -1,6 +1,6 @@
 ---
 name: pre-commit-review
-description: Use when the user asks to "revisa la rama", "pre-commit review", "review antes del PR", "chequea el diff", or right before running `gh pr create`. Prepares the review context in the main thread (branch kickoff, scope, applicable invariants), delegates the analysis to the `code-reviewer` subagent via the Agent tool over `git diff main...HEAD`, and folds the subagent summary into prioritized findings. Does NOT rewrite code. Does NOT apply fixes. Does NOT replace `simplify`.
+description: Use when the user asks to "revisa la rama", "pre-commit review", "review antes del PR", "chequea el diff", or right before running `gh pr create`. Prepares the review context in the main thread (branch kickoff, scope, applicable invariants), delegates the analysis to the `pos-code-reviewer` subagent via the Agent tool over `git diff main...HEAD`, and folds the subagent summary into prioritized findings. Does NOT rewrite code. Does NOT apply fixes. Does NOT replace `simplify`.
 allowed-tools:
   - Read
   - Grep
@@ -14,7 +14,7 @@ allowed-tools:
 
 # pre-commit-review
 
-Produce a prioritized review of the current branch's diff (`main...HEAD`) before the user opens a PR with `gh pr create`. Delegate the heavy analysis to the `code-reviewer` subagent; the main thread only prepares context and folds the summary.
+Produce a prioritized review of the current branch's diff (`main...HEAD`) before the user opens a PR with `gh pr create`. Delegate the heavy analysis to the `pos-code-reviewer` subagent; the main thread only prepares context and folds the summary.
 
 Framing: this is an eligibility hint, not a guaranteed auto-trigger. Claude Code decides whether to activate you based on `description`. Output is a review proposal — the user decides which findings to act on.
 
@@ -24,7 +24,7 @@ You MAY:
 - Read the kickoff commit and recent branch commits with `git log`.
 - Inspect the diff with `git diff main...HEAD`.
 - Read `.claude/rules/*.md`, `CLAUDE.md`, and any file cited in the branch's `MASTER_PLAN.md` entry to seed invariants into the review prompt.
-- Delegate the analysis to the `code-reviewer` subagent via the Agent tool (see "Delegation" below).
+- Delegate the analysis to the `pos-code-reviewer` subagent via the Agent tool (see "Delegation" below).
 - Emit prioritized findings in this conversation (confidence-filtered, bucketed by severity).
 
 You MUST NOT:
@@ -36,17 +36,17 @@ You MUST NOT:
 
 ## Delegation (hybrid: main prepares context, subagent analyzes)
 
-Main thread stays cheap; heavy analysis goes to the `code-reviewer` subagent via the `Agent` tool:
+Main thread stays cheap; heavy analysis goes to the `pos-code-reviewer` subagent via the `Agent` tool:
 
 1. Main gathers context — kickoff commit, branch scope, invariants cited in `.claude/rules/*.md` that touch paths in the diff.
-2. Main invokes `Agent(subagent_type="code-reviewer", prompt=...)` with:
+2. Main invokes `Agent(subagent_type="pos-code-reviewer", prompt=...)` with:
    - The prepared context (branch scope + invariants applicable to touched paths).
    - The full diff (`git diff main...HEAD`).
    - Explicit asks: bugs, logic errors, security vulnerabilities, adherence to branch scope, adherence to repo invariants.
 3. Subagent runs in its own fork, returns a summary with confidence-filtered findings.
 4. Main folds the summary — does NOT paste-through. Prioritizes by severity, attaches `file:line` references, groups by theme if useful.
 
-The string `code-reviewer` here reflects the Claude Code default shipped today. It is hardcoded with a disclaimer: default `subagent_type` names can vary between releases/environments. If the Agent tool's `subagent_type` enum at runtime does NOT include `code-reviewer`, fall back to `general-purpose` with a task prompt that names the same capability (bugs + logic + security + convention adherence). See `.claude/rules/skills.md § Fork / delegación`.
+The string `pos-code-reviewer` here reflects the Claude Code default shipped today. It is hardcoded with a disclaimer: default `subagent_type` names can vary between releases/environments. If the Agent tool's `subagent_type` enum at runtime does NOT include `pos-code-reviewer`, fall back to `general-purpose` with a task prompt that names the same capability (bugs + logic + security + convention adherence). See `.claude/rules/skills.md § Fork / delegación`.
 
 ## Steps
 
@@ -66,13 +66,13 @@ The string `code-reviewer` here reflects the Claude Code default shipped today. 
    - Collect applicable invariants from `CLAUDE.md` (regla #3 tests-first, regla #7 patrones antes de abstraer, etc.).
    - Summarize branch scope from `MASTER_PLAN.md § Rama <slug>` if the section exists.
 
-3. **Delegate to `code-reviewer`** via the Agent tool. The prompt must include:
+3. **Delegate to `pos-code-reviewer`** via the Agent tool. The prompt must include:
    - Branch name, base, and kickoff scope.
    - Invariants applicable to the touched paths (grep output, not full rule files).
    - The full diff (`git diff main...HEAD`).
    - Explicit asks: "bugs, logic errors, security vulnerabilities, places where the diff leaves the branch scope, and violations of the cited invariants. Group findings by severity (blocker / high / medium / nit). Confidence-filter: omit findings below medium confidence."
 
-   If the runtime Agent tool does NOT list `code-reviewer`, fall back to `general-purpose` with a prompt that names the capability; note the fallback in the user-facing summary.
+   If the runtime Agent tool does NOT list `pos-code-reviewer`, fall back to `general-purpose` with a prompt that names the capability; note the fallback in the user-facing summary.
 
 4. **Fold the subagent summary** into this conversation. Do NOT paste-through:
    - Dedup findings that say the same thing twice.
@@ -97,7 +97,7 @@ The string `code-reviewer` here reflects the Claude Code default shipped today. 
 
 - HEAD is `main` / `master` → no branch to review; stop and tell the user. Log `status: partial`.
 - `git diff main...HEAD` returns empty → no changes to review; stop. Log `status: partial`.
-- `code-reviewer` subagent unavailable at runtime → fall back to `general-purpose` with an equivalent task prompt; note the fallback in the user-facing summary. Log `status: degraded`.
+- `pos-code-reviewer` subagent unavailable at runtime → fall back to `general-purpose` with an equivalent task prompt; note the fallback in the user-facing summary. Log `status: degraded`.
 - Subagent returns an empty / unusable summary → report it to the user; do NOT invent findings. Log `status: ambiguous`.
 
 ## Explicitly out of scope
