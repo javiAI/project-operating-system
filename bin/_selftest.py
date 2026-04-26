@@ -258,11 +258,54 @@ def scenario_d5_post_action(synthetic: Path) -> tuple[bool, str]:
     return True, ""
 
 
+POLICY_SKILLS_ALLOWED_ONLY = textwrap.dedent("""\
+    skills_allowed:
+      - "pos:simplify"
+""")
+
+
+def scenario_d6_stop_policy_check(synthetic: Path) -> tuple[bool, str]:
+    """D6: enforce skill allowlist scoped by session_id; allow when clean."""
+    (synthetic / "policy.yaml").write_text(POLICY_SKILLS_ALLOWED_ONLY, encoding="utf-8")
+    skills_log = synthetic / ".claude" / "logs" / "skills.jsonl"
+    skills_log.parent.mkdir(parents=True, exist_ok=True)
+    skills_log.write_text(
+        json.dumps({
+            "ts": "2026-04-26T00:00:00Z",
+            "skill": "pos:rogue",
+            "session_id": "sess-rogue",
+            "status": "ok",
+        }) + "\n",
+        encoding="utf-8",
+    )
+
+    deny_payload = {"session_id": "sess-rogue"}
+    res = invoke_hook("stop-policy-check", deny_payload, synthetic)
+    if res.returncode != 2:
+        return False, (
+            f"deny phase: expected exit 2, got {res.returncode}\n"
+            f"stdout: {res.stdout}\nstderr: {res.stderr}"
+        )
+    if '"permissionDecision": "deny"' not in res.stdout:
+        return False, f"deny phase: missing permissionDecision deny\nstdout: {res.stdout}"
+
+    allow_payload = {"session_id": "sess-clean"}
+    res = invoke_hook("stop-policy-check", allow_payload, synthetic)
+    if res.returncode != 0:
+        return False, (
+            f"allow phase: expected exit 0, got {res.returncode}\n"
+            f"stdout: {res.stdout}\nstderr: {res.stderr}"
+        )
+
+    return True, ""
+
+
 SCENARIOS = [
     ("D1", "pre-branch-gate", scenario_d1_pre_branch_gate),
     ("D3", "pre-write-guard", scenario_d3_pre_write_guard),
     ("D4", "pre-pr-gate", scenario_d4_pre_pr_gate),
     ("D5", "post-action", scenario_d5_post_action),
+    ("D6", "stop-policy-check", scenario_d6_stop_policy_check),
 ]
 
 
