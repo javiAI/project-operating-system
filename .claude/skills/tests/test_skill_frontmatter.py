@@ -324,17 +324,21 @@ class TestDeepInterviewBehavior:
 
 
 class TestPreCommitReviewBehavior:
-    def test_delegates_to_code_reviewer(self):
-        """The skill must delegate to the `code-reviewer` subagent via the
-        Agent tool (same pattern branch-plan established in E1b). The string
-        `code-reviewer` is hardcoded with a disclaimer about default-name
-        fragility (see .claude/rules/skills.md § Fork / delegación)."""
+    def test_delegates_to_pos_code_reviewer(self):
+        """F2: pre-commit-review must delegate to the `pos-code-reviewer`
+        subagent (plugin-owned, namespaced to avoid collision with built-in
+        defaults). Fallback to `general-purpose` is mandatory if the runtime
+        does not expose plugin agents."""
         _, body = read_skill("pre-commit-review")
         low = body.lower()
-        assert "code-reviewer" in low, (
-            "pre-commit-review body must name the `code-reviewer` subagent "
-            "(the canonical default in Claude Code today) so the delegation "
+        assert "pos-code-reviewer" in low, (
+            "pre-commit-review body must name the `pos-code-reviewer` "
+            "subagent (F2 plugin agent, namespaced) so the delegation "
             "contract is explicit and greppable."
+        )
+        assert "general-purpose" in low, (
+            "pre-commit-review body must document the fallback to "
+            "`general-purpose` when `pos-code-reviewer` is unavailable."
         )
         assert "subagent_type" in low or "agent tool" in low, (
             "pre-commit-review body must reference the Agent-tool delegation "
@@ -680,14 +684,21 @@ class TestCompoundBehavior:
             "(marks writer-scoped limit: writes patterns, stops)."
         )
 
-    def test_body_declares_fallback(self):
-        """compound documents fallback to general-purpose if code-architect unavailable."""
+    def test_body_delegates_to_pos_architect_with_fallback(self):
+        """F2: compound must delegate to the `pos-architect` plugin subagent
+        (namespaced to avoid collision with built-in defaults). Fallback to
+        `general-purpose` is mandatory if the runtime does not expose plugin
+        agents."""
         _, body = read_skill("compound")
         low = body.lower()
-        # Verify fallback is documented in the body
-        assert ("fallback" in low and "general-purpose" in low) or "general-purpose" in low, (
-            "compound body must document fallback to general-purpose subagent "
-            "when code-architect is unavailable."
+        assert "pos-architect" in low, (
+            "compound body must name the `pos-architect` subagent "
+            "(F2 plugin agent, namespaced) so the delegation contract is "
+            "explicit and greppable."
+        )
+        assert "general-purpose" in low, (
+            "compound body must document the fallback to `general-purpose` "
+            "when `pos-architect` is unavailable."
         )
 
 
@@ -727,7 +738,14 @@ class TestPatternAuditBehavior:
         """pattern-audit is main-strict: no Agent tool delegation in E3a."""
         _, body = read_skill("pattern-audit")
         low = body.lower()
-        delegation_tokens = ("delegate", "subagent", "code-architect", "agent(")
+        delegation_tokens = (
+            "delegate",
+            "subagent",
+            "code-architect",
+            "pos-architect",
+            "pos-code-reviewer",
+            "agent(",
+        )
         assert not any(tok in low for tok in delegation_tokens), (
             "pattern-audit body must NOT mention Agent delegation or subagents; "
             "analysis must be main-strict (local Grep/Bash only)."
@@ -799,7 +817,13 @@ class TestAuditSessionBehavior:
         needed."""
         _, body = read_skill("audit-session")
         low = body.lower()
-        delegation_tokens = ("subagent", "code-architect", "agent(")
+        delegation_tokens = (
+            "subagent",
+            "code-architect",
+            "pos-architect",
+            "pos-code-reviewer",
+            "agent(",
+        )
         assert not any(tok in low for tok in delegation_tokens), (
             "audit-session body must NOT mention Agent delegation or subagents; "
             "comparison must be main-strict (local Read/Glob/Grep only)."
