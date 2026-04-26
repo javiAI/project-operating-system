@@ -86,6 +86,28 @@ def init_baseline_repo(repo: Path) -> None:
     git_in(repo, "commit", "-q", "-m", "baseline")
 
 
+def check_deny(phase: str, res: subprocess.CompletedProcess) -> tuple[bool, str]:
+    """Standard deny assertion: exit 2 + permissionDecision deny in stdout."""
+    if res.returncode != 2:
+        return False, (
+            f"{phase}: expected exit 2, got {res.returncode}\n"
+            f"stdout: {res.stdout}\nstderr: {res.stderr}"
+        )
+    if '"permissionDecision": "deny"' not in res.stdout:
+        return False, f"{phase}: missing permissionDecision deny\nstdout: {res.stdout}"
+    return True, ""
+
+
+def check_allow(phase: str, res: subprocess.CompletedProcess) -> tuple[bool, str]:
+    """Standard allow assertion: exit 0."""
+    if res.returncode != 0:
+        return False, (
+            f"{phase}: expected exit 0, got {res.returncode}\n"
+            f"stdout: {res.stdout}\nstderr: {res.stderr}"
+        )
+    return True, ""
+
+
 def scenario_d1_pre_branch_gate(synthetic: Path) -> tuple[bool, str]:
     """D1: deny `git checkout -b` without marker; allow with marker present."""
     payload = {
@@ -93,27 +115,15 @@ def scenario_d1_pre_branch_gate(synthetic: Path) -> tuple[bool, str]:
         "tool_input": {"command": "git checkout -b feat/example"},
     }
 
-    res = invoke_hook("pre-branch-gate", payload, synthetic)
-    if res.returncode != 2:
-        return False, (
-            f"deny phase: expected exit 2, got {res.returncode}\n"
-            f"stdout: {res.stdout}\nstderr: {res.stderr}"
-        )
-    if '"permissionDecision": "deny"' not in res.stdout:
-        return False, f"deny phase: missing permissionDecision deny\nstdout: {res.stdout}"
+    ok, reason = check_deny("deny phase", invoke_hook("pre-branch-gate", payload, synthetic))
+    if not ok:
+        return False, reason
 
     marker = synthetic / ".claude" / "branch-approvals" / "feat_example.approved"
     marker.parent.mkdir(parents=True, exist_ok=True)
     marker.touch()
 
-    res = invoke_hook("pre-branch-gate", payload, synthetic)
-    if res.returncode != 0:
-        return False, (
-            f"allow phase: expected exit 0, got {res.returncode}\n"
-            f"stdout: {res.stdout}\nstderr: {res.stderr}"
-        )
-
-    return True, ""
+    return check_allow("allow phase", invoke_hook("pre-branch-gate", payload, synthetic))
 
 
 POLICY_PRE_WRITE_ONLY = textwrap.dedent("""\
@@ -140,27 +150,15 @@ def scenario_d3_pre_write_guard(synthetic: Path) -> tuple[bool, str]:
         "tool_input": {"file_path": str(target)},
     }
 
-    res = invoke_hook("pre-write-guard", payload, synthetic)
-    if res.returncode != 2:
-        return False, (
-            f"deny phase: expected exit 2, got {res.returncode}\n"
-            f"stdout: {res.stdout}\nstderr: {res.stderr}"
-        )
-    if '"permissionDecision": "deny"' not in res.stdout:
-        return False, f"deny phase: missing permissionDecision deny\nstdout: {res.stdout}"
+    ok, reason = check_deny("deny phase", invoke_hook("pre-write-guard", payload, synthetic))
+    if not ok:
+        return False, reason
 
     test_pair = synthetic / "hooks" / "tests" / "test_foo.py"
     test_pair.parent.mkdir(parents=True, exist_ok=True)
     test_pair.touch()
 
-    res = invoke_hook("pre-write-guard", payload, synthetic)
-    if res.returncode != 0:
-        return False, (
-            f"allow phase: expected exit 0, got {res.returncode}\n"
-            f"stdout: {res.stdout}\nstderr: {res.stderr}"
-        )
-
-    return True, ""
+    return check_allow("allow phase", invoke_hook("pre-write-guard", payload, synthetic))
 
 
 POLICY_DOCS_SYNC_ONLY = textwrap.dedent("""\
@@ -188,13 +186,9 @@ def scenario_d4_pre_pr_gate(synthetic: Path) -> tuple[bool, str]:
     }
 
     res = invoke_hook("pre-pr-gate", payload, synthetic)
-    if res.returncode != 2:
-        return False, (
-            f"deny phase: expected exit 2, got {res.returncode}\n"
-            f"stdout: {res.stdout}\nstderr: {res.stderr}"
-        )
-    if '"permissionDecision": "deny"' not in res.stdout:
-        return False, f"deny phase: missing permissionDecision deny\nstdout: {res.stdout}"
+    ok, reason = check_deny("deny phase", res)
+    if not ok:
+        return False, reason
     if "docs-sync" not in res.stdout:
         return False, f"deny phase: missing 'docs-sync' in reason\nstdout: {res.stdout}"
 
@@ -203,14 +197,7 @@ def scenario_d4_pre_pr_gate(synthetic: Path) -> tuple[bool, str]:
     git_in(synthetic, "add", "ROADMAP.md", "HANDOFF.md")
     git_in(synthetic, "commit", "-q", "-m", "docs: sync")
 
-    res = invoke_hook("pre-pr-gate", payload, synthetic)
-    if res.returncode != 0:
-        return False, (
-            f"allow phase: expected exit 0, got {res.returncode}\n"
-            f"stdout: {res.stdout}\nstderr: {res.stderr}"
-        )
-
-    return True, ""
+    return check_allow("allow phase", invoke_hook("pre-pr-gate", payload, synthetic))
 
 
 POLICY_POST_MERGE_ONLY = textwrap.dedent("""\
@@ -244,11 +231,9 @@ def scenario_d5_post_action(synthetic: Path) -> tuple[bool, str]:
         "tool_input": {"command": "git merge --no-ff feat/example"},
     }
     res = invoke_hook("post-action", payload, synthetic)
-    if res.returncode != 0:
-        return False, (
-            f"expected exit 0, got {res.returncode}\n"
-            f"stdout: {res.stdout}\nstderr: {res.stderr}"
-        )
+    ok, reason = check_allow("post-action", res)
+    if not ok:
+        return False, reason
     if "/pos:compound" not in res.stdout:
         return False, (
             f"missing /pos:compound advisory in stdout\n"
@@ -279,25 +264,17 @@ def scenario_d6_stop_policy_check(synthetic: Path) -> tuple[bool, str]:
         encoding="utf-8",
     )
 
-    deny_payload = {"session_id": "sess-rogue"}
-    res = invoke_hook("stop-policy-check", deny_payload, synthetic)
-    if res.returncode != 2:
-        return False, (
-            f"deny phase: expected exit 2, got {res.returncode}\n"
-            f"stdout: {res.stdout}\nstderr: {res.stderr}"
-        )
-    if '"permissionDecision": "deny"' not in res.stdout:
-        return False, f"deny phase: missing permissionDecision deny\nstdout: {res.stdout}"
+    ok, reason = check_deny(
+        "deny phase",
+        invoke_hook("stop-policy-check", {"session_id": "sess-rogue"}, synthetic),
+    )
+    if not ok:
+        return False, reason
 
-    allow_payload = {"session_id": "sess-clean"}
-    res = invoke_hook("stop-policy-check", allow_payload, synthetic)
-    if res.returncode != 0:
-        return False, (
-            f"allow phase: expected exit 0, got {res.returncode}\n"
-            f"stdout: {res.stdout}\nstderr: {res.stderr}"
-        )
-
-    return True, ""
+    return check_allow(
+        "allow phase",
+        invoke_hook("stop-policy-check", {"session_id": "sess-clean"}, synthetic),
+    )
 
 
 SCENARIOS = [
