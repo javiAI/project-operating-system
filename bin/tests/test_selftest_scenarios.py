@@ -42,3 +42,6 @@ class TestScenarios:
 
     def test_d3_pre_write_guard(self, selftest_run):
         assert "[ok] D3 pre-write-guard" in selftest_run.stdout, _scenario_diag("D3", selftest_run)
+
+    def test_d4_pre_pr_gate(self, selftest_run):
+        assert "[ok] D4 pre-pr-gate" in selftest_run.stdout, _scenario_diag("D4", selftest_run)
