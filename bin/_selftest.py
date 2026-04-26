@@ -25,6 +25,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import textwrap
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -94,8 +95,56 @@ def scenario_d1_pre_branch_gate(synthetic: Path) -> tuple[bool, str]:
     return True, ""
 
 
+POLICY_PRE_WRITE_ONLY = textwrap.dedent("""\
+    lifecycle:
+      pre_write:
+        enforced_patterns:
+          - label: "hooks_top_level_py"
+            match_glob: "hooks/*.py"
+            exclude_globs:
+              - "hooks/_lib/**"
+              - "hooks/tests/**"
+""")
+
+
+def scenario_d3_pre_write_guard(synthetic: Path) -> tuple[bool, str]:
+    """D3: deny Write to enforced path without test pair, allow with."""
+    # Synthetic project's rendered policy lacks pre_write (template drift
+    # documented post-D5b). Inject a minimal policy so the hook enforces.
+    (synthetic / "policy.yaml").write_text(POLICY_PRE_WRITE_ONLY, encoding="utf-8")
+
+    target = synthetic / "hooks" / "foo.py"
+    payload = {
+        "tool_name": "Write",
+        "tool_input": {"file_path": str(target)},
+    }
+
+    res = invoke_hook("pre-write-guard", payload, synthetic)
+    if res.returncode != 2:
+        return False, (
+            f"deny phase: expected exit 2, got {res.returncode}\n"
+            f"stdout: {res.stdout}\nstderr: {res.stderr}"
+        )
+    if '"permissionDecision": "deny"' not in res.stdout:
+        return False, f"deny phase: missing permissionDecision deny\nstdout: {res.stdout}"
+
+    test_pair = synthetic / "hooks" / "tests" / "test_foo.py"
+    test_pair.parent.mkdir(parents=True, exist_ok=True)
+    test_pair.touch()
+
+    res = invoke_hook("pre-write-guard", payload, synthetic)
+    if res.returncode != 0:
+        return False, (
+            f"allow phase: expected exit 0, got {res.returncode}\n"
+            f"stdout: {res.stdout}\nstderr: {res.stderr}"
+        )
+
+    return True, ""
+
+
 SCENARIOS = [
     ("D1", "pre-branch-gate", scenario_d1_pre_branch_gate),
+    ("D3", "pre-write-guard", scenario_d3_pre_write_guard),
 ]
 
 
