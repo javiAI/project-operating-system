@@ -828,15 +828,16 @@ class TestRealRepoPolicy:
         assert "phase_minus_one_state" in rules.persist
         assert "unsaved_pattern_candidates" in rules.persist
 
-    def test_real_skills_allowed_populated_by_e3b(self):
+    def test_real_skills_allowed_populated_by_f1(self):
         """E1a seeded `skills_allowed` with the first two real skills;
         E1b extended it with the Fase -1 pair (branch-plan + deep-interview);
         E2a adds the pre-PR quality pair (pre-commit-review + simplify);
         E2b extends it with advisory skills (compress + audit-plugin);
         E3a extends it with pattern skills (compound + pattern-audit);
         E3b extends it with test-quality skills (test-scaffold + test-audit
-        + coverage-explain).
-        Accessor returns the full 13-tuple — locks down the contract between
+        + coverage-explain);
+        F1 extends it with the audit advisory skill (audit-session).
+        Accessor returns the full 14-tuple — locks down the contract between
         `policy.yaml.skills_allowed` and the loader against silent drift.
         """
         from _lib import policy
