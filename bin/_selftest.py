@@ -65,6 +65,27 @@ def invoke_hook(name: str, payload: dict, cwd: Path) -> subprocess.CompletedProc
     )
 
 
+def git_in(repo: Path, *args: str) -> subprocess.CompletedProcess:
+    """Run `git <args>` inside `repo`. Raises on non-zero exit."""
+    return subprocess.run(
+        ["git", *args],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=10,
+    )
+
+
+def init_baseline_repo(repo: Path) -> None:
+    """Init a fresh git repo on `main`, configure user, commit current tree."""
+    git_in(repo, "init", "-q", "-b", "main")
+    git_in(repo, "config", "user.email", "selftest@pos.local")
+    git_in(repo, "config", "user.name", "pos selftest")
+    git_in(repo, "add", "-A")
+    git_in(repo, "commit", "-q", "-m", "baseline")
+
+
 def scenario_d1_pre_branch_gate(synthetic: Path) -> tuple[bool, str]:
     """D1: deny `git checkout -b` without marker; allow with marker present."""
     payload = {
@@ -142,9 +163,60 @@ def scenario_d3_pre_write_guard(synthetic: Path) -> tuple[bool, str]:
     return True, ""
 
 
+POLICY_DOCS_SYNC_ONLY = textwrap.dedent("""\
+    lifecycle:
+      pre_pr:
+        docs_sync_required:
+          - "ROADMAP.md"
+          - "HANDOFF.md"
+        docs_sync_conditional: []
+""")
+
+
+def scenario_d4_pre_pr_gate(synthetic: Path) -> tuple[bool, str]:
+    """D4: deny `gh pr create` when docs-sync incomplete; allow when satisfied."""
+    (synthetic / "policy.yaml").write_text(POLICY_DOCS_SYNC_ONLY, encoding="utf-8")
+    init_baseline_repo(synthetic)
+    git_in(synthetic, "checkout", "-q", "-b", "feat/example")
+    (synthetic / "src.txt").write_text("payload\n", encoding="utf-8")
+    git_in(synthetic, "add", "src.txt")
+    git_in(synthetic, "commit", "-q", "-m", "feat: add src")
+
+    payload = {
+        "tool_name": "Bash",
+        "tool_input": {"command": "gh pr create --title test --body test"},
+    }
+
+    res = invoke_hook("pre-pr-gate", payload, synthetic)
+    if res.returncode != 2:
+        return False, (
+            f"deny phase: expected exit 2, got {res.returncode}\n"
+            f"stdout: {res.stdout}\nstderr: {res.stderr}"
+        )
+    if '"permissionDecision": "deny"' not in res.stdout:
+        return False, f"deny phase: missing permissionDecision deny\nstdout: {res.stdout}"
+    if "docs-sync" not in res.stdout:
+        return False, f"deny phase: missing 'docs-sync' in reason\nstdout: {res.stdout}"
+
+    (synthetic / "ROADMAP.md").write_text("# ROADMAP\nupdated\n", encoding="utf-8")
+    (synthetic / "HANDOFF.md").write_text("# HANDOFF\nupdated\n", encoding="utf-8")
+    git_in(synthetic, "add", "ROADMAP.md", "HANDOFF.md")
+    git_in(synthetic, "commit", "-q", "-m", "docs: sync")
+
+    res = invoke_hook("pre-pr-gate", payload, synthetic)
+    if res.returncode != 0:
+        return False, (
+            f"allow phase: expected exit 0, got {res.returncode}\n"
+            f"stdout: {res.stdout}\nstderr: {res.stderr}"
+        )
+
+    return True, ""
+
+
 SCENARIOS = [
     ("D1", "pre-branch-gate", scenario_d1_pre_branch_gate),
     ("D3", "pre-write-guard", scenario_d3_pre_write_guard),
+    ("D4", "pre-pr-gate", scenario_d4_pre_pr_gate),
 ]
 
 
