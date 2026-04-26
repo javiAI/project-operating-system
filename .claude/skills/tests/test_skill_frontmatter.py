@@ -741,3 +741,90 @@ class TestPatternAuditBehavior:
             "pattern-audit body must contain uppercase STOP boundary "
             "(marks advisory-only scope limit)."
         )
+
+
+class TestAuditSessionBehavior:
+    """F1 — audit-session is a read-only advisory main-strict skill that
+    compares 3 surfaces of policy.yaml against the real .claude/logs/.
+
+    Surfaces (locked by Fase -1 decision A1.a):
+      1. policy.yaml.skills_allowed ↔ skills.jsonl invocations.
+      2. policy.yaml.lifecycle.*.hooks_required ↔ per-hook log file
+         existence + nonempty.
+      3. policy.yaml.audit.required_logs ↔ existence + age + nonempty
+         of declared logs.
+
+    Time-window guidance: 30-day review window declared in body as
+    textual guidance, NO date-math execution (Fase -1 decision A2.a +
+    user adjustment 3).
+
+    Prefix normalization: pos:<slug> ↔ <slug> declared as explicit
+    assumption (Fase -1 decision A3.a).
+    """
+
+    def test_body_declares_three_audit_surfaces(self):
+        """audit-session compares 3 surfaces of policy.yaml against logs."""
+        _, body = read_skill("audit-session")
+        assert "skills_allowed" in body, (
+            "audit-session body must reference policy.yaml.skills_allowed "
+            "as one of the 3 audit surfaces."
+        )
+        assert "lifecycle" in body and "hooks_required" in body, (
+            "audit-session body must reference lifecycle.*.hooks_required "
+            "as one of the 3 audit surfaces."
+        )
+        assert "required_logs" in body, (
+            "audit-session body must reference policy.yaml.audit.required_logs "
+            "as one of the 3 audit surfaces."
+        )
+
+    def test_body_declares_advisory_only(self):
+        """audit-session is read-only advisory: no file mutations,
+        no policy fixes, no log truncation."""
+        _, body = read_skill("audit-session")
+        low = body.lower()
+        advisory_tokens = (
+            "advisory",
+            "read-only",
+            "does not modify",
+            "no modifica",
+        )
+        assert any(tok in low for tok in advisory_tokens), (
+            "audit-session body must declare advisory/read-only scope."
+        )
+
+    def test_body_declares_main_strict_no_delegation(self):
+        """audit-session is main-strict: no Agent tool delegation in F1.
+        Comparison is local file-reading + log-counting; cheap, no fork
+        needed."""
+        _, body = read_skill("audit-session")
+        low = body.lower()
+        delegation_tokens = ("subagent", "code-architect", "agent(")
+        assert not any(tok in low for tok in delegation_tokens), (
+            "audit-session body must NOT mention Agent delegation or subagents; "
+            "comparison must be main-strict (local Read/Glob/Grep only)."
+        )
+
+    def test_body_declares_30day_review_window(self):
+        """audit-session declares a 30-day review window as textual
+        guidance, NOT actual date-math filtering of log entries.
+        User adjustment 3: validate the declaration, not the computation."""
+        _, body = read_skill("audit-session")
+        low = body.lower()
+        assert "30" in body and ("day" in low or "review window" in low), (
+            "audit-session body must declare a 30-day review window as guidance "
+            "(textual, NOT date-math execution)."
+        )
+
+    def test_body_declares_prefix_normalization_assumption(self):
+        """audit-session normalizes pos:<slug> ↔ <slug> when comparing
+        skills_allowed (plain slugs) to lifecycle.*.skills_required
+        (pos:-prefixed). Assumption must be explicit in the body
+        (Fase -1 decision A3.a)."""
+        _, body = read_skill("audit-session")
+        low = body.lower()
+        assert "pos:" in body and "normaliz" in low, (
+            "audit-session body must declare pos: prefix normalization "
+            "as an explicit assumption (skills_allowed uses plain slugs; "
+            "lifecycle.*.skills_required may use pos:-prefixed form)."
+        )
