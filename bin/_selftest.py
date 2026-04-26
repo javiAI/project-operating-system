@@ -213,10 +213,56 @@ def scenario_d4_pre_pr_gate(synthetic: Path) -> tuple[bool, str]:
     return True, ""
 
 
+POLICY_POST_MERGE_ONLY = textwrap.dedent("""\
+    lifecycle:
+      post_merge:
+        skills_conditional:
+          - trigger:
+              touched_paths_any_of:
+                - "generator/*.ts"
+              skip_if_only:
+                - "*.md"
+              min_files_changed: 1
+""")
+
+
+def scenario_d5_post_action(synthetic: Path) -> tuple[bool, str]:
+    """D5: confirmed merge whose diff matches trigger emits /pos:compound advisory."""
+    (synthetic / "policy.yaml").write_text(POLICY_POST_MERGE_ONLY, encoding="utf-8")
+    init_baseline_repo(synthetic)
+    git_in(synthetic, "checkout", "-q", "-b", "feat/example")
+    target = synthetic / "generator" / "feature.ts"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("export const x = 1;\n", encoding="utf-8")
+    git_in(synthetic, "add", "generator/feature.ts")
+    git_in(synthetic, "commit", "-q", "-m", "feat: add generator/feature.ts")
+    git_in(synthetic, "checkout", "-q", "main")
+    git_in(synthetic, "merge", "--no-ff", "feat/example", "-m", "Merge feat/example")
+
+    payload = {
+        "tool_name": "Bash",
+        "tool_input": {"command": "git merge --no-ff feat/example"},
+    }
+    res = invoke_hook("post-action", payload, synthetic)
+    if res.returncode != 0:
+        return False, (
+            f"expected exit 0, got {res.returncode}\n"
+            f"stdout: {res.stdout}\nstderr: {res.stderr}"
+        )
+    if "/pos:compound" not in res.stdout:
+        return False, (
+            f"missing /pos:compound advisory in stdout\n"
+            f"stdout: {res.stdout}\nstderr: {res.stderr}"
+        )
+
+    return True, ""
+
+
 SCENARIOS = [
     ("D1", "pre-branch-gate", scenario_d1_pre_branch_gate),
     ("D3", "pre-write-guard", scenario_d3_pre_write_guard),
     ("D4", "pre-pr-gate", scenario_d4_pre_pr_gate),
+    ("D5", "post-action", scenario_d5_post_action),
 ]
 
 
