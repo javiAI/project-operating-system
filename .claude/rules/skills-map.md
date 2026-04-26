@@ -62,7 +62,7 @@ Canonical order pre-PR: **`simplify → pre-commit-review`**. Reduce primero, re
 
 | Skill | Lifecycle | Modelo | Context | Qué hace |
 |---|---|---|---|---|
-| `/pos:audit-session` | semanal / on-demand | sonnet | fork | Compara policy.yaml vs logs reales |
+| `audit-session` | on-demand (manual invoke) | sonnet | main (main-strict, no delegation) | Read-only advisory: compara 3 superficies de `policy.yaml` contra `.claude/logs/` reales — (1) `skills_allowed` ↔ `skills.jsonl` invocations distintas (con normalization `pos:<slug>` ↔ `<slug>`); (2) `lifecycle.<gate>.hooks_required` ↔ `<hook>.jsonl` (existencia + nonempty); (3) `audit.required_logs` ↔ existencia + nonempty + mtime. **Declares candidate signals** (no "detecta", no auto-fixea). Reporte estructurado por surface (3 secciones + summary line con counts). 30-day review window declarado como **textual guidance** para el lector humano (no date arithmetic, no filtrado por timestamp). **NO** modifica `policy.yaml`, **NO** rota/trunca/edita logs, **NO** delega a subagent (main-strict por design — comparación local + barata). Allowed-tools: `Glob`, `Grep`, `Read`, `Bash(find:*)`, `Bash(wc:*)`, logger. |
 | `/pos:pr-description` | pre-PR | sonnet | main | Genera descripción del PR desde commits + kickoff |
 | `/pos:release` | en tag | sonnet | main | Valida versión + publica + notifica |
 

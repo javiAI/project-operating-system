@@ -5,8 +5,8 @@
 ## 1. Snapshot
 
 - Repo: `project-operating-system` (plugin `pos`).
-- Rama actual: **E3b ✅ PR #24** (`feat/e3b-skill-test-scaffold-audit-coverage`, en revisión docs-sync). Anterior: **E3a ✅ PR #23** (mergeada). Siguiente: **F1 — `feat/f1-skill-audit-session`** (`/pos:audit-session` — compara `policy.yaml` vs logs reales).
-- E3b entregó: `/pos:test-scaffold` (writer-scoped strict, main-strict) + `/pos:test-audit` (read-only advisory, declares candidate signals: flaky/orphan/trivial; main-strict, sin ejecución) + `/pos:coverage-explain` (read-only advisory, lee reportes existentes y declara strategy de gaps + targets mínimos; main-strict, sin ejecución). Policy: `skills_allowed` 10→13. Fase E **completa** — todas las core skills entregadas.
+- Rama actual: **F1 ✅ PR pendiente** (`feat/f1-skill-audit-session`, en revisión docs-sync). Anterior: **E3b ✅ PR #24** (mergeada). Siguiente: **F2 — `feat/f2-agents-subagents`** (3 subagents: `code-reviewer`, `architect`, `auditor`).
+- F1 entregó: `/pos:audit-session` (read-only advisory main-strict) — compara 3 superficies explícitas de `policy.yaml` (`skills_allowed`, `lifecycle.<gate>.hooks_required`, `audit.required_logs`) vs `.claude/logs/` reales; reporta drift candidates por bucket sin auto-fix. Policy: `skills_allowed` 13→14. Fase F abierta (1/4 ramas).
 - Fuente de verdad ejecutable: [MASTER_PLAN.md](MASTER_PLAN.md).
 - Estado vivo: [ROADMAP.md](ROADMAP.md).
 - Arquitectura canonical: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -131,14 +131,13 @@ Hasta que `pos` tenga sus propias skills:
 
 ## 9. Próxima rama
 
-**F1 — `feat/f1-skill-audit-session`** (tras merge de E3b — primer bloque de Fase F: audit + selftest + marketplace).
+**F2 — `feat/f2-agents-subagents`** (tras merge de F1 — segundo bloque de Fase F: subagents oficiales del plugin).
 
 Scope:
 
-- `/pos:audit-session` — skill que compara `policy.yaml.lifecycle` declarado vs logs reales emitidos en `.claude/logs/*.jsonl` durante la sesión. Detecta drift entre política y comportamiento (skills no invocadas que debían correr, hooks que no loguearon, gates saltados).
-- Contrato esperado: read-only advisory (precedente: `pattern-audit` E3a, `audit-plugin` E2b, `compress` E2b, `test-audit` + `coverage-explain` E3b). Análisis sin mutación. Reporte estructurado por phase-gate (session_start / pre_pr / post_merge / pre_compact / stop) con violations + advisory entries.
-- Evaluation en Fase -1 de F1: ¿main-strict o delegación a `Explore` para cross-log analysis pesado?, ¿qué umbral de drift dispara WARN vs FAIL?, ¿qué shape de reporte (tabla por phase-gate vs lista flat)?
-- `skills_allowed` extendido 13 → 14 (`audit-session`).
+- 3 subagent definitions en `agents/`: `code-reviewer.md`, `architect.md`, `auditor.md`. Hoy las skills E2a (`pre-commit-review`) y E3a (`compound`) referencian `subagent_type="code-reviewer"` y `code-architect` con disclaimer de fallback a `general-purpose`; F2 los entrega como contratos canónicos del plugin (no defaults de Claude Code).
+- Decisión Fase -1: ¿shape de subagent definition primitive-correct (Markdown body + frontmatter `name`/`description`/`tools`)?, ¿cómo se descubren desde el plugin (`agents/` directory en plugin root vs registro en `policy.yaml`)?, ¿naming conflict con `code-reviewer` default de Claude Code (resolver vía namespace o aceptar override)?
+- Sin cambios a `skills_allowed` (subagents no son skills); evaluar si `policy.yaml.agents_allowed` aparece como nuevo top-level (precedente: `skills_allowed`).
 
 ## 10. Estado E2b (✅ merged PR #22)
 
@@ -348,3 +347,40 @@ Entregables completados:
 **Resultado**: la suite conjunta `hooks/tests` + `.claude/skills/tests` añade los renames de 2 tests integration + 22 parametrizados via `ALLOWED_SKILLS` 10→13 + 15 behavior contract; sin regresión D1..D6 + E1a..E3a. CI verde tras docs-sync (`ROADMAP.md` E3 ✅, `HANDOFF.md` §1+§9+§17+§18 nuevos, `MASTER_PLAN.md § Rama E3b` expandida + cierre `✅ PR #24`, `.claude/rules/skills-map.md` filas E3b finalizadas).
 
 **Detalle + deferrals + ajustes**: ver [ROADMAP.md § feat/e3b-skill-test-scaffold-audit-coverage](ROADMAP.md), [MASTER_PLAN.md § Rama E3b](MASTER_PLAN.md), [.claude/rules/skills-map.md](.claude/rules/skills-map.md).
+
+## 19. Estado F1 (cerrada en rama, docs-sync en curso)
+
+`feat/f1-skill-audit-session` — **primera rama de Fase F**, abre el bloque audit + release tras cierre completo de Fase E. Una skill nueva, read-only advisory main-strict, hereda primitive minimal sin reabrir frontmatter. Cierra el ciclo determinismo declarado en `docs/ARCHITECTURE.md § Determinismo` capa 3 (la capa que faltaba poblar): comparar lo que `policy.yaml` declara contra lo que `.claude/logs/` realmente registra.
+
+**Entregables**:
+
+- `.claude/skills/audit-session/SKILL.md` — read-only advisory main-strict (precedente: `pattern-audit` E3a, `audit-plugin` E2b, `compress` E2b, `test-audit` + `coverage-explain` E3b). Compara **tres superficies explícitas** de `policy.yaml` contra `.claude/logs/`: (1) `skills_allowed` ↔ `skills.jsonl` invocations distintas con prefijo `pos:` normalizado; (2) `lifecycle.<gate>.hooks_required` ↔ archivos `<hook>.jsonl` (existencia + nonempty); (3) `audit.required_logs` ↔ existencia + nonempty + mtime. Reporte estructurado por surface (3 secciones + summary line con counts). **Pre-existing drift expected**: hoy `audit.required_logs` declara `hooks.jsonl` pero los hooks logean a per-hook files; la skill reporta esto como Bucket 3 candidate y **no auto-fixea** — el usuario decide. Que el finding emerja en la primera invocación es evidencia de que el advisor funciona.
+- Allowed-tools: `Glob`, `Grep`, `Read`, `Bash(find:*)`, `Bash(wc:*)`, `Bash(.claude/skills/_shared/log-invocation.sh:*)`. **Sin `Bash(git log:*)`** (recortado por ajuste 2 del usuario en Fase -1; la skill no necesita git introspection — sólo filesystem + policy parse), **sin `Edit`/`Write`** (advisory contract), **sin Agent tool** (main-strict explícito).
+- `policy.yaml.skills_allowed` extendido 13 → 14 (`audit-session`). Comentario inline actualizado (`E3b 13 skills → F1 14 skills`). `stop-policy-check.py` sigue en enforcement live, ahora con 14 skills aceptadas — sin cambio de código en el hook.
+- Tests (extensión, no reescritura):
+  - `.claude/skills/tests/test_skill_frontmatter.py` — añadida `TestAuditSessionBehavior` con 5 casos (3 surfaces declaration / advisory-only / main-strict no delegation / 30-day window declaration / prefix normalization assumption). Tokens locked: `skills_allowed`+`lifecycle`+`hooks_required`+`required_logs`; `advisory`/`read-only`/`does not modify`/`no modifica`; ausencia de `subagent`/`code-architect`/`agent(`; `30`+`day`/`review window`; `pos:`+`normaliz`.
+  - `.claude/skills/tests/_allowed_skills.py` — `ALLOWED_SKILLS` 13 → 14; header docstring con línea F1.
+  - `hooks/tests/test_lib_policy.py::test_real_skills_allowed_populated_by_e3b` rename a `_by_f1`; tupla 13 → 14.
+  - `hooks/tests/test_skills_log_contract.py::test_all_thirteen_e1_e3b_skills_end_to_end` rename a `test_all_fourteen_e1_e3b_f1_skills_end_to_end`; allowlist + loop cubren las 14 skills.
+
+**Contrato fijado por la suite** (extiende E1..E3b sin reabrirlos):
+
+- Primitive frontmatter inmutable; sin `skill.json`; sin prefijo `pos:`; sin campos inventados. Precedentes E1a..E3b intactos.
+- `audit-session` **es read-only advisory**: nunca modifica `policy.yaml`, nunca rota/trunca/edita logs, nunca auto-fixea drift detectado.
+- `audit-session` **es main-strict**: ausencia de tokens `subagent` / `code-architect` / `agent(` enforce vivo. Si una rama futura propone delegation, abrir branch nueva con justificación (regla #7 CLAUDE.md: ≥2 repeticiones antes de abstraer).
+- `30-day review window` declarado como **textual guidance** para el lector humano — la skill no ejecuta date arithmetic, no filtra entries por timestamp, no podría aunque quisiera (allowed-tools subset estricto). El test valida declaración del body, no comportamiento de date math (ajuste 3 del usuario en Fase -1).
+- `pos:<slug>` ↔ `<slug>` normalization assumption explicit en body — `policy.yaml.skills_allowed` lista plain slugs y `policy.yaml.lifecycle.*.skills_required` lista user-facing forms (`pos:` prefix); reconciliar es decisión consciente, no un bug.
+- `ALLOWED_SKILLS = 14` entries enforce vivo. Invocar una skill no listada sigue produciendo deny exit 2 (contrato D6 intacto).
+
+**Ajustes vs plan original (Fase -1 aprobada con 3 ajustes obligatorios del usuario)**:
+
+- **Ajuste 1 — verificar shape de `policy.yaml` antes del body**: confirmé `lifecycle.<gate>.hooks_required` y `audit.required_logs` como claves canónicas existentes. Sin verificación el body habría usado nombres aproximados.
+- **Ajuste 2 — recortar `Bash(git log:*)` de allowed-tools**: la skill no necesita git introspection (sólo lee policy + filesystem de logs). Allowed-tools final: 6 entries.
+- **Ajuste 3 — test del 30-day window valida declaración, no ejecución**: la primera versión podría haber asertado sobre filtrado real de entries por timestamp, empujando scope hacia date arithmetic. Reformulado para asertar sólo declaración en el body.
+- **Decisiones A1.a..A6.a ratificadas en Fase -1**: A1.a 3 surfaces (no exhaustive auditor); A2.a 30-day window textual; A3.a prefix normalization explícito; A4.a `hooks.jsonl` pre-existing drift reportado, no auto-fixed; A5.a report estructurado por surface; A6.a `audit.session_audit.schedule` documental (cron / CI hook diferido).
+
+**YAML parse gotcha evitado**: por precedente E2a `simplify` + E3b `test-audit/coverage-explain`, la description fue redactada sin `palabra: palabra` para evitar parse-as-mapping-separator. Confirmed via test suite verde en GREEN inicial.
+
+**Resultado**: suite conjunta `hooks/tests` + `.claude/skills/tests` arroja **793 passed + 1 skipped** (sin regresión D1..D6 + E1a..E3b; +5 behavior + 22 parametrizados via `ALLOWED_SKILLS` 13→14 + 2 renames integration). El skip es el D5 intencional `TestIntegrationDiffUnavailable` por subprocess-no-cover. CI verde tras docs-sync (`ROADMAP.md` Fase F abierta + § F1 detallado, `HANDOFF.md` §1+§9+§19 nuevos, `MASTER_PLAN.md § Rama F1` expandida + cierre `✅ PR pendiente`, `.claude/rules/skills-map.md` fila `/pos:audit-session` populada).
+
+**Detalle + deferrals + ajustes**: ver [ROADMAP.md § feat/f1-skill-audit-session](ROADMAP.md), [MASTER_PLAN.md § Rama F1](MASTER_PLAN.md), [.claude/rules/skills-map.md](.claude/rules/skills-map.md).

@@ -13,7 +13,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | E1 | Skills orquestación | ✅ (E1a + E1b) |
 | E2 | Skills calidad | ✅ (E2a + E2b) |
 | E3 | Skills patterns + tests | ✅ (E3a ✅, E3b ✅) |
-| F | Audit + selftest + marketplace | ⏳ pendiente |
+| F | Audit + selftest + marketplace | 🔄 (F1 ✅, F2..F4 ⏳) |
 | G | Knowledge Plane (opcional) | ⏳ solo planificación (scope cerrado, sin implementación) |
 
 ## Ramas
@@ -42,7 +42,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | `feat/e2b-skill-compress-audit-plugin` | Read-only advisory skills: `/pos:compress` (context planner) + `/pos:audit-plugin` (community-tool gate); both E2b-scoped; enforcement deferred | ✅ | — (PR pendiente) |
 | `feat/e3a-skill-compound-pattern-audit` | `/pos:compound` (writer-scoped pattern extraction, Agent delegation with fallback), `/pos:pattern-audit` (read-only advisory, main-strict analysis) | ✅ | #23 |
 | `feat/e3b-skill-test-scaffold-audit-coverage` | `/pos:test-scaffold` (writer-scoped), `/pos:test-audit` (read-only advisory), `/pos:coverage-explain` (read-only advisory); `skills_allowed` 10→13 | ✅ | — (PR pendiente) |
-| `feat/f1-skill-audit-session` | `/pos:audit-session` | ⏳ | — |
+| `feat/f1-skill-audit-session` | `/pos:audit-session` (read-only advisory main-strict) — compara 3 superficies de `policy.yaml` (`skills_allowed`, `lifecycle.*.hooks_required`, `audit.required_logs`) vs `.claude/logs/`; `skills_allowed` 13→14 | ✅ | — (PR pendiente) |
 | `feat/f2-agents-subagents` | 3 subagents | ⏳ | — |
 | `feat/f3-selftest-end-to-end` | `bin/pos-selftest.sh` + escenarios | ⏳ | — |
 | `feat/f4-marketplace-public-repo` | `javiAI/pos-marketplace` + release flow | ⏳ | — |
@@ -563,6 +563,47 @@ Contrato fijado por la suite (extiende E1a + E1b sin reabrirlos):
 - **YAML parse gotcha atrapado en GREEN**: descripción v1 de `simplify` contenía `"Writer scoped: edits files..."` — el `: ` activaba el parser YAML como mapping-separator y rompía el frontmatter entero. Fix: em-dash `Writer-scoped — edits files...`. Lección para futuras skills: evitar `palabra: palabra` dentro de descriptions.
 
 **Criterio de salida**: 668 verdes + 1 skip intencional. E1a + E1b + D1..D6 regression intacta. `test_real_skills_allowed_populated_by_e2a` flippa el pinpoint de la tupla 4→6. `stop-policy-check.py` sigue en enforcement live sin cambio de código — sólo con allowlist ampliada. Docs-sync dentro del PR (ROADMAP § E2a + HANDOFF §1/§9 + §15 nuevo + MASTER_PLAN § Rama E2a + `.claude/rules/skills-map.md` canonicalizando 2 filas Calidad + `.claude/rules/skills.md` rename `E1_SKILLS_KNOWN` → `ALLOWED_SKILLS` + notas sobre E2a como primera consumidora de `code-reviewer` y `simplify` como segunda writer-scoped tras `writing-handoff`). `docs/ARCHITECTURE.md` **no** requerido (E2a no toca `generator/` ni `hooks/`). El hook `pre-pr-gate.py` aprueba este mismo PR (dogfooding D4 sobre E2a).
+
+## Progreso Fase F
+
+### `feat/f1-skill-audit-session` — ✅ (PR pendiente)
+
+Primera rama de Fase F — abre el bloque audit + release tras cierre completo de Fase E. `/pos:audit-session` es la skill que cierra el ciclo determinismo declarado en `docs/ARCHITECTURE.md` § Determinismo (capa 3): compara lo que `policy.yaml` declara contra lo que `.claude/logs/` realmente registra. Read-only advisory main-strict, sin auto-fix; el usuario decide qué candidatos son drift real y cuáles son intención.
+
+Entregables:
+
+- `.claude/skills/audit-session/SKILL.md` — read-only advisory main-strict (precedente: `pattern-audit` E3a, `audit-plugin` E2b, `compress` E2b, `test-audit` + `coverage-explain` E3b). Compara **tres superficies explícitas** de `policy.yaml` contra el filesystem de `.claude/logs/`:
+  1. `policy.yaml.skills_allowed` (slugs plain) ↔ `.claude/logs/skills.jsonl` invocations distintas. Detecta `declared but never invoked` (allowlist entry muerto) y `invoked but not declared` (denegado hoy por Stop hook). Normaliza prefijo `pos:<slug>` ↔ `<slug>` antes de comparar.
+  2. `policy.yaml.lifecycle.<gate>.hooks_required` ↔ archivos `.claude/logs/<hook>.jsonl`. Detecta `declared hook with no log file`, `declared hook with empty log` (silently disabled) y `logging hook not declared in any lifecycle gate` (logueando huérfano).
+  3. `policy.yaml.audit.required_logs` ↔ existencia + nonempty + mtime. Detecta archivos declarados ausentes / vacíos / antiguos (>30d advisory, sin block).
+- Reporte estructurado por surface (3 secciones + summary line con counts). **Pre-existing drift expected**: hoy `audit.required_logs` declara `hooks.jsonl` pero los hooks logean a per-hook files (`pre-branch-gate.jsonl`, etc.); la skill reporta esto como Bucket 3 candidate y **no auto-fixea** — el usuario decide si actualizar `policy.yaml` o aceptar la declaración como aspiración documental. Que el finding emerja en la primera invocación es evidencia de que el advisor funciona.
+- Allowed-tools: `Glob`, `Grep`, `Read`, `Bash(find:*)`, `Bash(wc:*)`, `Bash(.claude/skills/_shared/log-invocation.sh:*)`. **Sin `Bash(git log:*)`** (la skill no necesita git introspection — sólo filesystem + policy parse) **sin `Edit`/`Write`** (advisory contract). **Sin Agent tool** (main-strict explícito; los precedentes pattern-audit / test-audit / coverage-explain / audit-plugin / compress son main-strict y la comparación es local + barata).
+- `policy.yaml.skills_allowed` extendido 13 → 14 (`audit-session`). Comentario inline actualizado (`E3b 13 skills → F1 14 skills`). `stop-policy-check.py` sigue en enforcement live, ahora con 14 skills aceptadas — sin cambio de código en el hook.
+- Tests (extensión, no reescritura):
+  - `.claude/skills/tests/test_skill_frontmatter.py` — añadida `TestAuditSessionBehavior` con 5 casos: `test_body_declares_three_audit_surfaces` (lock down `skills_allowed` + `lifecycle` + `hooks_required` + `required_logs` tokens), `test_body_declares_advisory_only` (lock down `advisory`/`read-only`/`does not modify`/`no modifica` tokens), `test_body_declares_main_strict_no_delegation` (asserta ausencia de `subagent`/`code-architect`/`agent(` tokens), `test_body_declares_30day_review_window` (lock down `30` + `day`/`review window` tokens — valida **declaración**, no ejecución de date math), `test_body_declares_prefix_normalization_assumption` (lock down `pos:` + `normaliz` tokens).
+  - `.claude/skills/tests/_allowed_skills.py` — `ALLOWED_SKILLS` extendida 13 → 14; header docstring con línea F1.
+  - `hooks/tests/test_lib_policy.py::test_real_skills_allowed_populated_by_e3b` (rename desde `_by_e3b` → `_by_f1`) — tupla esperada crece 13 → 14.
+  - `hooks/tests/test_skills_log_contract.py::test_all_thirteen_e1_e3b_skills_end_to_end` (rename desde `_thirteen_e1_e3b_` → `_fourteen_e1_e3b_f1_`) — emite una línea JSONL por cada una de las 14 skills via shared logger, invoca Stop, asserta allow.
+
+Suite global post-F1: **793 passed + 1 skipped** (sin regresión D1..D6 + E1a..E3b). El skip es el D5 intencional `TestIntegrationDiffUnavailable` por subprocess-no-cover.
+
+Contrato fijado por la suite (extiende E1..E3b sin reabrirlos):
+
+- Primitive frontmatter inmutable; sin `skill.json`; sin prefijo `pos:`; sin campos inventados. Precedentes E1a..E3b intactos.
+- `audit-session` **es read-only advisory**: nunca modifica `policy.yaml`, nunca rota/trunca/edita logs, nunca auto-fixea drift. Wording locked: "advisory" + "read-only" + "does not modify" + "no modifica" presentes literalmente en body.
+- `audit-session` **es main-strict**: ausencia de tokens `subagent` / `code-architect` / `agent(` enforce vivo. Si una rama futura propone delegation, abrir branch nueva con justificación (segunda repetición patrón delegation-en-audit no existe hoy → regla #7 CLAUDE.md).
+- `30-day review window` declarado como **textual guidance** para el lector humano — la skill no ejecuta date arithmetic, no filtra entries por timestamp, no podría aunque quisiese (allowed-tools subset estricto). Test `test_body_declares_30day_review_window` valida declaración del body, no comportamiento de date math.
+- `pos:<slug>` ↔ `<slug>` normalization assumption explicit en body. Test lock-down asserta que el body lo declara antes de comparar — `policy.yaml.skills_allowed` lista plain slugs y `policy.yaml.lifecycle.*.skills_required` lista user-facing forms (`pos:` prefijo); reconciliación es **una decisión consciente**, no un bug.
+- `ALLOWED_SKILLS = 14` entries enforce vivo. Invocar una skill no listada sigue produciendo deny exit 2 (contrato D6 intacto).
+
+**Ajustes vs plan original (Fase -1 aprobada con 3 ajustes obligatorios del usuario)**:
+
+- **Ajuste 1 — verificar shape de `policy.yaml` antes del body**: confirmé que `lifecycle.<gate>.hooks_required` y `audit.required_logs` son las claves canónicas que existen hoy. Sin ajuste el body habría usado nombres aproximados; con verificación quedaron literalmente alineados.
+- **Ajuste 2 — recortar `Bash(git log:*)` de allowed-tools**: la skill no necesita git introspection (sólo lee policy + filesystem de logs); incluirlo habría sobre-prometido capabilities. Recortado a 6 entries: `Glob` / `Grep` / `Read` / `Bash(find:*)` / `Bash(wc:*)` / `Bash(.claude/skills/_shared/log-invocation.sh:*)`.
+- **Ajuste 3 — test del 30-day window valida declaración, no ejecución**: la primera versión del test podría haber asertado sobre filtrado real de entries por timestamp, lo que habría empujado el scope hacia date arithmetic. Reformulado para asertar sólo que el body declara el lens de 30 días como guía textual; la skill nunca ejecuta date math.
+- **Decisiones A1.a..A6.a ratificadas en Fase -1**: A1.a = 3 surfaces explícitas (no exhaustive auditor, advisor pattern-seeking); A2.a = review window default 30 days textual; A3.a = prefijo normalization explícito; A4.a = pre-existing drift `hooks.jsonl` reportado, no auto-fixed; A5.a = report estructurado por surface (3 sections + summary); A6.a = `audit.session_audit.schedule` documental, no enforcement (cron / CI hook diferido).
+
+**Criterio de salida**: 793 verdes + 1 skip intencional. E1a..E3b + D1..D6 regression intacta. `test_real_skills_allowed_populated_by_f1` flippa el pinpoint de la tupla 13→14. `stop-policy-check.py` sigue en enforcement live sin cambio de código — sólo con allowlist ampliada. Docs-sync dentro del PR (ROADMAP § F1 + HANDOFF §1/§9 + §19 nuevo + MASTER_PLAN § Rama F1 expandida + `.claude/rules/skills-map.md` fila `/pos:audit-session` populada). `docs/ARCHITECTURE.md` **no** requerido (F1 no toca `generator/` ni `hooks/`). El hook `pre-pr-gate.py` aprueba este mismo PR (dogfooding D4 sobre F1 — primer enforcement docs-sync sobre Fase F).
 
 ## Convenciones de este archivo
 
