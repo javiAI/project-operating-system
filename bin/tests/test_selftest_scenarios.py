@@ -45,3 +45,6 @@ class TestScenarios:
 
     def test_d4_pre_pr_gate(self, selftest_run):
         assert "[ok] D4 pre-pr-gate" in selftest_run.stdout, _scenario_diag("D4", selftest_run)
+
+    def test_d5_post_action(self, selftest_run):
+        assert "[ok] D5 post-action" in selftest_run.stdout, _scenario_diag("D5", selftest_run)
