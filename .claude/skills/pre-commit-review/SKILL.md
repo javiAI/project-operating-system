@@ -46,7 +46,7 @@ Main thread stays cheap; heavy analysis goes to the `pos-code-reviewer` subagent
 3. Subagent runs in its own fork, returns a summary with confidence-filtered findings.
 4. Main folds the summary — does NOT paste-through. Prioritizes by severity, attaches `file:line` references, groups by theme if useful.
 
-The string `pos-code-reviewer` here reflects the Claude Code default shipped today. It is hardcoded with a disclaimer: default `subagent_type` names can vary between releases/environments. If the Agent tool's `subagent_type` enum at runtime does NOT include `pos-code-reviewer`, fall back to `general-purpose` with a task prompt that names the same capability (bugs + logic + security + convention adherence). See `.claude/rules/skills.md § Fork / delegación`.
+The string `pos-code-reviewer` is the plugin subagent shipped by `pos` in F2 (defined in `agents/pos-code-reviewer.md`). It is hardcoded with a disclaimer: runtimes that do not load plugin agents (or load them under different names) may not expose it. If the Agent tool's `subagent_type` enum at runtime does NOT include `pos-code-reviewer`, fall back to `general-purpose` with a task prompt that names the same capability (bugs + logic + security + convention adherence). See `.claude/rules/skills.md § Fork / delegación`.
 
 ## Steps
 
