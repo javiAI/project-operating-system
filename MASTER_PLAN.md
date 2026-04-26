@@ -733,7 +733,7 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 **Archivos entregados**:
 
 - `bin/pos-selftest.sh` — wrapper bash (`#!/usr/bin/env bash` + `set -euo pipefail` + delega a `python3 bin/_selftest.py`). 9 líneas. Sin lógica.
-- `bin/_selftest.py` — orquestador Python stdlib (~344 líneas). Por escenario: tmpdir + generator real + sobre-escribe sección mínima de `synthetic/policy.yaml` + monta git repo (`git init -b main` + commit baseline) + invoca hook real vía subprocess + asserta exit + tokens.
+- `bin/_selftest.py` — orquestador Python stdlib. Por escenario: tmpdir + generator real + sobre-escribe sección mínima de `synthetic/policy.yaml` + monta git repo (`git init -b main` + commit baseline) + invoca hook real vía subprocess + asserta exit + tokens.
 - `bin/tests/test_selftest_smoke.py` (4 tests) — contrato del wrapper.
 - `bin/tests/test_selftest_scenarios.py` (5 tests) — fixture module-scoped + asserción `[ok] D{N} {name}` por escenario.
 - `.github/workflows/ci.yml` — job `selftest` (ubuntu × py 3.11, single matrix). Setup Node + Python + `npm ci` + `pip install -r requirements-dev.txt`. Comando: `pytest bin/tests -q`.
