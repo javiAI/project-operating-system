@@ -27,11 +27,18 @@ def selftest_run():
     )
 
 
+def _scenario_diag(scenario: str, run: subprocess.CompletedProcess) -> str:
+    return (
+        f"{scenario} scenario did not pass\n"
+        f"--- exit ---\n{run.returncode}\n"
+        f"--- stdout ---\n{run.stdout}\n"
+        f"--- stderr ---\n{run.stderr}"
+    )
+
+
 class TestScenarios:
     def test_d1_pre_branch_gate(self, selftest_run):
-        assert "[ok] D1 pre-branch-gate" in selftest_run.stdout, (
-            f"D1 scenario did not pass\n"
-            f"--- exit ---\n{selftest_run.returncode}\n"
-            f"--- stdout ---\n{selftest_run.stdout}\n"
-            f"--- stderr ---\n{selftest_run.stderr}"
-        )
+        assert "[ok] D1 pre-branch-gate" in selftest_run.stdout, _scenario_diag("D1", selftest_run)
+
+    def test_d3_pre_write_guard(self, selftest_run):
+        assert "[ok] D3 pre-write-guard" in selftest_run.stdout, _scenario_diag("D3", selftest_run)
