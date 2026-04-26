@@ -598,7 +598,7 @@ PR separado `chore/compound-YYYY-MM-DD` con:
 
 - Unit (vitest/pytest).
 - Integration.
-- Selftest (`bin/pos-selftest.sh`): escenarios end-to-end con proyecto sintético.
+- Selftest (`bin/pos-selftest.sh`): escenarios end-to-end con proyecto sintético (ver subsección).
 - Coverage gate (threshold de `policy.yaml.testing.unit.coverage_threshold`).
 
 Hook `pre-push.sh` corre todos antes de permitir `git push`.
@@ -606,6 +606,27 @@ Hook `pre-push.sh` corre todos antes de permitir `git push`.
 ### CI (GitHub Actions)
 
 Mismo set que local + matriz (2 OS × 2 versiones runtime). Branch protection requiere todos verdes para merge a main.
+
+### Selftest end-to-end (entregado en F3)
+
+`bin/pos-selftest.sh` cierra el círculo "lo que el plugin promete enforce-ar contra repos generados, lo prueba sobre uno generado al vuelo". Estructura:
+
+- **Wrapper** `bin/pos-selftest.sh` (bash mínimo): `#!/usr/bin/env bash` + `set -euo pipefail` + delega a `python3 bin/_selftest.py`. Sin lógica; entrypoint estable que tests + CI consumen sin path absoluto.
+- **Orquestador** `bin/_selftest.py` (stdlib only, sin deps externas). Por escenario:
+  1. crea tmpdir,
+  2. ejecuta `npx tsx generator/run.ts --profile questionnaire/profiles/cli-tool.yaml --out <tmpdir>` (la generator real, no fixture committeado),
+  3. sobre-escribe la sección mínima de `synthetic/policy.yaml` que el escenario necesita (desacopla la cobertura de la migración pendiente del template `policy.yaml.hbs` al shape post-D5b),
+  4. monta el sintético como git repo (`git init -b main` + commit baseline),
+  5. invoca el hook real (`hooks/<name>.py`) vía subprocess con payload JSON,
+  6. asserta exit code + presencia de tokens en stdout/stderr/files,
+  7. imprime `[ok] D{N} {name}` o `[fail] D{N} {name}: <diag>`.
+- **Pytest harness** `bin/tests/test_selftest_smoke.py` (4 tests, contrato del wrapper) + `bin/tests/test_selftest_scenarios.py` (5 tests, fixture module-scoped que corre `pos-selftest.sh` una vez y comparte stdout).
+
+**Escenarios cubiertos** (5 funcionales-críticos): D1 pre-branch-gate, D3 pre-write-guard, D4 pre-pr-gate, D5 post-action (advisory `/pos:compound`), D6 stop-policy-check. **Out of scope**: D2 session-start + D6 pre-compact (informative, sin contrato deny/allow), Claude Code runtime (no instancia Claude, no invoca skills/agents reales — cobertura estática queda en `agents/tests/test_agent_frontmatter.py` y `.claude/skills/tests/test_skill_frontmatter.py`), D5b loader (cubierto indirectamente vía hooks consumidores).
+
+**CI**: nuevo job `selftest` en `.github/workflows/ci.yml` (ubuntu × Python 3.11, single matrix — gates funcionales platform-agnostic; matriz extendida sería sobre-promesa). Comando único: `pytest bin/tests -q`. Ejecución end-to-end local ~1.2s.
+
+**Drift abierto**: `templates/policy.yaml.hbs` y `generator/renderers/policy.ts` siguen emitiendo el shape pre-D5b. F3 lo evade sobre-escribiendo la sección relevante en `synthetic/policy.yaml` por escenario. Reabrir migración del template en rama propia post-F3.
 
 ### Generador emite test harness
 

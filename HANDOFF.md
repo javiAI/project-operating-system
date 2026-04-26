@@ -5,9 +5,10 @@
 ## 1. Snapshot
 
 - Repo: `project-operating-system` (plugin `pos`).
-- Rama actual: **F2 ✅ PR pendiente** (`feat/f2-agents-subagents`, en revisión docs-sync). Anterior: **F1 ✅ PR #25** (mergeada). Siguiente: **F3 — `feat/f3-selftest-end-to-end`** (`bin/pos-selftest.sh` + escenarios end-to-end).
-- F2 entregó: `agents/pos-code-reviewer.md` + `agents/pos-architect.md` (plugin subagents primitive-correct con namespace `pos-*`); flips de `pre-commit-review` y `compound` a los nuevos consumidores; 26 contract tests parametrizados (`agents/tests/test_agent_frontmatter.py`). Behavior tests del consumer flippean assertions (sin delta de count). **No** toca `policy.yaml` (`agents_allowed` diferido). `auditor` diferido (sin consumer real, regla #7).
-- F1 entregó: `/pos:audit-session` (read-only advisory main-strict) — compara 3 superficies explícitas de `policy.yaml` (`skills_allowed`, `lifecycle.<gate>.hooks_required`, `audit.required_logs`) vs `.claude/logs/` reales; reporta drift candidates por bucket sin auto-fix. Policy: `skills_allowed` 13→14. Fase F abierta (2/4 ramas).
+- Rama actual: **F3 ✅ PR pendiente** (`feat/f3-selftest-end-to-end`, en revisión docs-sync). Anterior: **F2 ✅ PR #26** (mergeada). Siguiente: **F4 — `feat/f4-marketplace-public-repo`** (`javiAI/pos-marketplace` + release flow).
+- F3 entregó: `bin/pos-selftest.sh` (wrapper bash mínimo) + `bin/_selftest.py` (orquestador stdlib Python) + `bin/tests/test_selftest_smoke.py` + `bin/tests/test_selftest_scenarios.py` (5 escenarios funcionales-críticos D1/D3/D4/D5/D6 sobre proyecto sintético generado real-time por `npx tsx generator/run.ts --profile cli-tool.yaml`). CI: nuevo job `selftest` (ubuntu × py 3.11) en `.github/workflows/ci.yml`. Sin Claude Code runtime, sin invocaciones reales de skills/agents. Suite: 829 passed + 1 skipped.
+- F2 entregó: `agents/pos-code-reviewer.md` + `agents/pos-architect.md` (plugin subagents primitive-correct con namespace `pos-*`); flips de `pre-commit-review` y `compound` a los nuevos consumidores; 26 contract tests parametrizados (`agents/tests/test_agent_frontmatter.py`). **No** toca `policy.yaml` (`agents_allowed` diferido). `auditor` diferido (sin consumer real, regla #7).
+- F1 entregó: `/pos:audit-session` (read-only advisory main-strict) — compara 3 superficies explícitas de `policy.yaml` (`skills_allowed`, `lifecycle.<gate>.hooks_required`, `audit.required_logs`) vs `.claude/logs/` reales; reporta drift candidates por bucket sin auto-fix. Policy: `skills_allowed` 13→14. Fase F abierta (3/4 ramas).
 - Fuente de verdad ejecutable: [MASTER_PLAN.md](MASTER_PLAN.md).
 - Estado vivo: [ROADMAP.md](ROADMAP.md).
 - Arquitectura canonical: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -133,13 +134,14 @@ Hasta F1 el plugin reusaba subagents built-in; desde F2 los críticos son propio
 
 ## 9. Próxima rama
 
-**F3 — `feat/f3-selftest-end-to-end`** (tras merge de F2 — tercer bloque de Fase F: selftest end-to-end del plugin).
+**F4 — `feat/f4-marketplace-public-repo`** (tras merge de F3 — última rama de Fase F: marketplace público + release flow).
 
 Scope:
 
-- `bin/pos-selftest.sh` + escenarios. Valida los gates principales (kickoff, Fase -1 marker, pre-write, pre-pr-gate, stop-policy-check, post-action) sobre un proyecto sintético generado por `npx tsx generator/run.ts`.
-- Decisión Fase -1: ¿qué subset de gates entran en F3 vs diferimos?, ¿cómo aislar el repo sintético (tmpdir vs fixture committeado)?, ¿qué profile canónico se usa para el smoke (`nextjs-app` / `cli-tool` / `agent-sdk`)?, ¿cómo se ejecuta el selftest en CI (mismo workflow que vitest+pytest o workflow propio)?
-- F3 puede dogfooding F2: el selftest invoca `pre-commit-review` y `compound` reales, lo que ejercita el resolution `pos-code-reviewer` / `pos-architect` con fallback `general-purpose` cuando el runtime sintético no expone los agents.
+- Crear repo `javiAI/pos-marketplace` con `marketplace.json` + release flow.
+- Docs en `docs/RELEASE.md`.
+- Workflow `.github/workflows/release.yml` (en tag `v*`): valida versión `plugin.json` = tag, publica release con assets, actualiza `pos-marketplace` vía PR automático.
+- Decisión Fase -1: ¿shape de `marketplace.json`?, ¿cómo se versiona el plugin (`plugin.json` vs git tag)?, ¿qué assets entran en el release bundle?, ¿`audit.yml` nightly entra aquí o se difiere a una rama post-F4?
 
 ## 10. Estado E2b (✅ merged PR #22)
 
@@ -425,3 +427,42 @@ Entregables completados:
 **Resultado**: **819 passed + 1 skipped** (vs baseline F1 de 793; +26 netos del nuevo `agents/tests/test_agent_frontmatter.py` parametrizado por 2 slugs × 13 métodos. Las behavior flips de `test_skill_frontmatter.py` actualizan assertions de tests existentes — no añaden count). Sin regresión D1..D6 / E1a..E3b / F1. `stop-policy-check.py` sigue en enforcement live con `ALLOWED_SKILLS = 14` (F2 no añade skills, solo agents). El skip es el D5 intencional `TestIntegrationDiffUnavailable` por subprocess-no-cover.
 
 **Detalle + deferrals + ajustes**: ver [ROADMAP.md § feat/f2-agents-subagents](ROADMAP.md), [MASTER_PLAN.md § Rama F2](MASTER_PLAN.md), [.claude/rules/skills-map.md § Subagents del plugin](.claude/rules/skills-map.md), [.claude/rules/skills.md § Fork / delegación](.claude/rules/skills.md).
+
+## 21. Estado F3 (cerrada en rama, docs-sync en curso)
+
+`feat/f3-selftest-end-to-end` — **tercera rama de Fase F**. Entrega el selftest end-to-end del propio plugin: cierra el círculo "lo que el plugin promete enforce-ar contra repos generados, lo prueba sobre uno generado al vuelo", sin Claude Code runtime y sin invocaciones reales de skills/agents (cobertura estática queda en sus tests dedicados).
+
+**Entregables**:
+
+- `bin/pos-selftest.sh` (9 líneas) — wrapper bash mínimo (`#!/usr/bin/env bash` + `set -euo pipefail` + delega a `python3 bin/_selftest.py`). Sin lógica; entrypoint estable.
+- `bin/_selftest.py` (~344 líneas) — orquestador stdlib Python. Por escenario: tmpdir + `npx tsx generator/run.ts --profile cli-tool.yaml --out <tmpdir>` para generar proyecto sintético, sobre-escribe la sección mínima de `synthetic/policy.yaml` que el escenario necesita, monta el sintético como git repo (`git init -b main` + commit baseline), invoca el hook real (`hooks/<name>.py`) vía subprocess con payload JSON, asserta exit + tokens en stdout/stderr/files. Imprime `[ok] D{N} {name}` o `[fail] D{N} {name}: <diag>`.
+- `bin/tests/test_selftest_smoke.py` — 4 tests pytest sobre el contrato del wrapper.
+- `bin/tests/test_selftest_scenarios.py` — 5 tests pytest, fixture `module-scoped` que corre `pos-selftest.sh` una vez y comparte stdout. Cada test asserta `"[ok] D{N} {name}"`.
+- `.github/workflows/ci.yml` — nuevo job `selftest` (ubuntu × Python 3.11, sin matriz extendida — gates funcionales platform-agnostic, generación sintética es la op más cara). Setup Node + Python + `npm ci` + `pip install -r requirements-dev.txt`. Comando único: `pytest bin/tests -q`.
+- `.claude/rules/ci-cd.md` — bullet "integración end-to-end" promovido de "Diferidos" a "Aterrizado". H3 `### Job selftest (entregado en F3)` documenta scope + qué corre + qué queda fuera + drift sintético ↔ meta-repo.
+
+**Escenarios cubiertos** (5 funcionales-críticos):
+
+- D1 pre-branch-gate: deny `git checkout -b` sin marker → allow tras `touch <marker>`.
+- D3 pre-write-guard: deny `Write hooks/foo.py` sin test pair → allow tras crear `hooks/tests/test_foo.py`.
+- D4 pre-pr-gate: deny `gh pr create` sin docs-sync (ROADMAP + HANDOFF) → allow tras commit que añade los docs.
+- D5 post-action: tras `git merge` confirmado por reflog cuyo diff matchea trigger globs, hook emite advisory `Consider running /pos:compound`.
+- D6 stop-policy-check: Stop con `session_id` rogue (allowlist + `skills.jsonl` con entry no permitida) deniega; `session_id` clean permite.
+
+**Out of scope** (ratificado en F3 Fase -1):
+
+- D2 session-start (informative, exit 0 sin enforcement) y D6 pre-compact (informative). Sin contrato deny/allow; cobertura via tests unitarios en `hooks/tests/`.
+- Claude Code runtime: no instancia Claude Code, no invoca `pre-commit-review` / `compound` / `audit-session`, no dispatcha `/pos:compound`. Skills/agents se verifican estáticamente.
+- D5b loader: cubierto **indirectamente** — los hooks D3/D4/D5 lo consumen y los escenarios sobre-escriben la sección relevante de `synthetic/policy.yaml`. Esto desacopla la cobertura de la migración del template `templates/policy.yaml.hbs` al shape post-D5b (drift abierto, reabrir en rama propia post-F3).
+
+**Decisiones Fase -1 ratificadas**: A1.b (wrapper bash + orquestador Python + smoke pytest); A2 (subset funcional-crítico D1/D3/D4/D5/D6); A3 (tmpdir + cli-tool profile + generator real, no fixture); A4 (exit code + tokens, no golden diff); A5 (job `selftest` en `ci.yml`, no workflow separado, single matrix); A6 (no Claude runtime, no skills/agents reales).
+
+**Ajustes durante implementación**:
+
+- D5 trigger globs: `fnmatch` no recursa en `**/`. Corregido `generator/**/*.ts` → `generator/*.ts` (toplevel-only); `**/*.md` → `*.md`. Lección: si una rama futura necesita recursión real, switch a `pathlib.PurePath.match` o glob walker.
+- D4 accessor doble-clave: `docs_sync_rules()` requiere **ambas** `docs_sync_required` AND `docs_sync_conditional` o devuelve `None`. Corregido añadiendo `docs_sync_conditional: []` al override.
+- ci-cd.md placement de H3: la primera versión rompió la lista ordenada (MD029/MD032). Movido a después del item 3 (`release.yml`), antes de `## Workflows generados`.
+
+**Resultado**: **829 passed + 1 skipped** (vs baseline F2 819 + 1 skip = +10 nuevos: 4 smoke + 5 D-scenarios + 1 GREEN smoke ya merged). Sin regresión D1..D6 + E1a..E3b + F1 + F2. Selftest end-to-end local ~1.2s.
+
+**Detalle + deferrals + ajustes**: ver [ROADMAP.md § feat/f3-selftest-end-to-end](ROADMAP.md), [MASTER_PLAN.md § Rama F3](MASTER_PLAN.md), [.claude/rules/ci-cd.md § Job selftest (entregado en F3)](.claude/rules/ci-cd.md), [docs/ARCHITECTURE.md § 10 Selftest end-to-end](docs/ARCHITECTURE.md).

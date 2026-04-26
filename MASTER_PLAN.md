@@ -728,7 +728,53 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 
 ### Rama F3 — `feat/f3-selftest-end-to-end`
 
-**Scope**: `bin/pos-selftest.sh` + escenarios. Valida todos los gates con proyecto sintético.
+**Scope realizado**: `bin/pos-selftest.sh` (wrapper bash mínimo) + `bin/_selftest.py` (orquestador stdlib Python) + 5 escenarios funcionales-críticos (D1/D3/D4/D5/D6) sobre proyecto sintético generado real-time por `npx tsx generator/run.ts --profile cli-tool.yaml`. CI: nuevo job `selftest` en `.github/workflows/ci.yml`. **Sin Claude Code runtime, sin invocaciones reales de skills/agents**.
+
+**Archivos entregados**:
+
+- `bin/pos-selftest.sh` — wrapper bash (`#!/usr/bin/env bash` + `set -euo pipefail` + delega a `python3 bin/_selftest.py`). 9 líneas. Sin lógica.
+- `bin/_selftest.py` — orquestador Python stdlib (~344 líneas). Por escenario: tmpdir + generator real + sobre-escribe sección mínima de `synthetic/policy.yaml` + monta git repo (`git init -b main` + commit baseline) + invoca hook real vía subprocess + asserta exit + tokens.
+- `bin/tests/test_selftest_smoke.py` (4 tests) — contrato del wrapper.
+- `bin/tests/test_selftest_scenarios.py` (5 tests) — fixture module-scoped + asserción `[ok] D{N} {name}` por escenario.
+- `.github/workflows/ci.yml` — job `selftest` (ubuntu × py 3.11, single matrix). Setup Node + Python + `npm ci` + `pip install -r requirements-dev.txt`. Comando: `pytest bin/tests -q`.
+- `.claude/rules/ci-cd.md` — bullet "integración end-to-end" promovido a "Aterrizado" + nuevo H3 `### Job selftest (entregado en F3)` con scope + drift sintético.
+- `docs/ARCHITECTURE.md § 10 Selftest end-to-end` — subsección nueva dentro de `§ 10 Testing — tres niveles` documentando el wrapper + orquestador, escenarios cubiertos / out of scope, CI, y drift abierto.
+
+**Decisiones Fase -1 ratificadas (ajustes obligatorios del usuario sobre v1)**:
+
+- **(A1.b)** Shape: bash wrapper mínimo + Python orquestador stdlib + smoke pytest. Rechazadas A1.a (todo bash, lectura ilegible para 5 escenarios) y A1.c (Python embebido en heredoc, frágil). Bash invoke + Python orquesta = separation of concerns mínima.
+- **(A2)** Gates: subset **funcional-crítico** D1/D3/D4/D5 post-action/D6 stop-policy-check. **Diferidos**: D2 session-start (informative, exit 0 sin enforcement) y D6 pre-compact (informative). No tienen contrato deny/allow.
+- **(A3)** Sintético: tmpdir + cli-tool profile + `npx tsx generator/run.ts` real (no fixture committeado). Cada escenario tiene su tmpdir + cleanup. Cli-tool por simplicidad (TS + vitest, sin Next.js infra).
+- **(A4)** Validación: exit code + assertions sobre stdout/stderr/files. **No** golden diff (frágil ante cambios cosméticos en wording de hooks).
+- **(A5)** CI: nuevo `selftest` job en `.github/workflows/ci.yml` (no workflow separado). Single matrix (ubuntu × Python 3.11) — gates funcionales platform-agnostic; matriz extendida sería sobre-promesa.
+- **(A6)** Skills/agents: NO Claude Code runtime, NO real invocations. Cobertura estática queda en `agents/tests/test_agent_frontmatter.py` y `.claude/skills/tests/test_skill_frontmatter.py`. F3 ejercita **hooks**, no Claude.
+
+**Escenarios cubiertos** (cada uno asserta `[ok] D{N} {name}` en stdout):
+
+- **D1 pre-branch-gate** — deny `git checkout -b feat/x` sin marker → allow tras `touch .claude/branch-approvals/feat_x.approved`. Ejercita exit 2 + `permissionDecision: deny` y resolución del slug sanitizado (`/` → `_`).
+- **D3 pre-write-guard** — deny `Write hooks/foo.py` sin test pair → allow tras crear `hooks/tests/test_foo.py`. Policy override: `lifecycle.pre_write.enforced_patterns` con label `hooks_top_level_py`. Ejercita el accessor `pre_write_rules()` del loader D5b.
+- **D4 pre-pr-gate** — deny `gh pr create` sin docs-sync (ROADMAP + HANDOFF en el diff) → allow tras commit que añade los docs. Policy override: `docs_sync_required: [ROADMAP.md, HANDOFF.md]` + `docs_sync_conditional: []` (ambas claves obligatorias por el accessor `docs_sync_rules()` o devuelve `None`).
+- **D5 post-action** — tras `git merge` confirmado por reflog cuyo diff matchea trigger globs, hook emite advisory `Consider running /pos:compound`. Policy override: `lifecycle.post_merge.skills_conditional[0].trigger` con `touched_paths_any_of: ["generator/*.ts"]`, `skip_if_only: ["*.md"]`, `min_files_changed: 1`. Nota: `fnmatch` no recursa en `**/` — globs literales toplevel-only.
+- **D6 stop-policy-check** — Stop con `session_id` rogue (allowlist + `skills.jsonl` con entry no permitida pre-seeded) deniega; `session_id` clean permite. Policy override: top-level `skills_allowed: ["pos:simplify"]`. Ejercita el filtrado por `session_id` y el tri-estado del accessor `skills_allowed_list()`.
+
+**Ajustes durante implementación** (lecciones para ramas futuras):
+
+- **D5 trigger globs literales**: el primer attempt usó `generator/**/*.ts` esperando recursión; `fnmatch` lo trata como literal. Corregido a `generator/*.ts` (toplevel-only) + `*.md` para skip_if_only. Si una rama futura necesita recursión real → switch a `pathlib.PurePath.match` o glob walker.
+- **D4 accessor doble-clave**: el primer attempt para D4 sólo puso `docs_sync_required` en el override; el accessor `docs_sync_rules()` requiere **ambas** `docs_sync_required` AND `docs_sync_conditional` o devuelve `None`. Corregido añadiendo `docs_sync_conditional: []`. Documentado como contrato del loader.
+- **ci-cd.md placement de H3**: la primera versión del H3 "Job selftest" rompió la lista ordenada (MD029/MD032 markdown lint). Movido a después del item 3 (`release.yml`), antes de `## Workflows generados`. Convención: H3 entregables van fuera de la lista numerada.
+
+**Drift abierto post-F3**:
+
+- `templates/policy.yaml.hbs` y `generator/renderers/policy.ts` siguen emitiendo el shape **pre-D5b** (sección `pre_write` plana sin `enforced_patterns`, `docs_sync_required` flat sin `docs_sync_conditional`). Cada escenario sobre-escribe la sección que necesita en `synthetic/policy.yaml` para desacoplar la cobertura de la migración del template. Reabrir en rama propia post-F3 (no bloqueante).
+
+**Contexto a leer** (rangos): este §, `HANDOFF.md §1/§9`, `ROADMAP.md fila F3 + sección F`, `hooks/_lib/policy.py § docs_sync_rules + post_merge_trigger + skills_allowed_list`, `hooks/post-action.py § classify_command + reflog_confirms`, `hooks/stop-policy-check.py § _extract_invoked_skills`, `policy.yaml § lifecycle.pre_write/pre_pr/post_merge + skills_allowed`.
+
+**Criterio de salida**: **829 passed + 1 skipped** (vs baseline F2 819 + 1 skip; +10 netos: 4 smoke + 5 D-scenarios + 1 GREEN smoke). Sin regresión D1..D6 + E1a..E3b + F1 + F2. Selftest end-to-end local ~1.2s. Docs-sync dentro del PR (ROADMAP § F3 + HANDOFF §1/§9/§21 + MASTER_PLAN § Rama F3 expandida + `.claude/rules/ci-cd.md` selftest job promovido + `docs/ARCHITECTURE.md § 8 Selftest`). `pre-pr-gate.py` aprueba este mismo PR — los conditional triggers no aplican (`bin/**` no está en `docs_sync_conditional`, `.github/**` no está bajo `generator|hooks|skills|patterns`); required `ROADMAP.md` + `HANDOFF.md` satisfecho.
+
+**Carry-overs a F4**:
+
+- `.github/workflows/release.yml` queda como entrega de F4 (no F3). El `selftest` job se reusará en `release.yml` como gate antes de publicar tag.
+- Drift `templates/policy.yaml.hbs` → shape post-D5b queda diferido (no bloquea F4 ni Fase G).
 
 ### Rama F4 — `feat/f4-marketplace-public-repo`
 
