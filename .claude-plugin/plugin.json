@@ -2,7 +2,7 @@
   "$schema": "https://claude.com/schemas/plugin.json",
   "name": "pos",
   "displayName": "project-operating-system",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Generador y sistema operativo determinista para proyectos Claude Code: cuestionario → profile → repo generado con hooks, skills, policy, tests, CI/CD.",
   "author": {
     "name": "javiAI",

@@ -46,7 +46,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | `feat/f2-agents-subagents` | 2 plugin subagents en `agents/` con namespace `pos-*`: `pos-code-reviewer` (consumido por `pre-commit-review`), `pos-architect` (consumido por `compound`); `auditor` diferido (sin consumer real); `agents_allowed` diferido (sin enforcement consumer) | ✅ | — (PR pendiente) |
 | `feat/f3-selftest-end-to-end` | `bin/pos-selftest.sh` + orquestador Python + 5 escenarios funcionales-críticos (D1/D3/D4/D5/D6) sobre proyecto sintético | ✅ | #27 |
 | `refactor/template-policy-d5b-migration` | Migrar `templates/policy.yaml.hbs` + renderer + snapshots al shape post-D5b; cerrar drift documentado en D5b/F3 | ⏳ | — |
-| `feat/f4-marketplace-public-repo` | `javiAI/pos-marketplace` + release flow | ⏳ | — |
+| `feat/f4-marketplace-public-repo` | `marketplace.json` + `release.yml` (5 jobs: version-match, selftest, build-bundle, publish-release, mirror-marketplace condicional) + `docs/RELEASE.md` runbook + bump 0.0.1→0.1.0; repo público diferido | ✅ | — (PR pendiente) |
 | `feat/fx-knowledge-plane-plan` | Docs-only: abre FASE G en MASTER_PLAN (capa opcional knowledge plane) | ⏳ | — |
 | `feat/g1-knowledge-plane-contract` | Contrato tool-agnostic (raw/wiki/schema) + opt-in questionnaire | ⏳ | — |
 | `feat/g2-adapter-obsidian-reference` | Primer reference adapter: esqueleto `vault/` + Obsidian Web Clipper | ⏳ | — |
@@ -693,6 +693,55 @@ Contrato fijado por la suite (extiende E1..F2 sin reabrirlos):
 - **ci-cd.md placement de H3**: la primera versión del H3 "Job selftest" rompió la lista ordenada (MD029/MD032). Movido a después del item 3 (`release.yml`), antes de `## Workflows generados`. Convención: H3 entregables van fuera de la lista de workflows.
 
 **Criterio de salida**: 829 verdes + 1 skip. Sin regresión sobre F2. Docs-sync dentro del PR (ROADMAP § F3 + HANDOFF §1/§9/§21 + MASTER_PLAN § Rama F3 expandida + `.claude/rules/ci-cd.md` selftest job promovido + `docs/ARCHITECTURE.md § 10 Selftest end-to-end`). `pre-pr-gate.py` aprueba este mismo PR — los conditional triggers no aplican (`bin/**` no está en `docs_sync_conditional`, `.github/**` no está bajo `generator|hooks|skills|patterns`); required `ROADMAP.md` + `HANDOFF.md` satisfecho.
+
+### `feat/f4-marketplace-public-repo` — ✅ (PR pendiente)
+
+Cuarta y última rama de Fase F — entrega la **infraestructura local de marketplace + release flow** del plugin `pos`. Cierra el ciclo "el plugin tiene un manifest distribuible y un workflow que publica releases reproducibles" sin asumir todavía la existencia del repo público `javiAI/pos-marketplace` (creación manual diferida).
+
+Entregables:
+
+- `.claude-plugin/marketplace.json` (NEW) — manifest oficial del marketplace primitive de Claude Code: top-level `{name, owner, plugins, metadata}`. `owner.name = "javiAI"`. `plugins[0]`: `{name: "pos", source: {source: "github", repo: "javiAI/project-operating-system", ref: "v0.1.0"}, version: "0.1.0", description}`. Single source of truth de cómo `/plugin install pos` resolverá el repo + ref tras `marketplace add`.
+- `.claude-plugin/plugin.json` — bump version `0.0.1 → 0.1.0` (primer release público; pre-1.0 — semver puede romper entre minors hasta `1.0.0`). Single source of truth de la versión: tag git = `v${version}` y `marketplace.json.plugins[0].source.ref` lo espejan.
+- `.github/workflows/release.yml` (NEW) — workflow trigger `push.tags: ['v*']`. Cinco jobs: (1) `version-match` asserta `plugin.json.version == ${tag#v}` (primer gate, sin esto el resto no corre); (2) `selftest` reusa contrato F3 (`pytest bin/tests -q`) sobre el ref del tag; (3) `build-bundle` empaqueta `pos-v${version}.tar.gz` con scope **plugin-only curated** (`.claude-plugin/`, `.claude/skills/`, `.claude/rules/`, `hooks/`, `agents/`, `policy.yaml`, `bin/pos-selftest.sh`, `bin/_selftest.py`, `docs/RELEASE.md`); (4) `publish-release` `needs: [version-match, selftest, build-bundle]` + `gh release create v${version} --generate-notes <bundle>`; (5) `mirror-marketplace` condicional `if: vars.POS_MARKETPLACE_REPO != ''` — si la variable está vacía skippea silenciosamente sin romper el release. Actions pinneadas por SHA (regla `ci-cd.md#2`). `permissions.contents: write` para `gh release create`.
+- `docs/RELEASE.md` (NEW) — runbook completo: contrato de versionado (single source `plugin.json.version`), bundle scope (incluye/excluye), flujo en 5 pasos (preparar bump → tag → workflow → verificar → recovery), activación del mirror cuando exista repo público (`gh variable set POS_MARKETPLACE_REPO` + `gh secret set POS_MARKETPLACE_TOKEN`), instalación user-facing (`/plugin marketplace add javiAI/pos-marketplace` + `/plugin install pos`), branch protection del repo público (manual via Settings), diferidos.
+- `.claude/rules/ci-cd.md` — bullet `release.yml` promovido de "Diferidos" a "Aterrizado" (entregado en F4). H3 `### Job release (entregado en F4)` documenta los 5 jobs + bundle curated + source of truth de versión + out-of-scope.
+- `docs/ARCHITECTURE.md § 13` — sub-sección expandida "Marketplace + Release flow" cubriendo manifest, source of truth, jobs del workflow, bundle scope curated, deferral del repo público, determinismo del flujo, instalación user-facing, deferrals.
+- `bin/tests/test_marketplace_json_schema.py` (NEW, 12 tests) — 3 clases: `TestMarketplaceTopLevel` (5 tests: keys top-level, name, owner, plugins lista no vacía), `TestMarketplaceOwner` (1 test: `owner.name`), `TestMarketplacePluginEntry` (6 tests: name match `plugin.json`, source.source==github, source.repo, source.ref==`v${version}`, plugin.version sync con `plugin.json`).
+- `bin/tests/test_release_workflow_smoke.py` (NEW, 6 tests) — 3 clases: `TestReleaseWorkflowShape` (file exists + parses), `TestReleaseTrigger` (trigger `push.tags ['v*']`; maneja PyYAML quirk de parsear `on:` como Python `True`), `TestReleaseJobs` (5 jobs presentes, `publish-release.needs ⊇ {version-match, selftest, build-bundle}`, `mirror-marketplace.if` referencia `vars.POS_MARKETPLACE_REPO`).
+- `bin/tests/test_plugin_json_version_bump.py` (NEW, 3 tests) — `EXPECTED_VERSION = "0.1.0"` pin literal; bumpear requiere actualizar el test en el mismo commit (auto-documenta el milestone).
+
+**Decisiones cerradas en Fase -1 (8 ajustes ratificados por el usuario)**:
+
+- (A1.b) **Repo público diferido**: F4 entrega solo infra local. `javiAI/pos-marketplace` se crea manualmente cuando se decida ir live. Mirror gated por `vars.POS_MARKETPLACE_REPO`; release no falla si la variable está vacía.
+- (A2) **`marketplace.json` schema oficial**: top-level `{name, owner, plugins}` (no `plugins` directamente). `owner.name` requerido. `plugins[i].source.source = "github"` (string literal, no enum custom).
+- (A3) **Versionado**: bump 0.0.1 → 0.1.0 (no 1.0.0; pre-1.0 explícito). `plugin.json.version` source of truth; tag = `v${version}`; `marketplace.json.plugins[0].source.ref` espeja.
+- (A4) **Bundle curated plugin-only**: include set explícito (8 paths); excluye `generator/`, `templates/`, `questionnaire/`, `tools/`, `bin/tests/`, `.github/`, fixtures. Razón: el consumer del marketplace instala el plugin para usarlo, no para regenerar proyectos.
+- (A5) **release.yml jobs**: 5 jobs en orden estricto (version-match → selftest + build-bundle → publish-release; mirror-marketplace condicional opt-in). Test que `publish-release.needs` los liste.
+- (A6) **Diferidos NO en F4**: `audit.yml` nightly (sin consumer activo), `/pos:pr-description` + `/pos:release` skills (sin ≥2 repeticiones — regla #7), `CHANGELOG.md` enforced (autogenerated suffices), `refactor/template-policy-d5b-migration` (rama propia post-F4), Fase G entera.
+- (A7) **Tests RED-first**: 3 archivos nuevos con 21 tests totales. RED commit verde-only sobre tests del 0.1.0 cae cuando `plugin.json` aún tiene 0.0.1 — flippa en GREEN.
+- (A8) **Docs scope**: actualizar `docs/RELEASE.md` (NEW), `.claude/rules/ci-cd.md`, `docs/ARCHITECTURE.md § 13`, `ROADMAP.md`, `HANDOFF.md`, `MASTER_PLAN.md § Rama F4`. NO tocar: `policy.yaml`, `hooks/**`, `.claude/skills/**`, `agents/**`, `generator/**`, `templates/**`, `.claude/rules/skills-map.md`.
+
+**Ajuste durante GREEN** (gotcha persistente, no debug noise): PyYAML 1.1 parsea `on:` (clave canónica de triggers en GitHub Actions) como Python `bool True`. El test de trigger acepta ambos (`data.get("on") or data.get(True)`) — patrón aplicable a cualquier test futuro de workflow YAML.
+
+Suite global post-F4: **665 passed + 1 skipped** (vs baseline F3 644 + 1 skip = +21 nuevos tests F4: 12 marketplace schema + 6 release workflow + 3 plugin version pin). Sin regresión D1..D6 / E1a..E3b / F1..F3.
+
+Contrato fijado por la suite (extiende E1..F3 sin reabrirlos):
+
+- `marketplace.json` shape oficial: top-level `{name, owner, plugins}` con `owner.name` + `plugins[].name` + `plugins[].source.{source,repo,ref}` requeridos. Cualquier divergencia rompe en CI antes del tag.
+- `plugin.json.version` ↔ `marketplace.json.plugins[0].source.ref` ↔ `marketplace.json.plugins[0].version`: triángulo testado. Bumpear uno sin los otros falla.
+- `plugin.json.version` ↔ `EXPECTED_VERSION` en `test_plugin_json_version_bump.py`: pin literal — bumpear requiere PR explícito que actualice el test.
+- `release.yml` shape: trigger `push.tags ['v*']`; 5 jobs específicos; `publish-release.needs ⊇ {version-match, selftest, build-bundle}`; `mirror-marketplace` condicional vía `vars.POS_MARKETPLACE_REPO` (skippea, no falla).
+- Bundle scope curated: include explícito, no "todo el repo". Si una rama futura añade un path al runtime del plugin, debe extender el `tar` step.
+
+**Carry-overs post-F4** (cierre Fase F):
+
+- `audit.yml` nightly — declarado en `policy.yaml.ci_cd.workflows[name=audit.yml]` desde Fase A; sin consumer activo. Reabrir cuando `npm audit` + `pip-audit` + `/pos:audit-plugin --self` justifiquen ejecución periódica.
+- `/pos:pr-description` y `/pos:release` skills — diferidas por regla #7 CLAUDE.md (≥2 repeticiones documentadas). F4 entrega flow manual; cuando se observe el patrón ≥2 veces, extraer skill.
+- `CHANGELOG.md` enforced — F4 usa `--generate-notes` de `gh release create` (autogenerado de commits + PRs). Reabrir si el patrón sale corto.
+- Repo público `javiAI/pos-marketplace` — creación manual cuando se decida ir live. Activación por-runbook `docs/RELEASE.md § Mirror al marketplace público` (3 pasos: crear repo + `gh variable set` + `gh secret set`).
+- `refactor/template-policy-d5b-migration` — rama propia post-F4 para migrar `templates/policy.yaml.hbs` al shape post-D5b (drift abierto desde F3).
+
+**Criterio de salida**: 665 verdes + 1 skip. Sin regresión sobre F3. Docs-sync dentro del PR (ROADMAP § F4 + HANDOFF §1/§9/§22 + MASTER_PLAN § Rama F4 expandida + `.claude/rules/ci-cd.md` release job promovido + `docs/ARCHITECTURE.md § 13 Marketplace + Release flow` reescrita + `docs/RELEASE.md` nuevo runbook). `pre-pr-gate.py` aprueba este mismo PR — required `ROADMAP.md` + `HANDOFF.md` satisfecho; conditional `.github/**` no está bajo `generator|hooks|skills|patterns` (no requirement adicional).
 
 ## Convenciones de este archivo
 
