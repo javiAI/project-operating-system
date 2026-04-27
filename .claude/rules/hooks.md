@@ -291,11 +291,20 @@ Si un hook futuro necesita otra dep no-stdlib, abrir un commit propio que la jus
 - Loader con suite propia: `hooks/tests/test_lib_policy.py` (57 casos — cache behavior, los 3 accessors con happy path + missing section + missing file, `derive_test_pair` por label, invalidación del cache via `reset_cache()`, precedencia del first-match-wins en conditional rules).
 - Tests de los 3 hooks consumidores: fixture de repo escribe `policy.yaml` a disco + autouse `_reset_policy_cache` para isolation. Tests unitarios de los consumidores aceptan la dataclass tipada como argumento (`check_docs_sync(files, rules)`, `match_triggers(paths, trigger)`). Constantes hardcoded que eran mirror de `policy.yaml` (`TestIsEnforcedUnit`, `TestExpectedTestPairUnit`, `TestPolicyConstants`) eliminadas por redundantes con el loader test.
 
-### Drift temporal meta-repo ↔ template (abierto tras D5b)
+### Drift temporal meta-repo ↔ template — cerrado en `refactor/template-policy-d5b-migration`
 
-Tras D5b, `policy.yaml` del meta-repo tiene el shape nuevo (`pre_write.enforced_patterns` + `docs_sync_conditional.hooks/**` con `excludes: ["hooks/tests/**"]`). **`templates/policy.yaml.hbs` + `generator/renderers/policy.ts` + snapshots NO fueron tocados** en esta rama. Proyectos generados con `pos` hoy emiten un `policy.yaml` con el shape anterior. Reconciliar (template + renderer + snapshots + `pyyaml` en requirements-dev de stacks Python generados) queda diferido a una rama propia post-D6.
+Tras D5b el `policy.yaml` del meta-repo quedó con el shape nuevo, mientras que `templates/policy.yaml.hbs` siguió emitiendo el shape pre-D5b. El drift se cerró en la rama `refactor/template-policy-d5b-migration` migrando el template a un shape contractual con el loader (`hooks/_lib/policy.py`). Decisiones ratificadas:
 
-**No leer esta rule como "el template ya consume el loader"** — explícitamente no lo hace. Ver [MASTER_PLAN.md § Rama D5b](../../MASTER_PLAN.md), [ROADMAP.md § refactor/d5-policy-loader](../../ROADMAP.md), [HANDOFF.md §11](../../HANDOFF.md), [docs/ARCHITECTURE.md § 7](../../docs/ARCHITECTURE.md#capa-1-hooks).
+- `lifecycle.pre_write.enforced_patterns: []` — clave presente, lista vacía. Proyectos generados **no** heredan los enforcement patterns del meta-repo; el loader devuelve `PreWriteRules(())` (no `None`).
+- `skills_allowed` — clave **omitida** en el template. Loader devuelve `None` (deferred), reflejando el estado del meta-repo hasta que se pueble la allowlist por proyecto.
+- `lifecycle.pre_compact.persist` — los 3 items canónicos (`decisions_in_flight`, `phase_minus_one_state`, `unsaved_pattern_candidates`).
+- `lifecycle.post_merge.skills_conditional[0].trigger` — globs genéricos conservadores (`src/**`, `lib/**`, `*.py`, `package.json`, `pyproject.toml`) + `skip_if_only` para docs + `min_files_changed: 2`. Suficiente para que `post_merge_trigger()` devuelva un dataclass tipado; los proyectos afinan cuando estabilicen convenciones.
+
+Contrato lockdown: `bin/tests/test_template_loader_contract.py` corre los 5 accessors del loader real contra el output del generador real sobre los 3 profiles canónicos (cli-tool, nextjs-app, agent-sdk). Cualquier regresión del template que rompa el shape esperado se detecta ahí — no hay TS-side reimplementation del contrato.
+
+Selftest cleanup: `bin/_selftest.py` removió los overlays de D4 y D5 (template ahora emite baseline matching). D3 y D6 mantienen overlays mínimos por diseño explícito (A1 emite `enforced_patterns: []` + A2 omite `skills_allowed`); el comentario en cada escenario documenta la razón.
+
+Ver [MASTER_PLAN.md § Rama F3b](../../MASTER_PLAN.md), [ROADMAP.md fila refactor/template-policy-d5b-migration](../../ROADMAP.md), [HANDOFF.md §1](../../HANDOFF.md), [docs/ARCHITECTURE.md § 10 Selftest end-to-end](../../docs/ARCHITECTURE.md).
 
 ## Sexto hook entregado — `hooks/pre-compact.py` (Rama D6)
 

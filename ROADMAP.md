@@ -13,7 +13,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | E1 | Skills orquestación | ✅ (E1a + E1b) |
 | E2 | Skills calidad | ✅ (E2a + E2b) |
 | E3 | Skills patterns + tests | ✅ (E3a ✅, E3b ✅) |
-| F | Audit + selftest + marketplace | 🔄 (F1 ✅, F2 ✅, F3 ✅, F4 ⏳) |
+| F | Audit + selftest + marketplace | ✅ (F1 ✅, F2 ✅, F3 ✅, F4 ✅, F3b ✅) |
 | G | Knowledge Plane (opcional) | ⏳ solo planificación (scope cerrado, sin implementación) |
 
 ## Ramas
@@ -45,7 +45,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | `feat/f1-skill-audit-session` | `/pos:audit-session` (read-only advisory main-strict) — compara 3 superficies de `policy.yaml` (`skills_allowed`, `lifecycle.*.hooks_required`, `audit.required_logs`) vs `.claude/logs/`; `skills_allowed` 13→14 | ✅ | — (PR pendiente) |
 | `feat/f2-agents-subagents` | 2 plugin subagents en `agents/` con namespace `pos-*`: `pos-code-reviewer` (consumido por `pre-commit-review`), `pos-architect` (consumido por `compound`); `auditor` diferido (sin consumer real); `agents_allowed` diferido (sin enforcement consumer) | ✅ | — (PR pendiente) |
 | `feat/f3-selftest-end-to-end` | `bin/pos-selftest.sh` + orquestador Python + 5 escenarios funcionales-críticos (D1/D3/D4/D5/D6) sobre proyecto sintético | ✅ | #27 |
-| `refactor/template-policy-d5b-migration` | Migrar `templates/policy.yaml.hbs` + renderer + snapshots al shape post-D5b; cerrar drift documentado en D5b/F3 | ⏳ | — |
+| `refactor/template-policy-d5b-migration` | Migrar `templates/policy.yaml.hbs` al shape contractual con loader (`enforced_patterns: []`, `skills_allowed` omitido, `pre_compact.persist` 3 items, `post_merge.trigger` genérico); cierra drift D5b/F3; contract test Python-side; overlays D4/D5 removidos | ✅ | — |
 | `feat/f4-marketplace-public-repo` | `marketplace.json` + `release.yml` (5 jobs: version-match, selftest, build-bundle, publish-release, mirror-marketplace condicional) + `docs/RELEASE.md` runbook + bump 0.0.1→0.1.0; repo público diferido | ✅ | — (PR pendiente) |
 | `feat/fx-knowledge-plane-plan` | Docs-only: abre FASE G en MASTER_PLAN (capa opcional knowledge plane) | ⏳ | — |
 | `feat/g1-knowledge-plane-contract` | Contrato tool-agnostic (raw/wiki/schema) + opt-in questionnaire | ⏳ | — |
@@ -739,9 +739,45 @@ Contrato fijado por la suite (extiende E1..F3 sin reabrirlos):
 - `/pos:pr-description` y `/pos:release` skills — diferidas por regla #7 CLAUDE.md (≥2 repeticiones documentadas). F4 entrega flow manual; cuando se observe el patrón ≥2 veces, extraer skill.
 - `CHANGELOG.md` enforced — F4 usa `--generate-notes` de `gh release create` (autogenerado de commits + PRs). Reabrir si el patrón sale corto.
 - Repo público `javiAI/pos-marketplace` — creación manual cuando se decida ir live. Activación por-runbook `docs/RELEASE.md § Mirror al marketplace público` (3 pasos: crear repo + `gh variable set` + `gh secret set`).
-- `refactor/template-policy-d5b-migration` — rama propia post-F4 para migrar `templates/policy.yaml.hbs` al shape post-D5b (drift abierto desde F3).
+- `refactor/template-policy-d5b-migration` — ✅ cerrada post-F4. Migra `templates/policy.yaml.hbs` al shape contractual con el loader (`pre_write.enforced_patterns: []`, `pre_pr.docs_sync_conditional: []`, `pre_compact.persist` con 3 items, `post_merge.skills_conditional[0].trigger` con globs genéricos conservadores, `skills_allowed` omitido por diseño). Contract test Python-side (`bin/tests/test_template_loader_contract.py`) corre los accessors reales del loader contra output del generator real sobre los 3 profiles canónicos. Overlays de D4 y D5 removidos en `bin/_selftest.py`; D3 y D6 mantienen overlays mínimos por diseño explícito (A1 emite lista vacía, A2 omite la clave). Suite post: 645 pytest + 515 vitest + selftest 5/5.
 
 **Criterio de salida**: 665 verdes + 1 skip. Sin regresión sobre F3. Docs-sync dentro del PR (ROADMAP § F4 + HANDOFF §1/§9/§22 + MASTER_PLAN § Rama F4 expandida + `.claude/rules/ci-cd.md` release job promovido + `docs/ARCHITECTURE.md § 13 Marketplace + Release flow` reescrita + `docs/RELEASE.md` nuevo runbook). `pre-pr-gate.py` aprueba este mismo PR — required `ROADMAP.md` + `HANDOFF.md` satisfecho; conditional `.github/**` no está bajo `generator|hooks|skills|patterns` (no requirement adicional).
+
+### `refactor/template-policy-d5b-migration` — ✅ (PR pendiente)
+
+Sub-rama refactor post-F4 que cierra el drift `meta-repo ↔ template` documentado desde D5b y reforzado en F3 (cada escenario de selftest sobre-escribía `synthetic/policy.yaml` para evadir el shape pre-D5b emitido por el generator). Scope literal: el `policy.yaml` que emite el generator parsea limpio con el loader actual `hooks/_lib/policy.py` sin devolver `None` en los 5 accessors loader-relevant.
+
+Decisiones ratificadas en Fase -1 (A1-A6):
+
+- **A1**: `lifecycle.pre_write.enforced_patterns: []` — clave presente, lista vacía. Loader devuelve `PreWriteRules(())`, no `None`. Proyectos generados **no** heredan los enforcement patterns del meta-repo.
+- **A2**: `skills_allowed` — clave **omitida**. Loader devuelve `None` (deferred), reflejando el estado del meta-repo hasta que el proyecto pueble la allowlist.
+- **A3**: `lifecycle.pre_compact.persist` — los 3 items canónicos (`decisions_in_flight`, `phase_minus_one_state`, `unsaved_pattern_candidates`).
+- **A4**: `lifecycle.post_merge.skills_conditional[0].trigger` — globs genéricos conservadores (`src/**`, `lib/**`, `*.py`, `package.json`, `pyproject.toml`) + `skip_if_only` para docs (`docs/**`, `*.md`, `.claude/patterns/**`) + `min_files_changed: 2`. Suficiente para que `post_merge_trigger()` devuelva un dataclass tipado; los proyectos afinan cuando sus convenciones estabilicen.
+- **A5**: 2 commits — RED contract tests (`bin/tests/test_template_loader_contract.py`) → GREEN template + 3 snapshots regenerados + cleanup de overlays D4/D5 en `bin/_selftest.py`.
+- **A6**: contract test Python-side. No re-implementación del contrato en TS; los accessors reales del loader corren contra output del generator real sobre los 3 profiles canónicos (cli-tool, nextjs-app, agent-sdk).
+
+Entregables:
+
+- `templates/policy.yaml.hbs` — 4 secciones añadidas/modificadas según A1/A3/A4 + A2 explícitamente omitida. +26 líneas vs pre-D5b.
+- `generator/__snapshots__/{cli-tool,nextjs-app,agent-sdk}/policy.yaml.snap` — regenerados (cada uno +26 líneas espejando los nuevos bloques del template).
+- `bin/_selftest.py` — overlays D4 (`POLICY_DOCS_SYNC_ONLY`) y D5 (`POLICY_POST_MERGE_ONLY`) removidos; D5 refactorizado para commitear `src/feature.py` + `src/helper.py` (matchea trigger genérico + `min_files_changed: 2`); D3 y D6 conservan overlays mínimos por diseño con comentario actualizado.
+- `bin/tests/test_template_loader_contract.py` (NEW, 9 test cases × 3 profiles canónicos = 27 parametrizados) — 5 clases (`TestPreWriteRules`, `TestDocsSyncRules`, `TestPostMergeTrigger`, `TestPreCompactRules`, `TestSkillsAllowed`); fixture `module-scoped` para amortizar el coste de `npx tsx generator/run.ts`.
+
+Suite post-cierre: **645 passed + 1 skipped** (vs baseline F4 666 + 1 skip = neto +27 nuevos contract tests, sin regresión D1..D6 / E1..E3 / F1..F4). Vitest 515 pass / 0 fail. Selftest end-to-end 5/5 escenarios pass sin overlays para D4/D5.
+
+Contrato fijado por la suite:
+
+- Cualquier modificación futura de `templates/policy.yaml.hbs` que rompa los 5 accessors del loader (`pre_write_rules`, `docs_sync_rules`, `post_merge_trigger`, `pre_compact_rules`, `skills_allowed_list`) cae en CI antes del merge.
+- A2 lockdown: `skills_allowed` permanece **omitido** del template — `test_skills_allowed_list_is_none` falla si alguien añade la clave (incluso como `[]`).
+- A1 lockdown: `enforced_patterns` permanece **presente y vacío** — `test_enforced_patterns_is_empty_tuple` falla si alguien copia patrones del meta-repo o elimina la clave.
+
+**Ajustes durante Fase -1 (3 ratificados por el usuario)**:
+
+- **No crear `templates/requirements-dev.txt.hbs`**: el contract test no demostró necesidad real (el loader corre con `pyyaml` ya instalado en el meta-repo durante el test; los proyectos generados materializarán su propio manifest cuando D5b/F4 evolucione el harness Python).
+- **Framing literal**: scope descrito como "policy.yaml generado por template parsea con el loader actual" — **no** como "7 hooks blackbox" (overselling de implicaciones downstream que no eran parte de este PR).
+- **post_merge trigger**: globs genéricos suficientes para remover overlays F3 D4+D5, **no** un diseño perfecto de triggers para cualquier proyecto futuro. Los proyectos afinan cuando sus convenciones estabilicen.
+
+**Criterio de salida**: 645 + 1 skip + selftest 5/5. Docs-sync dentro del PR (ROADMAP fila + § progreso + carry-over post-F4 flippeado a ✅; HANDOFF §1 + §9; MASTER_PLAN § F3b stub flippeado a cerrada; `docs/ARCHITECTURE.md § 10 Selftest end-to-end` drift cerrado + § 13 deferral flippeado; `.claude/rules/hooks.md` § Drift cerrado).
 
 ## Convenciones de este archivo
 
