@@ -774,47 +774,44 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 **Carry-overs a F4**:
 
 - `.github/workflows/release.yml` queda como entrega de F4 (no F3). El `selftest` job se reusará en `release.yml` como gate antes de publicar tag.
-- Drift `templates/policy.yaml.hbs` → shape post-D5b queda diferido (no bloquea F4 ni Fase G). Stub abierto en `refactor/template-policy-d5b-migration` (ver siguiente sección).
+- Drift `templates/policy.yaml.hbs` → shape contractual con loader **cerrado** en sub-rama `refactor/template-policy-d5b-migration` (ver § siguiente).
 
-### Rama F3b — `refactor/template-policy-d5b-migration` (stub)
+### Rama F3b — `refactor/template-policy-d5b-migration` ✅ PR pendiente
 
-**Status**: stub abierto post-F3. Sub-rama refactor que cierra el drift `meta-repo ↔ template` documentado en D5b (rama D5b decidió explícitamente no migrar el template) y reforzado en F3 (cada escenario sobre-escribe `synthetic/policy.yaml` para evadir el drift). No bloquea F4 ni Fase G — se programa cuando un consumer real (`pos:audit-session` corriendo sobre proyecto generado, o futuro test contractual del template) requiera el shape post-D5b en el output del generator.
+**Status**: ✅ cerrada post-F4. Cierra el drift `meta-repo ↔ template` documentado desde D5b y reforzado en F3 (cada escenario sobre-escribía `synthetic/policy.yaml` para evadir el shape pre-D5b). Scope literal cumplido: `policy.yaml` emitido por el template parsea con el loader actual de `hooks/_lib/policy.py` sin devolver `None` en los 5 accessors loader-relevant.
 
-**Scope previsto**:
+**Decisiones ratificadas en Fase -1 (A1–A6)**:
 
-- `templates/policy.yaml.hbs` — migrar a shape post-D5b: bloque `pre_write.enforced_patterns` (lista, no flat) + `lifecycle.pre_pr.docs_sync_conditional[].excludes` + cualquier otra sección que el loader (`hooks/_lib/policy.py`) consuma vía dataclass tipada.
-- `generator/renderers/policy.ts` — adaptar el render para emitir el shape nuevo. Validar que las 3 ramas del profile (`nextjs-app` / `cli-tool` / `agent-sdk`) compilan sin patches manuales.
-- `generator/__snapshots__/<profile>/policy.yaml.snap` — re-snapshotear los 3 perfiles canónicos.
-- `templates/requirements-dev.txt.hbs` (o equivalente del stack Python emitido) — añadir `pyyaml==6.0.2` cuando el profile sea Python, consistente con el meta-repo (loader depende de pyyaml).
-- `bin/_selftest.py` — limpieza opcional: una vez el template emite shape post-D5b, los escenarios D3/D4/D5 pueden simplificarse (sólo override del campo específico, no la sección entera). Reabrir las constants `POLICY_PRE_WRITE_ONLY` / `POLICY_DOCS_SYNC_ONLY` / `POLICY_POST_MERGE_ONLY` para reducir.
-- Tests:
-  - `generator/lib/__tests__/policy.test.ts` — actualizar fixtures + asserciones del renderer.
-  - `bin/tests/test_selftest_scenarios.py` — debe seguir verde sin cambios (los hooks consumen el loader, no el shape literal). Si rompe, ahí está la regresión que justifica la rama.
-  - Considerar añadir un test contractual nuevo: render del policy del profile X parsea limpio con `hooks/_lib/policy.py.load_policy` (cierra el drift por construcción).
+- **A1** — `lifecycle.pre_write.enforced_patterns: []`. Clave presente, lista vacía. Loader devuelve `PreWriteRules(())`, no `None`. Proyectos generados **no** heredan los enforcement patterns del meta-repo; declaran los suyos cuando sus convenciones estabilicen.
+- **A2** — `skills_allowed`: clave **omitida** en el template. Loader devuelve `None` (deferred), reflejando el estado del meta-repo hasta que cada proyecto pueble su propia allowlist. **No** se emite `skills_allowed: []` (eso sería deny-all explícito, semánticamente distinto).
+- **A3** — `lifecycle.pre_compact.persist`: los 3 items canónicos (`decisions_in_flight`, `phase_minus_one_state`, `unsaved_pattern_candidates`).
+- **A4** — `lifecycle.post_merge.skills_conditional[0].trigger`: globs genéricos conservadores stack-agnostic (unión TS+Python: `src/**`, `lib/**`, `*.py`, `package.json`, `pyproject.toml`) + `skip_if_only` para docs (`docs/**`, `*.md`, `.claude/patterns/**`) + `min_files_changed: 2`. Suficiente para que `post_merge_trigger()` devuelva un dataclass tipado. Comentario in-template declara que los proyectos afinan cuando sus convenciones estabilicen.
+- **A5** — 2 commits: RED contract test (un único archivo Python-side parametrizado por profile) → GREEN bundle único (template + 3 snapshots + cleanup overlays selftest). NO commit-por-profile.
+- **A6** — contract test Python-side. `bin/tests/test_template_loader_contract.py` corre los accessors reales de `hooks/_lib/policy.py` sobre output del generator real (`npx tsx generator/run.ts --profile cli-tool|nextjs-app|agent-sdk.yaml`). NO TS-side reimplementation del contrato.
 
-**Contexto a leer**:
+**Ajustes durante Fase -1 (3 ratificados por el usuario, anti-overselling)**:
 
-- `policy.yaml` (meta-repo, shape post-D5b) vs `templates/policy.yaml.hbs` (shape pre-D5b) — diff manual.
-- `hooks/_lib/policy.py § dataclasses + accessors` — contrato que el template debe cumplir.
-- `bin/_selftest.py § POLICY_*_ONLY constants` — overrides actuales por escenario, son la referencia de qué shape espera cada hook.
-- `MASTER_PLAN.md § Rama D5b` — decisiones (b.1 strings/globs en YAML, c.2 failure mode `None`).
-- `generator/renderers/policy.ts` + sus tests + snapshots actuales.
+- **NO crear `templates/requirements-dev.txt.hbs`**: el contract test no demostró necesidad real (pyyaml ya está en el meta-repo durante test; los proyectos generados materializarán su manifest cuando D5b/F4 evolucione el harness Python).
+- **Framing literal**: scope descrito como "policy.yaml generado parsea con el loader actual" — **no** como "7 hooks blackbox" ni "end-to-end completo". Overselling implicaciones downstream que no eran parte de este PR fue corregido.
+- **post_merge trigger**: globs genéricos suficientes para remover overlays F3 D4+D5; **no** un diseño perfecto de triggers para cualquier proyecto futuro.
 
-**Decisiones a cerrar en Fase -1**:
+**Archivos entregados**:
 
-- Ámbito: ¿migrar todos los profiles a la vez o uno por commit (pattern incremental F3)? Probablemente uno por commit: `cli-tool` primero (es el que usa el selftest), luego `nextjs-app` y `agent-sdk` con re-snapshot.
-- ¿Añadir test contractual `template render → loader parse` o dejarlo implícito por el selftest? El test contractual cierra el drift por construcción y pertenece a `generator/lib/__tests__/`.
-- ¿Limpieza de overlays en `bin/_selftest.py` se hace en esta rama o se difiere? Probablemente en esta rama — la justificación de la rama es exactamente que los overlays dejen de ser necesarios.
+- `bin/tests/test_template_loader_contract.py` (NEW, 182 líneas) — fixture `module-scoped` parametrizada sobre los 3 profiles canónicos (cli-tool, nextjs-app, agent-sdk) que genera el proyecto sintético una vez por profile. 5 clases, 9 test methods, parametrizadas × 3 profiles = 27 cases: `TestPreWriteRules` (returns dataclass + empty tuple), `TestDocsSyncRules` (returns dataclass + ROADMAP/HANDOFF en baseline), `TestPostMergeTrigger` (returns dataclass + min_files_changed int no bool), `TestPreCompactRules` (returns dataclass + 3 items canónicos), `TestSkillsAllowed` (returns None per A2).
+- `templates/policy.yaml.hbs` (+26 líneas) — bloques añadidos: `pre_write.enforced_patterns: []` + `pre_pr.docs_sync_conditional: []` + `post_merge.skills_conditional[0].trigger` con globs genéricos + `pre_compact.persist` con 3 items. `skills_allowed` permanece omitido por A2.
+- `generator/__snapshots__/{cli-tool,nextjs-app,agent-sdk}/policy.yaml.snap` — regenerados (cada uno +26 líneas, byte-identical determinismo).
+- `bin/_selftest.py` — overlays D4 (`POLICY_DOCS_SYNC_ONLY`) y D5 (`POLICY_POST_MERGE_ONLY`) **removidos**; D5 refactorizado para commitear `src/feature.py` + `src/helper.py` (matchea trigger genérico `src/**` + `min_files_changed: 2`); D3 conserva `POLICY_PRE_WRITE_ONLY` por A1 (template emite lista vacía, hay que inyectar entry no vacío para ejercer deny path); D6 conserva `POLICY_SKILLS_ALLOWED_ONLY` por A2 (template omite la clave, hay que inyectar lista para ejercer deny path).
 
-**Criterio de salida (preliminar)**:
+**Contrato fijado por la suite**:
 
-- Los 3 profiles canónicos generan `policy.yaml` que parsea con `hooks/_lib/policy.py` sin warnings ni `policy_unavailable`.
-- `bin/tests/test_selftest_scenarios.py` verde sin cambios funcionales (sólo simplificación de overlays si se hace).
-- Snapshots actualizados con diff revisado.
-- Drift `meta-repo ↔ template` cerrado en HANDOFF + ARCHITECTURE.
-- Sin regresión en tests del generator ni de los 3 hooks D3/D4/D5.
+- `bin/tests/test_template_loader_contract.py` corre en CI sobre los 3 profiles canónicos. Cualquier modificación futura del template que rompa los 5 accessors del loader (`pre_write_rules`, `docs_sync_rules`, `post_merge_trigger`, `pre_compact_rules`, `skills_allowed_list`) cae antes del merge.
+- A2 lockdown: `skills_allowed` **debe** permanecer omitido del template — `test_skills_allowed_list_is_none` falla si alguien añade la clave (incluso como `[]`).
+- A1 lockdown: `enforced_patterns` **debe** permanecer presente y vacío — `test_enforced_patterns_is_empty_tuple` falla si alguien copia patrones del meta-repo o elimina la clave.
+- Snapshots regenerados son la verdad; futuras modificaciones al template requieren `npx vitest run -u` explícito (o `rm` de los `.snap` afectados + re-render) con diff revisado.
 
-**Razón para no entregarlo en F3**: F3 es selftest. Mezclar migración del template inflaría el scope, retrasaría la cobertura D-gates, y los overlays por escenario son una solución limpia y auto-contenida que **prueba** la independencia hook/loader respecto al template. Documentar el drift como abierto + abrir stub explícito (este §) es la decisión correcta.
+**Suite global post-cierre**: **671 passed + 1 skipped** (vs main baseline 644 + 1 skip = neto +27 contract tests, sin regresión D1..D6 / E1..E3 / F1..F4). Vitest 515 / 0 fail. Selftest end-to-end 5/5 escenarios verdes sin overlays D4/D5.
+
+**Criterio de salida**: 671 + 1 skip + selftest 5/5. Docs-sync dentro del PR (este § flippeado a ✅ + ROADMAP fila refactor + § progreso nuevo + carry-over post-F4 flippeado a ✅; HANDOFF §1 + §7 + §9; `docs/ARCHITECTURE.md § 10 Selftest end-to-end` drift cerrado + § 13 deferral flippeado; `.claude/rules/hooks.md § Drift cerrado`). `pre-pr-gate.py` aprueba este mismo PR — required `ROADMAP.md` + `HANDOFF.md` satisfecho.
 
 ### Rama F4 — `feat/f4-marketplace-public-repo` ✅ PR pendiente
 
@@ -859,7 +856,7 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 - `audit.yml` nightly — declarado en `policy.yaml.ci_cd.workflows` desde Fase A; sin consumer activo. Reabrir en rama dedicada cuando `npm audit` + `pip-audit` + `/pos:audit-plugin --self` consuman cadencia automatizada.
 - `/pos:pr-description` + `/pos:release` skills — listadas en `skills-map.md § Audit + Release` como "entregado en F"; F4 cierra el flow manual sin extraer skills (regla #7 — sin repetición demostrada). Reabrir cuando el manual repita patrón.
 - Repo público `javiAI/pos-marketplace` — la creación es **manual**, no parte de F4. Activación del job `mirror-marketplace` requiere: (1) crear el repo, (2) `gh variable set POS_MARKETPLACE_REPO`, (3) `gh secret set POS_MARKETPLACE_TOKEN`. Runbook en `docs/RELEASE.md`.
-- `refactor/template-policy-d5b-migration` — drift independiente, no bloquea F4 ni Fase G.
+- `refactor/template-policy-d5b-migration` — ✅ cerrada post-F4 (sub-rama F3b). Cierre del drift `meta-repo ↔ template` documentado desde D5b.
 - Fase G (Knowledge Plane) — opcional, sin fecha; no afecta a F4.
 
 ---
