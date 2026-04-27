@@ -60,6 +60,12 @@ lifecycle:
     skills_required: ["pos:pre-commit-review"]
     blocking: true
 
+  pre_write:
+    # Empty by default. Generated projects do not inherit meta-repo enforcement
+    # patterns; declare project-specific entries here when conventions stabilize.
+    # Loader contract: hooks/_lib/policy.py::pre_write_rules → PreWriteRules(()).
+    enforced_patterns: []
+
   pre_push:
     checks_required:
       - name: "typecheck"
@@ -80,11 +86,30 @@ lifecycle:
     docs_sync_required:
       - "ROADMAP.md"
       - "HANDOFF.md"
+    docs_sync_conditional: []
     ci_dry_run_required: true
     invariants_check: true
     blocking: true
 
   post_merge:
+    # Generic post-merge trigger; projects should tune this once conventions
+    # stabilize. The globs below cover common TS/JS + Python source layouts
+    # without assuming meta-repo paths. Loader contract:
+    # hooks/_lib/policy.py::post_merge_trigger → PostMergeTrigger.
+    skills_conditional:
+      - skill: "pos:compound"
+        trigger:
+          touched_paths_any_of:
+            - "src/**"
+            - "lib/**"
+            - "*.py"
+            - "package.json"
+            - "pyproject.toml"
+          skip_if_only:
+            - "docs/**"
+            - "*.md"
+            - ".claude/patterns/**"
+          min_files_changed: 2
     hooks_required: ["post-action.py"]
 
   pre_compact:
@@ -92,6 +117,7 @@ lifecycle:
     persist:
       - decisions_in_flight
       - phase_minus_one_state
+      - unsaved_pattern_candidates
 
 # ─────────────────────────────────────────────
 # Safety — community tools

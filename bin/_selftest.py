@@ -140,8 +140,9 @@ POLICY_PRE_WRITE_ONLY = textwrap.dedent("""\
 
 def scenario_d3_pre_write_guard(synthetic: Path) -> tuple[bool, str]:
     """D3: deny Write to enforced path without test pair, allow with."""
-    # Synthetic project's rendered policy lacks pre_write (template drift
-    # documented post-D5b). Inject a minimal policy so the hook enforces.
+    # The template (per A1) emits enforced_patterns: [] so generated projects
+    # do not inherit meta-repo enforcement. To exercise D3's deny path we
+    # inject a minimal policy with an explicit pattern.
     (synthetic / "policy.yaml").write_text(POLICY_PRE_WRITE_ONLY, encoding="utf-8")
 
     target = synthetic / "hooks" / "foo.py"
@@ -161,19 +162,10 @@ def scenario_d3_pre_write_guard(synthetic: Path) -> tuple[bool, str]:
     return check_allow("allow phase", invoke_hook("pre-write-guard", payload, synthetic))
 
 
-POLICY_DOCS_SYNC_ONLY = textwrap.dedent("""\
-    lifecycle:
-      pre_pr:
-        docs_sync_required:
-          - "ROADMAP.md"
-          - "HANDOFF.md"
-        docs_sync_conditional: []
-""")
-
-
 def scenario_d4_pre_pr_gate(synthetic: Path) -> tuple[bool, str]:
     """D4: deny `gh pr create` when docs-sync incomplete; allow when satisfied."""
-    (synthetic / "policy.yaml").write_text(POLICY_DOCS_SYNC_ONLY, encoding="utf-8")
+    # Uses the policy.yaml emitted by the template (no overlay): baseline
+    # docs_sync_required = [ROADMAP.md, HANDOFF.md], docs_sync_conditional = [].
     init_baseline_repo(synthetic)
     git_in(synthetic, "checkout", "-q", "-b", "feat/example")
     (synthetic / "src.txt").write_text("payload\n", encoding="utf-8")
@@ -200,29 +192,19 @@ def scenario_d4_pre_pr_gate(synthetic: Path) -> tuple[bool, str]:
     return check_allow("allow phase", invoke_hook("pre-pr-gate", payload, synthetic))
 
 
-POLICY_POST_MERGE_ONLY = textwrap.dedent("""\
-    lifecycle:
-      post_merge:
-        skills_conditional:
-          - trigger:
-              touched_paths_any_of:
-                - "generator/*.ts"
-              skip_if_only:
-                - "*.md"
-              min_files_changed: 1
-""")
-
-
 def scenario_d5_post_action(synthetic: Path) -> tuple[bool, str]:
     """D5: confirmed merge whose diff matches trigger emits /pos:compound advisory."""
-    (synthetic / "policy.yaml").write_text(POLICY_POST_MERGE_ONLY, encoding="utf-8")
+    # Uses the policy.yaml emitted by the template (no overlay): the generic
+    # post_merge trigger covers `src/**` with min_files_changed: 2. Two files
+    # under src/ satisfy both conditions.
     init_baseline_repo(synthetic)
     git_in(synthetic, "checkout", "-q", "-b", "feat/example")
-    target = synthetic / "generator" / "feature.ts"
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text("export const x = 1;\n", encoding="utf-8")
-    git_in(synthetic, "add", "generator/feature.ts")
-    git_in(synthetic, "commit", "-q", "-m", "feat: add generator/feature.ts")
+    src_dir = synthetic / "src"
+    src_dir.mkdir(parents=True, exist_ok=True)
+    (src_dir / "feature.py").write_text("# feature\n", encoding="utf-8")
+    (src_dir / "helper.py").write_text("# helper\n", encoding="utf-8")
+    git_in(synthetic, "add", "src/feature.py", "src/helper.py")
+    git_in(synthetic, "commit", "-q", "-m", "feat: add src/feature.py + src/helper.py")
     git_in(synthetic, "checkout", "-q", "main")
     git_in(synthetic, "merge", "--no-ff", "feat/example", "-m", "Merge feat/example")
 
@@ -251,6 +233,9 @@ POLICY_SKILLS_ALLOWED_ONLY = textwrap.dedent("""\
 
 def scenario_d6_stop_policy_check(synthetic: Path) -> tuple[bool, str]:
     """D6: enforce skill allowlist scoped by session_id; allow when clean."""
+    # The template (per A2) omits the skills_allowed key so the hook degrades
+    # to status: deferred. To exercise D6's deny path we inject a minimal
+    # policy with an explicit allowlist.
     (synthetic / "policy.yaml").write_text(POLICY_SKILLS_ALLOWED_ONLY, encoding="utf-8")
     skills_log = synthetic / ".claude" / "logs" / "skills.jsonl"
     skills_log.parent.mkdir(parents=True, exist_ok=True)
