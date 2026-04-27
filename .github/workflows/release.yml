@@ -35,6 +35,7 @@ jobs:
   selftest:
     name: selftest (ubuntu, py 3.11)
     runs-on: ubuntu-latest
+    needs: [version-match]
     steps:
       - name: Checkout
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
@@ -64,6 +65,7 @@ jobs:
   build-bundle:
     name: build-bundle (curated plugin-only)
     runs-on: ubuntu-latest
+    needs: [version-match]
     outputs:
       bundle_path: ${{ steps.pack.outputs.bundle_path }}
     steps:
@@ -167,11 +169,25 @@ jobs:
           dst_path.write_text(json.dumps(dst, indent=2) + '\n')
           PY
           git add marketplace.json
+          if git diff --cached --quiet --exit-code; then
+            echo "No marketplace changes detected; skip mirror"
+            exit 0
+          fi
           git -c user.email=actions@github.com -c user.name="github-actions[bot]" \
             commit -m "bump pos to ${tag}"
           git push -u origin "$branch"
-          gh pr create \
+          existing_pr=$(gh pr list \
             --repo "$MARKETPLACE_REPO" \
-            --title "bump pos to ${tag}" \
-            --body "Automated bump of pos plugin to ${tag}." \
-            --head "$branch"
+            --head "$branch" \
+            --state open \
+            --json number \
+            --jq '.[0].number')
+          if [ -n "$existing_pr" ]; then
+            echo "Open PR #$existing_pr already exists for branch $branch; skip create"
+          else
+            gh pr create \
+              --repo "$MARKETPLACE_REPO" \
+              --title "bump pos to ${tag}" \
+              --body "Automated bump of pos plugin to ${tag}." \
+              --head "$branch"
+          fi
