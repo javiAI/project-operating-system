@@ -1,0 +1,22 @@
+{
+  "name": "pos-marketplace",
+  "owner": {
+    "name": "javiAI"
+  },
+  "metadata": {
+    "description": "Marketplace for the pos Claude Code plugin.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "pos",
+      "source": {
+        "source": "github",
+        "repo": "javiAI/project-operating-system",
+        "ref": "v0.1.0"
+      },
+      "description": "Generador y sistema operativo determinista para proyectos Claude Code: cuestionario → profile → repo generado con hooks, skills, policy, tests, CI/CD.",
+      "version": "0.1.0"
+    }
+  ]
+}
