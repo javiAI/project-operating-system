@@ -763,7 +763,7 @@ Entregables:
 - `bin/_selftest.py` — overlays D4 (`POLICY_DOCS_SYNC_ONLY`) y D5 (`POLICY_POST_MERGE_ONLY`) removidos; D5 refactorizado para commitear `src/feature.py` + `src/helper.py` (matchea trigger genérico + `min_files_changed: 2`); D3 y D6 conservan overlays mínimos por diseño con comentario actualizado.
 - `bin/tests/test_template_loader_contract.py` (NEW, 9 test cases × 3 profiles canónicos = 27 parametrizados) — 5 clases (`TestPreWriteRules`, `TestDocsSyncRules`, `TestPostMergeTrigger`, `TestPreCompactRules`, `TestSkillsAllowed`); fixture `module-scoped` para amortizar el coste de `npx tsx generator/run.ts`.
 
-Suite post-cierre: **645 passed + 1 skipped** (vs baseline F4 666 + 1 skip = neto +27 nuevos contract tests, sin regresión D1..D6 / E1..E3 / F1..F4). Vitest 515 pass / 0 fail. Selftest end-to-end 5/5 escenarios pass sin overlays para D4/D5.
+Suite post-cierre: **671 passed + 1 skipped** (vs main baseline 644 + 1 skip = neto +27 nuevos contract tests, sin regresión D1..D6 / E1..E3 / F1..F4). Vitest 515 pass / 0 fail. Selftest end-to-end 5/5 escenarios pass sin overlays para D4/D5.
 
 Contrato fijado por la suite:
 
