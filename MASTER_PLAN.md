@@ -816,9 +816,51 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 
 **Razón para no entregarlo en F3**: F3 es selftest. Mezclar migración del template inflaría el scope, retrasaría la cobertura D-gates, y los overlays por escenario son una solución limpia y auto-contenida que **prueba** la independencia hook/loader respecto al template. Documentar el drift como abierto + abrir stub explícito (este §) es la decisión correcta.
 
-### Rama F4 — `feat/f4-marketplace-public-repo`
+### Rama F4 — `feat/f4-marketplace-public-repo` ✅ PR pendiente
 
-**Scope**: crear repo `javiAI/pos-marketplace` con `marketplace.json` + release flow. Docs en `docs/RELEASE.md`.
+**Scope realizado**: aterrizar la **infra local** del marketplace + release flow del plugin `pos` sin depender de que `javiAI/pos-marketplace` exista todavía. Cierra el bloque audit + selftest + marketplace (última rama de Fase F) — primer artefacto público del plugin (manifest + release workflow + runbook).
+
+**Archivos entregados**:
+
+- `.claude-plugin/marketplace.json` (NEW) — schema oficial Claude Code marketplace. Top-level `{name, owner: {name}, plugins: [...]}`. `plugins[0]: {name: "pos", source: {source: "github", repo: "javiAI/project-operating-system", ref: "v0.1.0"}, version: "0.1.0", description}`. `metadata.{description, version}` para humans. Source of truth de qué publica este repo.
+- `.claude-plugin/plugin.json` — bump `version: "0.0.1"` → `"0.1.0"` (primer release público; pre-1.0). Single source of truth de versión; tag git = `v${version}`.
+- `.github/workflows/release.yml` (NEW) — trigger `push.tags: ['v*']`. Permissions `contents: write`. Cinco jobs encadenados:
+  - `version-match` — primer gate. Asserta `plugin.json.version == ${tag#v}`.
+  - `selftest` — reusa contrato F3 (`pytest bin/tests -q`) sobre el repo en el ref del tag.
+  - `build-bundle` — empaqueta `pos-v${version}.tar.gz` con scope curated plugin-only.
+  - `publish-release` — `needs: [version-match, selftest, build-bundle]`. `gh release create` con `--generate-notes` + bundle.
+  - `mirror-marketplace` — condicional `if: vars.POS_MARKETPLACE_REPO != ''`. Abre PR en repo público vía `gh`. Skippea silenciosamente si la variable está vacía (caso por defecto hoy).
+  - Actions pinneadas por SHA (ci-cd.md regla #2).
+- `docs/RELEASE.md` (NEW) — runbook user-facing: contrato de versionado, scope del bundle, flujo de release paso a paso, recovery (pre/post `publish-release`), activación del mirror cuando `javiAI/pos-marketplace` exista, branch protection, lista de diferidos.
+- `.claude/rules/ci-cd.md` — bullet `release.yml` actualizado de "(cuando exista)" a "(entregado en F4)" + nuevo H3 `### Job release (entregado en F4)` con scope completo.
+- `docs/ARCHITECTURE.md § 13` — reescrita de placeholder de 6 líneas a sub-sección completa (manifest, source of truth de versión, workflow, bundle scope, repo público, determinismo, instalación user-facing, diferidos).
+- Tests (RED → GREEN):
+  - `bin/tests/test_marketplace_json_schema.py` (NEW, 12 tests) — top-level keys, `owner.name`, plugin entry, sync `marketplace.json` ↔ `plugin.json` (name/version/ref).
+  - `bin/tests/test_release_workflow_smoke.py` (NEW, 6 tests) — shape, trigger `v*`, jobs presentes, `publish-release.needs ⊇ {version-match, selftest, build-bundle}`, `mirror-marketplace` conditional/skippable.
+  - `bin/tests/test_plugin_json_version_bump.py` (NEW, 3 tests) — pin `version == "0.1.0"`. Bumpear requiere actualizar el test (auto-documenta milestone).
+
+**Decisiones cerradas en Fase -1 (ratificadas por el usuario con 8 ajustes obligatorios sobre el plan v1)**:
+
+- **A1.b — repo público diferido**. F4 aterriza infra local + workflow listo; no crea ni depende de `javiAI/pos-marketplace`. Mirror gated por `vars.POS_MARKETPLACE_REPO`. No fallar release si el mirror no está configurado. Repo público se crea manualmente cuando se decida ir live.
+- **A2 — schema oficial Claude Code marketplace**. Top-level `{name, owner, plugins}` (no inventar). `owner.name` requerido. Cada plugin requiere mínimo `{name, source}`. `source.{source: "github", repo, ref}`. Tests asertan los 7 cruces (top-level, owner, plugin name match, source.source, source.repo, source.ref, plugin.version sync).
+- **A3 — version bump 0.0.1 → 0.1.0**. Pre-1.0 explícito. Contrato: `plugin.json.version` source of truth; tag = `v${version}`; `marketplace.json.source.ref` mirror-ea.
+- **A4 — bundle curated plugin-only**. Incluye: `.claude-plugin/`, `.claude/skills/`, `.claude/rules/`, `hooks/`, `agents/`, `policy.yaml`, `bin/pos-selftest.sh`, `bin/_selftest.py`, `docs/RELEASE.md`. Excluye: `generator/`, `templates/`, `questionnaire/`, `tools/` (meta-repo, no runtime del plugin instalado).
+- **A5 — `release.yml` jobs**. Cinco jobs (`version-match`, `selftest`, `build-bundle`, `publish-release`, `mirror-marketplace`). `publish-release.needs` cubre los tres gates anteriores. Test asserta el grafo de dependencias.
+- **A6 — diferidos**. NO en F4: `audit.yml` nightly, skills `/pos:pr-description` + `/pos:release`, `CHANGELOG.md` enforced, `refactor/template-policy-d5b-migration`, Fase G.
+- **A7 — tests RED-first**. 3 archivos `bin/tests/`. RED state: 19 failed + 12 passed (12 = F3 baseline 9 + 3 plugin.json existe/parses). GREEN state: 21 passed sobre los nuevos.
+- **A8 — docs-sync**. Tocar: `docs/RELEASE.md` (NEW), `.claude/rules/ci-cd.md`, `docs/ARCHITECTURE.md § 13`, `ROADMAP.md`, `HANDOFF.md`, `MASTER_PLAN.md § F4` (este bloque). NO tocar: `policy.yaml`, `hooks/**`, `skills/**`, `agents/**`, `generator/**`, `templates/**`, `skills-map.md` (sin skills nuevas).
+
+**Contexto leído en Fase -1** (rangos): `MASTER_PLAN.md § F1/F2/F3` (precedentes), `HANDOFF.md §1/§9/§6b/§7`, `ROADMAP.md fila F4 + § Progreso Fase F`, `.claude/rules/ci-cd.md` (release.yml ya declarado planeado), `.claude-plugin/plugin.json` (shape canonical Claude Code), `policy.yaml § ci_cd.workflows + audit.session_audit`.
+
+**Criterio de salida**: **665 passed + 1 skipped** sobre pytest (baseline F3 645 + 20 netos: 12 marketplace + 6 release.yml + 3 plugin.json - 1 que ya pasaba pre-RED por existencia de plugin.json). Sin regresión D1..D6 + E1a..E3b + F1..F3. El skip sigue siendo el D5 intencional `TestIntegrationDiffUnavailable`. Vitest TS suite intacta (F4 no toca `generator/` ni `tools/`). Docs-sync dentro del PR (ROADMAP § F4 + HANDOFF §1/§9/§22 + MASTER_PLAN § Rama F4 expandida + `.claude/rules/ci-cd.md` release job promovido + `docs/ARCHITECTURE.md § 13` reescrita + `docs/RELEASE.md` nuevo). `pre-pr-gate.py` aprueba este mismo PR — required `ROADMAP.md` + `HANDOFF.md` satisfecho; conditional triggers no aplican (`bin/**`, `.github/**`, `.claude-plugin/**`, `docs/**` no están en `docs_sync_conditional` actual de policy.yaml).
+
+**Carry-overs post-F4 (cierre Fase F)**:
+
+- `audit.yml` nightly — declarado en `policy.yaml.ci_cd.workflows` desde Fase A; sin consumer activo. Reabrir en rama dedicada cuando `npm audit` + `pip-audit` + `/pos:audit-plugin --self` consuman cadencia automatizada.
+- `/pos:pr-description` + `/pos:release` skills — listadas en `skills-map.md § Audit + Release` como "entregado en F"; F4 cierra el flow manual sin extraer skills (regla #7 — sin repetición demostrada). Reabrir cuando el manual repita patrón.
+- Repo público `javiAI/pos-marketplace` — la creación es **manual**, no parte de F4. Activación del job `mirror-marketplace` requiere: (1) crear el repo, (2) `gh variable set POS_MARKETPLACE_REPO`, (3) `gh secret set POS_MARKETPLACE_TOKEN`. Runbook en `docs/RELEASE.md`.
+- `refactor/template-policy-d5b-migration` — drift independiente, no bloquea F4 ni Fase G.
+- Fase G (Knowledge Plane) — opcional, sin fecha; no afecta a F4.
 
 ---
 
