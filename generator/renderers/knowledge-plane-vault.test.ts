@@ -17,6 +17,12 @@ const profileEnabled = makeProfile(true);
 const profileDisabled = makeProfile(false);
 const profileAbsent = makeProfile(undefined);
 
+const profileIntegrationsNoKP: Profile = {
+  meta: { version: "1", profileName: "test", profileDescription: "test" },
+  answers: { integrations: {} },
+  placeholders: [],
+};
+
 describe("renderers/knowledge-plane-vault — opt-in gate", () => {
   it("returns [] when enabled is false", () => {
     expect(render(profileDisabled)).toEqual([]);
@@ -24,6 +30,10 @@ describe("renderers/knowledge-plane-vault — opt-in gate", () => {
 
   it("returns [] when enabled is absent (default false)", () => {
     expect(render(profileAbsent)).toEqual([]);
+  });
+
+  it("returns [] when integrations exists but knowledge_plane key is absent", () => {
+    expect(render(profileIntegrationsNoKP)).toEqual([]);
   });
 
   it("returns exactly 3 FileWrite entries when enabled is true", () => {
