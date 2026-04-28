@@ -48,7 +48,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | `refactor/template-policy-d5b-migration` | Migrar `templates/policy.yaml.hbs` al shape contractual con loader (`enforced_patterns: []`, `skills_allowed` omitido, `pre_compact.persist` 3 items, `post_merge.trigger` genérico); cierra drift D5b/F3; contract test Python-side; overlays D4/D5 removidos | ✅ | — |
 | `feat/f4-marketplace-public-repo` | `marketplace.json` + `release.yml` (5 jobs: version-match, selftest, build-bundle, publish-release, mirror-marketplace condicional) + `docs/RELEASE.md` runbook + bump 0.0.1→0.1.0; repo público diferido | ✅ | — (PR pendiente) |
 | `feat/fx-knowledge-plane-plan` | Docs-only: abre FASE G en MASTER_PLAN (capa opcional knowledge plane) | ✅ | cc7d2c3 (#14) |
-| `feat/g1-knowledge-plane-contract` | Contrato tool-agnostic (raw/wiki/schema) + opt-in questionnaire | ⏳ | — |
+| `feat/g1-knowledge-plane-contract` | Contrato tool-agnostic (raw/wiki/schema) + opt-in questionnaire + `docs/KNOWLEDGE_PLANE.md` + `.claude/rules/knowledge-plane.md` + schema field boolean | ✅ | — (PR pendiente) |
 | `feat/g2-adapter-obsidian-reference` | Primer reference adapter: esqueleto `vault/` + Obsidian Web Clipper | ⏳ | — |
 | `feat/g3-ingest-cli` | Stub CLI `pos knowledge ingest` (diferida) | ⏳ | — |
 | `feat/g4-wiki-lint` | Skill `/pos:knowledge-lint` (diferida) | ⏳ | — |
