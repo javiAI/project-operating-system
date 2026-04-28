@@ -3,6 +3,7 @@ import {
   allRenderers,
   cicdRenderers,
   coreDocRenderers,
+  knowledgePlaneRenderers,
   policyAndRulesRenderers,
   skillsHooksRenderers,
   testsHarnessRenderers,
@@ -83,6 +84,24 @@ describe("renderers/index — skillsHooksRenderers (C5)", () => {
 
   it("is frozen to prevent accidental mutation", () => {
     expect(Object.isFrozen(skillsHooksRenderers)).toBe(true);
+  });
+});
+
+describe("renderers/index — knowledgePlaneRenderers (G2)", () => {
+  it("exposes exactly 1 renderer (G2 scope: vault skeleton)", () => {
+    expect(knowledgePlaneRenderers).toHaveLength(1);
+  });
+
+  it("is frozen to prevent accidental mutation", () => {
+    expect(Object.isFrozen(knowledgePlaneRenderers)).toBe(true);
+  });
+
+  it("is included in allRenderers", () => {
+    const kpFns = [...knowledgePlaneRenderers];
+    const allFns = [...allRenderers];
+    for (const fn of kpFns) {
+      expect(allFns).toContain(fn);
+    }
   });
 });
 
