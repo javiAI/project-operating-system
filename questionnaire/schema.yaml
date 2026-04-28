@@ -110,7 +110,7 @@ sections:
         description: >
           Activa la capa knowledge plane opt-in en el repo generado (vault/raw + vault/wiki +
           vault/config.md). Contrato tool-agnostic: cualquier editor Markdown es compatible.
-          El generador emite el esqueleto vault/ sólo cuando este campo es true.
+          Con este campo en true, el generador emitirá el esqueleto vault/ a partir de G2.
           Ver docs/KNOWLEDGE_PLANE.md para el contrato completo.
 
   # ─────────────────────────────────────────────

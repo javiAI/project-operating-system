@@ -39,8 +39,9 @@ completo (tres capas, principios invariantes, scope de cada rama G1–G4).
    El pre-write-guard enforza test-pair co-located para `generator/**/*.ts`.
 
 2. **Registrar el renderer** en `generator/renderers/index.ts` dentro del grupo
-   `knowledgePlaneRenderers` (nuevo grupo, patrón `renderer-group` — quinta aplicación
-   del patrón, ver `.claude/rules/generator.md § Renderers`).
+   `knowledgePlaneRenderers` (nuevo grupo, patrón `renderer-group` — sexta aplicación
+   del patrón; los 5 grupos existentes son core/policy/tests/cicd/skills-hooks, ver
+   `.claude/rules/generator.md § Renderers`).
 
 3. **Snapshots deterministas**: el renderer no debe usar `Date.now()` ni rutas del
    host. El timestamp se inyecta vía `profile.metadata.generatedAt`.
