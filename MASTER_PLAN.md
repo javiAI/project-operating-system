@@ -867,23 +867,41 @@ Esperar aprobación explícita del usuario. Con OK → crear marker + rama.
 >
 > **Estado**: planificada, sin fecha de ejecución. Puede reordenarse o descartarse sin impacto sobre A..F.
 
-### Rama G1 — `feat/g1-knowledge-plane-contract`
+### Rama G1 — `feat/g1-knowledge-plane-contract` — ✅
 
-**Scope**: fijar el contrato tool-agnostic de la capa. Markdown file-based, tres capas separadas (raw / wiki / schema).
+**Scope entregado**: contrato tool-agnostic de la capa knowledge plane. Markdown file-based,
+tres capas separadas (raw / wiki / config.md). Cero código de adapter, renderer o ingest.
 
-**Archivos (previstos)**:
+**Archivos entregados**:
 
-- `docs/KNOWLEDGE_PLANE.md` — especificación conceptual (shape de `schema.md`, convenciones `raw/` y `wiki/`, invariantes).
-- `.claude/rules/knowledge-plane.md` — rule path-scoped cuando se editan archivos bajo `vault/**`.
-- `questionnaire/schema.yaml` — añade opt-in `integrations.knowledge_plane.enabled`. **Candidate shape to be finalized in G1**: no se decide en esta rama si el opt-in es bool único o sub-objeto `{ enabled, adapter, vault_path }`.
+- `docs/KNOWLEDGE_PLANE.md` (NEW) — especificación standalone: tres capas, principios
+  invariantes (file-based, tool-agnostic, opt-in, sin runtime compartido), convenciones
+  raw/wiki/config.md, opt-in schema, scope G1-G4, relación con modelo de dos capas.
+- `.claude/rules/knowledge-plane.md` (NEW) — rule path-scoped: cubre `templates/vault/**`
+  (meta-repo, activo en G2+) y `vault/**` (proyecto generado). Documenta qué hacer/no hacer
+  en cada contexto.
+- `questionnaire/schema.yaml` (+9 líneas) — campo `integrations.knowledge_plane.enabled`
+  (type: boolean, default: false) en sección E Integraciones.
+- `docs/ARCHITECTURE.md § 1.1` — resumen + puntero a `docs/KNOWLEDGE_PLANE.md`. Diagrama
+  ASCII actualizado (config.md en lugar de schema.md). Nota "no implementada todavía" reemplazada.
+- `tools/validate-profile.test.ts` (+13 líneas) — 2 nuevos test cases.
+- `tools/__fixtures__/profiles/valid/knowledge-plane-on.yaml` (NEW) — fixture RED/GREEN.
+- `tools/__fixtures__/profiles/invalid/knowledge-plane-type-mismatch.yaml` (NEW).
 
-**NO incluye**: adapter concreto, renderer, ingest CLI, lint.
+**Decisiones cerradas en Fase -1**:
 
-**Cuestión abierta** (a resolver en G1): el término `schema.md` colisiona léxicamente con `questionnaire/schema.yaml` (ya canonical). G1 decide renombre (p.ej. `vault/_meta.md`, `vault/config.md`) o justifica coexistencia.
+- **A1 — Opt-in bool único**. `integrations.knowledge_plane.enabled: boolean, default: false`.
+  `adapter` y `vault_path` diferidos a G2+ (regla #7 — sin consumer real hoy).
+- **A2 — Config file = `vault/config.md`**. `vault/schema.md` descartado por colisión léxica
+  con `questionnaire/schema.yaml` (canónico). Decisión permanente: no usar `schema.md` en vault.
+- **A3 — Path-scope dual**. `.claude/rules/knowledge-plane.md` cubre `templates/vault/**`
+  (meta-repo) y `vault/**` (proyecto generado). Ambos documentados con contexto explícito.
+- **A4 — Standalone**. `docs/KNOWLEDGE_PLANE.md` independiente; ARCHITECTURE §1.1 = resumen
+  y puntero. Consistente con `docs/RELEASE.md` en F4.
 
-**Contexto a leer**: [docs/ARCHITECTURE.md § 1.1](docs/ARCHITECTURE.md) (incluye link al gist de Karpathy sobre wikis LLM-friendly).
-
-**Criterio de salida**: contrato público legible sin ambigüedad sobre qué es "raw" vs "wiki" vs "schema"; opt-in testeable; cero código de adapter o ingest.
+**Criterio de salida cumplido**: contrato público legible sin ambigüedad (raw/wiki/config.md);
+opt-in testeable (517 vitest, validate:profiles 3 canónicos OK, type-mismatch validado);
+cero código de adapter o ingest.
 
 ### Rama G2 — `feat/g2-adapter-obsidian-reference`
 

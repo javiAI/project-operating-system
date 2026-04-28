@@ -1,0 +1,25 @@
+# tools/__fixtures__/profiles/valid/knowledge-plane-on.yaml
+#
+# Profile que activa el knowledge plane opt-in.
+# RED: produce answer-unknown-path hasta que schema.yaml declare el campo.
+# GREEN: exits 0 tras añadir integrations.knowledge_plane.enabled a schema.yaml.
+
+version: "0.1.0"
+
+profile:
+  name: "cli-tool"
+  description: "TypeScript CLI with knowledge plane enabled."
+
+answers:
+  "domain.type": "cli"
+  "stack.language": "typescript"
+  "stack.database": "none"
+  "testing.unit_framework": "vitest"
+  "testing.coverage_threshold": 85
+  "testing.e2e_framework": "none"
+  "workflow.ci_host": "github"
+  "workflow.release_strategy": "semantic-release"
+  "workflow.branch_protection": true
+  "claude_code.default_model": "claude-sonnet-4-6"
+  "claude_code.team_size": "solo"
+  "integrations.knowledge_plane.enabled": true

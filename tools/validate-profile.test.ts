@@ -62,6 +62,19 @@ describe("validateProfileFile (unit)", () => {
     expect(report).toMatch(/status: FAIL/);
     expect(report).toMatch(/answer-value-not-in-enum/);
   });
+
+  it("exits 0 for knowledge-plane-on fixture (integrations.knowledge_plane.enabled: true)", async () => {
+    const result = await validateProfileFile(SCHEMA, "tools/__fixtures__/profiles/valid/knowledge-plane-on.yaml");
+    expect(result.issues).toEqual([]);
+    expect(result.exitCode).toBe(0);
+  });
+
+  it("reports answer-type-mismatch for integrations.knowledge_plane.enabled: 'yes'", async () => {
+    const result = await validateProfileFile(SCHEMA, "tools/__fixtures__/profiles/invalid/knowledge-plane-type-mismatch.yaml");
+    expect(result.exitCode).toBe(1);
+    const kinds = result.issues.map((i) => i.kind);
+    expect(kinds).toContain("answer-type-mismatch");
+  });
 });
 
 describe("validate-profile CLI (integration)", () => {

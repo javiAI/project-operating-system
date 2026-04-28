@@ -1,0 +1,9 @@
+version: "0.1.0"
+
+profile:
+  name: "cli-tool"
+  description: "Profile with knowledge_plane.enabled as a string instead of boolean."
+
+answers:
+  "stack.language": "typescript"
+  "integrations.knowledge_plane.enabled": "yes"

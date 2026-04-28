@@ -104,6 +104,15 @@ sections:
         values: ["none", "sentry", "datadog", "opentelemetry"]
         default: "none"
 
+      - path: integrations.knowledge_plane.enabled
+        type: boolean
+        default: false
+        description: >
+          Activa la capa knowledge plane opt-in en el repo generado (vault/raw + vault/wiki +
+          vault/config.md). Contrato tool-agnostic: cualquier editor Markdown es compatible.
+          Con este campo en true, el generador emitirá el esqueleto vault/ a partir de G2.
+          Ver docs/KNOWLEDGE_PLANE.md para el contrato completo.
+
   # ─────────────────────────────────────────────
   - id: F
     name: Workflow
