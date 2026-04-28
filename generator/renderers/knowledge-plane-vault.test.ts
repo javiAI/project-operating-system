@@ -117,9 +117,9 @@ describe("renderers/knowledge-plane-vault — structural invariants", () => {
     }
   });
 
-  it("is deterministic: byte-identical FileWrite[] across runs", () => {
-    expect(JSON.stringify(render(profileEnabled))).toBe(
-      JSON.stringify(render(profileEnabled))
+  it("is deterministic: byte-identical output for equivalent profiles", () => {
+    expect(JSON.stringify(render(makeProfile(true)))).toBe(
+      JSON.stringify(render(makeProfile(true)))
     );
   });
 });
