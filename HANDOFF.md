@@ -138,7 +138,7 @@ Hasta F1 el plugin reusaba subagents built-in; desde F2 los críticos son propio
 
 Fase F + drift template **cerrados** tras F4 + `refactor/template-policy-d5b-migration`. Carry-overs abiertos:
 
-- **`feat/fx-knowledge-plane-plan`** (Fase G entry-point, opcional): docs-only — abre Fase G en MASTER_PLAN.md como capa knowledge plane opt-in. Sin fecha — el usuario decide cuándo arrancar.
+- **`feat/fx-knowledge-plane-plan`** ✅ mergeada `cc7d2c3` (PR #14, post-D3). FASE G abierta en MASTER_PLAN + ARCHITECTURE § 1.1. Siguiente: **`feat/g1-knowledge-plane-contract`** (contrato tool-agnostic raw/wiki/schema + opt-in questionnaire).
 - **Activación del marketplace público**: cuando se decida crear `javiAI/pos-marketplace`, seguir el runbook de [docs/RELEASE.md § Mirror al marketplace público](docs/RELEASE.md) (3 pasos: crear repo + `gh variable set POS_MARKETPLACE_REPO` + `gh secret set POS_MARKETPLACE_TOKEN`). El próximo release abre PR automático contra el repo público.
 - **Skills `/pos:pr-description` + `/pos:release`**: diferidas por regla #7 CLAUDE.md (≥2 repeticiones documentadas). F4 entrega flow manual; cuando se observe el patrón ≥2 veces, extraer.
 - **`audit.yml` nightly**: declarado en `policy.yaml.ci_cd.workflows` desde Fase A; sin consumer activo. Reabrir cuando `npm audit` + `pip-audit` + `/pos:audit-plugin --self` justifiquen ejecución periódica.
