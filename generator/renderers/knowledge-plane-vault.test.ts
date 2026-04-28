@@ -2,26 +2,24 @@ import { describe, expect, it } from "vitest";
 import { render } from "./knowledge-plane-vault.ts";
 import type { Profile } from "../lib/profile-model.ts";
 
-function makeProfile(enabled: unknown): Profile {
+function makeProfileWithAnswers(answers: Record<string, unknown>): Profile {
   return {
     meta: { version: "1", profileName: "test", profileDescription: "test" },
-    answers:
-      enabled === undefined
-        ? {}
-        : { integrations: { knowledge_plane: { enabled } } },
+    answers,
     placeholders: [],
   };
+}
+
+function makeProfile(enabled: unknown): Profile {
+  return makeProfileWithAnswers(
+    enabled === undefined ? {} : { integrations: { knowledge_plane: { enabled } } }
+  );
 }
 
 const profileEnabled = makeProfile(true);
 const profileDisabled = makeProfile(false);
 const profileAbsent = makeProfile(undefined);
-
-const profileIntegrationsNoKP: Profile = {
-  meta: { version: "1", profileName: "test", profileDescription: "test" },
-  answers: { integrations: {} },
-  placeholders: [],
-};
+const profileIntegrationsNoKP = makeProfileWithAnswers({ integrations: {} });
 
 describe("renderers/knowledge-plane-vault — opt-in gate", () => {
   it("returns [] when enabled is false", () => {
