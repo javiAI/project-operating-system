@@ -49,7 +49,7 @@ Estado vivo. Cada fila refleja una rama de [MASTER_PLAN.md](MASTER_PLAN.md).
 | `feat/f4-marketplace-public-repo` | `marketplace.json` + `release.yml` (5 jobs: version-match, selftest, build-bundle, publish-release, mirror-marketplace condicional) + `docs/RELEASE.md` runbook + bump 0.0.1→0.1.0; repo público diferido | ✅ | — (PR pendiente) |
 | `feat/fx-knowledge-plane-plan` | Docs-only: abre FASE G en MASTER_PLAN (capa opcional knowledge plane) | ✅ | cc7d2c3 (#14) |
 | `feat/g1-knowledge-plane-contract` | Contrato tool-agnostic (vault/raw, vault/wiki, vault/config.md) + opt-in questionnaire + `docs/KNOWLEDGE_PLANE.md` + `.claude/rules/knowledge-plane.md` + schema field boolean | ✅ | — (PR pendiente) |
-| `feat/g2-adapter-obsidian-reference` | Primer reference adapter: esqueleto `vault/` + Obsidian Web Clipper | ⏳ | — |
+| `feat/g2-adapter-obsidian-reference` | Renderer `knowledge-plane-vault.ts` + `templates/vault/config.md.hbs` + grupo `knowledgePlaneRenderers`; opt-in gate; Obsidian Web Clipper como reference adapter; 19 tests nuevos (538 total) | ✅ | — (PR pendiente) |
 | `feat/g3-ingest-cli` | Stub CLI `pos knowledge ingest` (diferida) | ⏳ | — |
 | `feat/g4-wiki-lint` | Skill `/pos:knowledge-lint` (diferida) | ⏳ | — |
 

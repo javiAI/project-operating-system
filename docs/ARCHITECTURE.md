@@ -32,7 +32,9 @@ El meta-repo nunca ejecuta código del proyecto destino. El proyecto destino nun
 
 > **Opcional.** Capa extra mountable *dentro* del repo generado, adoptable vía opt-in del questionnaire.
 > Contrato fijado en G1 — ver especificación completa en [docs/KNOWLEDGE_PLANE.md](KNOWLEDGE_PLANE.md).
-> Renderer y esqueleto `vault/` en G2 (no implementados todavía).
+> Renderer `knowledge-plane-vault.ts` entregado en G2: con `integrations.knowledge_plane.enabled: true`,
+> el generador emite `vault/config.md` + `vault/raw/.gitkeep` + `vault/wiki/.gitkeep`; con el flag a `false`
+> (default) no se emite nada. Obsidian Web Clipper documentado en `vault/config.md` como reference adapter — no contrato base.
 
 ```
 ┌────────────────────────────────────────┐

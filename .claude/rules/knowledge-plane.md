@@ -46,7 +46,13 @@ completo (tres capas, principios invariantes, scope de cada rama G1–G4).
 3. **Snapshots deterministas**: el renderer no debe usar `Date.now()` ni rutas del
    host. El timestamp se inyecta vía `profile.metadata.generatedAt`.
 
-4. **Opt-in gate**: el renderer sólo emite archivos cuando
+4. **Sin interpolación no escapada en templates vault**: `loadTemplate` usa `noEscape: true`
+   globalmente. Los templates de vault que añadan `{{answers.X}}` renderizarán sin HTML-escaping.
+   En G2 `config.md.hbs` no tiene interpolaciones — riesgo cero hoy. Si G3/G4 añade
+   interpolación de datos del profile, revisar si el campo puede contener input arbitrario
+   y escapar explícitamente con `{{{{raw}}}}` o sanitizar antes de inyectar.
+
+5. **Opt-in gate**: el renderer sólo emite archivos cuando
    `answers["integrations.knowledge_plane.enabled"] === true`. Con `false` (default),
    la función devuelve `[]`.
 

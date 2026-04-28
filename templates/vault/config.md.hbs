@@ -1,0 +1,38 @@
+# vault/config.md — configuración de este vault
+
+> Fuente de verdad de las convenciones adoptadas por este proyecto.
+> Editar este archivo cuando cambien las convenciones de nomenclatura o tags.
+
+## Propósito
+
+TODO: Describir el propósito de esta capa de conocimiento en el contexto del proyecto.
+Ejemplo: "Centralizar decisiones de diseño, referencias técnicas y síntesis de investigación."
+
+## Estructura
+
+```
+vault/
+├── raw/    fuentes inmutables (artículos, transcripciones, specs)
+├── wiki/   síntesis y conocimiento procesado
+└── config.md  este archivo
+```
+
+## Convenciones raw/
+
+- Un archivo por fuente. Nombre en kebab-case descriptivo.
+- Metadatos mínimos al inicio: `source:`, `date:`, `tags:`.
+- TODO: Definir convención de subdirectorios si se adopta (por defecto: sin subdirectorios).
+
+## Convenciones wiki/
+
+- Un archivo por concepto o decisión de diseño.
+- TODO: Definir mapa de categorías o tags adoptado en este proyecto.
+- Las páginas sin raw correspondiente son válidas (conocimiento sintetizado ad hoc).
+
+## Ingestor recomendado
+
+**Referencia**: [Obsidian](https://obsidian.md) + [Obsidian Web Clipper](https://obsidian.md/clipper)
+guarda páginas web como Markdown en el vault con un clic.
+
+Este adapter es una **referencia**, no un contrato base. El vault es file-based y tool-agnostic:
+cualquier editor Markdown (Logseq, Foam, Zettlr, plain-text) es compatible por construcción.

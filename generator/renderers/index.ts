@@ -10,6 +10,7 @@ import { render as renderRules } from "./rules.ts";
 import { render as renderTests } from "./tests.ts";
 import { render as renderCiCd } from "./ci-cd.ts";
 import { render as renderSkillsHooksSkeleton } from "./skills-hooks-skeleton.ts";
+import { render as renderKnowledgePlaneVault } from "./knowledge-plane-vault.ts";
 
 export const coreDocRenderers: readonly Renderer[] = Object.freeze([
   renderClaudeMd,
@@ -37,10 +38,15 @@ export const skillsHooksRenderers: readonly Renderer[] = Object.freeze([
   renderSkillsHooksSkeleton,
 ]);
 
+export const knowledgePlaneRenderers: readonly Renderer[] = Object.freeze([
+  renderKnowledgePlaneVault,
+]);
+
 export const allRenderers: readonly Renderer[] = Object.freeze([
   ...coreDocRenderers,
   ...policyAndRulesRenderers,
   ...testsHarnessRenderers,
   ...cicdRenderers,
   ...skillsHooksRenderers,
+  ...knowledgePlaneRenderers,
 ]);

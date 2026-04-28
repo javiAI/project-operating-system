@@ -905,24 +905,28 @@ cero código de adapter o ingest.
 
 ### Rama G2 — `feat/g2-adapter-obsidian-reference`
 
-**Scope**: **primer reference adapter** sobre Obsidian + Obsidian Web Clipper. Renderer nuevo que, cuando `integrations.knowledge_plane.enabled` está on, emite esqueleto mínimo del vault:
+**Scope**: renderer nuevo que, cuando `integrations.knowledge_plane.enabled` está on, emite esqueleto mínimo del vault. Obsidian + Web Clipper documentado como **ingestor manual recomendado** (no contrato base). El knowledge plane permanece file-based/tool-agnostic — cualquier editor Markdown (Logseq, Foam, plain-text) es compatible por construcción.
 
-- `vault/schema.md` — template inicial (estructura, convenciones, cómo añadir fuentes).
+Output cuando `enabled: true`:
+
+- `vault/config.md` — skeleton minimal con TODOs (§ Propósito / Estructura / Convenciones raw / Convenciones wiki / Ingestor recomendado).
 - `vault/raw/.gitkeep`
 - `vault/wiki/.gitkeep`
 
-Documenta Obsidian Web Clipper como **ingestor manual recomendado** (extensión oficial que guarda páginas web como Markdown en el vault). **Adapter de referencia, no definitivo**: el knowledge plane permanece file-based/tool-agnostic — cualquier editor Markdown (Logseq, Foam, plain-text) es compatible por construcción.
+Output cuando `enabled: false` (default): `[]` — sin error, sin emisión.
 
-**Archivos (previstos)**:
+**Archivos (ratificados en Fase -1)**:
 
-- `templates/vault/schema.md.hbs`
-- `generator/renderers/knowledge-plane-obsidian.ts` + `*.test.ts` (co-located, patrón de C1–C5).
-- `generator/renderers/index.ts` — registrar en nuevo grupo congelado `knowledgePlaneRenderers` (patrón `renderer-group` de [.claude/rules/generator.md](.claude/rules/generator.md)).
-- `docs/ARCHITECTURE.md § 1.1` — ampliar con referencia al adapter entregado.
+- `templates/vault/config.md.hbs` — template Handlebars del skeleton. (Nota: MASTER_PLAN original decía `schema.md`; renombrado a `config.md` por decisión G1 — evita colisión léxica con `questionnaire/schema.yaml`. Ver `.claude/rules/knowledge-plane.md`.)
+- `generator/renderers/knowledge-plane-vault.ts` + `knowledge-plane-vault.test.ts` (co-located, TDD-first, patrón C1–C5). Nombre refleja contrato tool-agnostic, no la herramienta de referencia.
+- `generator/renderers/index.ts` — nuevo grupo congelado `knowledgePlaneRenderers` (patrón `renderer-group`, 6ª aplicación).
+- `docs/ARCHITECTURE.md §1.1` — 2–3 frases inline referenciando el renderer entregado.
 
-**NO incluye**: ingest automático, LLM calls, sync runtime, múltiples adapters.
+**Tests**: perfiles sintéticos inline en el renderer test. Sin 4º profile canónico. Sin nuevas snapshots para profiles canónicos (contador permanece en 54).
 
-**Criterio de salida**: con `integrations.knowledge_plane.enabled: true` en el profile, `npx tsx generator/run.ts --out <tmp>` emite `vault/` esqueleto; con flag off, no se emite nada. Tests semánticos sobre paths + contenido de `vault/schema.md`. Coverage ≥85% sobre el renderer nuevo.
+**NO incluye**: ingest automático, LLM calls, sync runtime, múltiples adapters, skills, hooks, agents.
+
+**Criterio de salida**: con `integrations.knowledge_plane.enabled: true`, el renderer emite los 3 archivos; con `false`/ausente emite `[]`. Tests semánticos sobre paths + contenido de `vault/config.md`. Coverage ≥85% sobre el renderer nuevo.
 
 ### Rama G3 — `feat/g3-ingest-cli` (diferida)
 
